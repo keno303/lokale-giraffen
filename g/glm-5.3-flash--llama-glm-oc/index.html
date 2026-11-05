@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Giraffe &middot; Three.js</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: #dfd8c3;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  canvas { display: block; touch-action: none; }
+  #hud {
+    position: fixed; left: 14px; top: 14px; z-index: 10;
+    color: #f6eeda;
+    background: rgba(28, 22, 12, 0.55);
+    border: 1px solid rgba(246, 238, 218, 0.18);
+    border-radius: 12px;
+    padding: 12px 16px 11px;
+    user-select: none;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    max-width: 300px;
+  }
+  #hud h1 {
+    margin: 0 0 2px; font-size: 19px; font-weight: 650; letter-spacing: 0.04em;
+  }
+  #hud .sub { font-size: 11.5px; opacity: 0.75; margin-bottom: 10px; }
+  #hud .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  #hud button {
+    font: inherit; font-size: 13px; cursor: pointer;
+    color: #1d160b; background: #f0e3c6;
+    border: 0; border-radius: 8px; padding: 6px 14px;
+  }
+  #hud button:hover { background: #fff3d9; }
+  #hud label { font-size: 12px; display: flex; align-items: center; gap: 6px; opacity: 0.95; }
+  #hud input[type="range"] { width: 96px; accent-color: #e0b25f; }
+  #hud .hint { font-size: 10.5px; opacity: 0.55; margin-top: 9px; }
+  #speedVal { min-width: 34px; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div id="hud">
+  <h1>Giraffe</h1>
+  <div class="sub">procedural three.js &middot; lateral-sequence walk</div>
+  <div class="controls">
+    <button id="modeBtn" type="button">Stop</button>
+    <label>speed
+      <input id="speed" type="range" min="0.4" max="1.8" step="0.05" value="1" />
+      <span id="speedVal">1.0&times;</span>
+    </label>
+    <label><input id="follow" type="checkbox" checked /> follow cam</label>
+  </div>
+  <div class="hint">drag = orbit &middot; wheel / pinch = zoom</div>
+</div>
+<script src="three.min.js"></script>
+<script src="giraffe.js"></script>
+</body>
+</html>

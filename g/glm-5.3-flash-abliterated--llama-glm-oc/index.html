@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Giraffe — walking (Three.js)</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #b9cfd9; }
+    canvas { display: block; }
+    #hint {
+      position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+      font: 13px/1.4 system-ui, sans-serif; letter-spacing: 0.04em;
+      color: #3c4a35; background: rgba(255, 253, 240, 0.75);
+      padding: 6px 14px; border-radius: 999px;
+      animation: fade 9s ease forwards; pointer-events: none;
+    }
+    @keyframes fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+    #err { position: fixed; top: 10px; left: 10px; right: 10px; color: #b00;
+           font: 14px monospace; white-space: pre-wrap; z-index: 10; }
+  </style>
+</head>
+<body>
+  <div id="hint">drag&nbsp;·&nbsp;orbit&nbsp;&nbsp;&nbsp;scroll&nbsp;·&nbsp;zoom</div>
+  <div id="err"></div>
+  <script>
+    window.onerror = (m, s, l) => {
+      document.getElementById('err').textContent = m + '  (' + (s || '').split('/').pop() + ':' + l + ')';
+    };
+  </script>
+  <script src="three.min.js"></script>
+  <script src="giraffe.js"></script>
+</body>
+</html>

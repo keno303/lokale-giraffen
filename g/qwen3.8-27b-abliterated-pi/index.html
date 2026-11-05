@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Giraffe — Three.js</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #7fa8c9; }
+  #app { position: fixed; inset: 0; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(20,15,5,0.35) 100%); }
+  #hud { position: fixed; top: 14px; left: 14px; z-index: 10; width: 252px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: rgba(18, 22, 28, 0.78); color: #f3eee3; border-radius: 14px;
+    padding: 14px 16px 12px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.35); user-select: none; }
+  #hud h1 { font-size: 19px; margin: 0 0 1px; letter-spacing: 0.4px; }
+  #hud .sub { font-size: 11px; color: #b9b2a2; margin-bottom: 10px; }
+  #hud label { display: block; font-size: 11.5px; color: #cfc8b8; margin: 9px 0 4px; }
+  #hud input[type=range] { width: 100%; accent-color: #d9a13f; margin: 0; }
+  #hud .row { display: flex; gap: 6px; margin-top: 10px; }
+  #hud button { flex: 1; font: 600 12px system-ui, sans-serif; padding: 7px 0; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.07); color: #f3eee3;
+    cursor: pointer; transition: background 0.15s; }
+  #hud button:hover { background: rgba(255,255,255,0.16); }
+  #hud button.active { background: #d9a13f; border-color: #d9a13f; color: #241a08; }
+  #hud .check { display: flex; align-items: center; gap: 7px; margin-top: 11px; font-size: 12px; color: #d8d1c0; cursor: pointer; }
+  #hud .hint { margin-top: 10px; font-size: 10.5px; color: #948d7d; line-height: 1.5; }
+  #stat { margin-top: 8px; font-size: 12px; color: #e6c47c; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="vignette"></div>
+<div id="hud">
+  <h1>Giraffe</h1>
+  <div class="sub">Three.js &middot; fully procedural &middot; no server</div>
+  <label>Speed &nbsp;<span id="speedVal">1.6 m/s</span></label>
+  <input type="range" id="speed" min="0" max="100" value="55" step="1">
+  <div class="row">
+    <button id="bStand">Stand</button>
+    <button id="bWalk" class="active">Walk</button>
+    <button id="bTrot">Trot</button>
+  </div>
+  <label class="check"><input type="checkbox" id="orbit" checked> Auto-orbit camera</label>
+  <div id="stat">Walking</div>
+  <div class="hint">Drag to look around &middot; scroll / pinch to zoom &middot; double-click to reset view</div>
+</div>
+<script src="lib/three.min.js"></script>
+<script src="giraffe.js"></script>
+</body>
+</html>

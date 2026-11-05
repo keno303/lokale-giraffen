@@ -1,0 +1,1732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Giraffa reticulata — walking giraffe in Three.js</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>
+  html,body{margin:0;height:100%;background:#0b0d0c;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#e8e2d4}
+  #c{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+  #c:active{cursor:grabbing}
+  #ui{position:fixed;left:14px;top:14px;width:250px;padding:11px 12px 10px;border-radius:12px;
+      background:rgba(16,18,17,.52);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+      border:1px solid rgba(255,255,255,.13);font-size:11.5px;line-height:1.5;user-select:none;z-index:5}
+  #ui .hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+  #ui b{font-size:13px;letter-spacing:.3px}
+  #ui .hdr span{opacity:.6;font-variant-numeric:tabular-nums}
+  .row{display:flex;gap:5px;align-items:center;margin:5px 0;flex-wrap:wrap}
+  .row label{display:flex;align-items:center;gap:6px;flex:1;opacity:.9}
+  .row span{opacity:.65;min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
+  button{font:inherit;color:#efe9db;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);
+      border-radius:7px;padding:3px 8px;cursor:pointer}
+  button:hover{background:rgba(255,255,255,.18)}
+  button.on{background:#a7762f;border-color:#d0a055;color:#fff}
+  .cam button{padding:2px 6px;font-size:10.5px}
+  .cam{opacity:.95;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px}
+  input[type=range]{flex:1;height:14px;accent-color:#c78f3e;margin:0}
+  .hint{margin-top:7px;opacity:.45;font-size:10px}
+  #credit{position:fixed;right:14px;bottom:11px;font-size:10px;opacity:.4;z-index:5}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div class="hdr"><b>Giraffa reticulata</b><span id="fps"></span></div>
+  <div class="row">
+    <button id="walkBtn">Stand</button>
+    <button id="pauseBtn">Pause</button>
+    <button id="follow" class="on">Follow</button>
+  </div>
+  <div class="row"><label>speed<input id="speed" type="range" min="0" max="2.4" step="0.05" value="1.25"></label><span id="speedV"></span></div>
+  <div class="row cam">camera
+    <button data-cam="side">side</button>
+    <button data-cam="low">low</button>
+    <button data-cam="full">full</button>
+    <button data-cam="head">head</button>
+    <button data-cam="portrait">near</button>
+    <button data-cam="top">high</button>
+  </div>
+  <div class="row"><label>sun<input id="sun" type="range" min="4" max="72" step="1" value="26"></label><span id="sunV"></span></div>
+  <div class="row"><label>azimuth<input id="sunAz" type="range" min="0" max="360" step="1" value="118"></label><span id="sunAzV"></span></div>
+  <div class="row"><button id="coatBtn">New coat</button><button id="shadowBtn" class="on">Shadows</button></div>
+  <div class="hint">drag to orbit &middot; wheel to zoom &middot; double-click toggles follow</div>
+</div>
+<div id="credit">procedural geometry &amp; coat &mdash; three.js, no build step</div>
+<!-- three.js r152 (vendored, classic script: works from file:// with no server) -->
+<script src="lib/three.min.js"></script>
+<script>if(!window.THREE){document.write('<script src="https://unpkg.com/three@0.152.2/build/three.min.js"><\/script>')}</script>
+<!-- generated from src/00_util.js, src/15_coat.js, src/20_loft.js, src/25_materials.js, src/30_giraffe.js, src/40_world.js, src/50_main.js by tools/bundle.mjs -->
+<script>
+"use strict";
+
+/* ======================= 00_util.js ======================= */
+// ---------------------------------------------------------------------------
+// 00_util.js  --  math / noise / misc helpers
+// ---------------------------------------------------------------------------
+window.G = window.G || {};
+(function (G) {
+  'use strict';
+
+  G.TAU = Math.PI * 2;
+  G.clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  G.lerp = (a, b, t) => a + (b - a) * t;
+  G.inv = (a, b, v) => (v - a) / (b - a);
+  G.smooth = (a, b, v) => { const t = G.clamp((v - a) / (b - a || 1e-6), 0, 1); return t * t * (3 - 2 * t); };
+  G.fract = (v) => v - Math.floor(v);
+  G.mix = (a, b, t) => a + (b - a) * t;
+  // gaussian bump, 1 at c, ~0 at c +- w
+  G.bump = (x, c, w) => Math.exp(-Math.pow((x - c) / w, 2));
+  // signed distance-ish band
+  G.band = (x, c, w) => G.clamp(1 - Math.abs(x - c) / w, 0, 1);
+
+  // deterministic PRNG (mulberry32)
+  G.rand = (a, b) => a + Math.random() * (b - a);
+
+  G.rng = function (seed) {
+    let a = (seed >>> 0) || 1;
+    const f = function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    f.range = (lo, hi) => lo + f() * (hi - lo);
+    f.int = (lo, hi) => Math.floor(lo + f() * (hi - lo + 1));
+    f.sign = () => (f() < 0.5 ? -1 : 1);
+    return f;
+  };
+
+  // ---- 2D value noise (tileable in x with period px) ----------------------
+  function hash2(x, y, seed) {
+    let h = x * 374761393 + y * 668265263 + seed * 1442695040888963407;
+    h = (h ^ (h >> 13)) >>> 0;
+    h = Math.imul(h, 1274126177) >>> 0;
+    return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+  }
+  G.noise2 = function (x, y, seed) {
+    seed = seed || 0;
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x - xi, yf = y - yi;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = hash2(xi, yi, seed), b = hash2(xi + 1, yi, seed);
+    const c = hash2(xi, yi + 1, seed), d = hash2(xi + 1, yi + 1, seed);
+    return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+  };
+  G.fbm = function (x, y, oct, seed) {
+    let s = 0, a = 0.5, f = 1, n = 0;
+    for (let i = 0; i < oct; i++) { s += a * G.noise2(x * f, y * f, seed + i * 17); n += a; a *= 0.5; f *= 2.03; }
+    return s / n;
+  };
+
+  // ---- centripetal Catmull-Rom through 3D points -------------------------
+  G.curve = function (pts, closed) {
+    const P = pts.map((p) => (p.isVector3 ? p.clone() : new THREE.Vector3(p[0], p[1], p[2])));
+    if (closed) P.unshift(P[P.length - 2]), P.push(P[1]);
+    else { P.unshift(P[0]); P.push(P[P.length - 1]); }
+    const n = P.length;
+    return {
+      // t in [0,1] over the whole (middle) span
+      at: function (t, out) {
+        out = out || new THREE.Vector3();
+        const segs = n - 3;
+        const s = G.clamp(t, 0, 1) * segs;
+        let i = Math.min(Math.floor(s), segs - 1);
+        const k = s - i;
+        const p0 = P[i], p1 = P[i + 1], p2 = P[i + 2], p3 = P[i + 3];
+        // uniform catmull-rom is fine for our hand-placed control points
+        const k2 = k * k, k3 = k2 * k;
+        out.set(
+          0.5 * ((2 * p1.x) + (-p0.x + p2.x) * k + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * k2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * k3),
+          0.5 * ((2 * p1.y) + (-p0.y + p2.y) * k + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * k2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * k3),
+          0.5 * ((2 * p1.z) + (-p0.z + p2.z) * k + (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * k2 + (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * k3)
+        );
+        return out;
+      },
+      pts: P
+    };
+  };
+
+  // ---- canvas helpers ----------------------------------------------------
+  G.canvas = function (w, h) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return c;
+  };
+  G.tex = function (canvas, opts) {
+    opts = opts || {};
+    const t = new THREE.CanvasTexture(canvas);
+    t.wrapS = opts.wrapS || THREE.ClampToEdgeWrapping;
+    t.wrapT = opts.wrapT || THREE.ClampToEdgeWrapping;
+    if (opts.repeat) t.repeat.set(opts.repeat[0], opts.repeat[1]);
+    t.flipY = opts.flipY !== undefined ? opts.flipY : true;
+    if (opts.srgb) t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = opts.aniso || 8;
+    t.needsUpdate = true;
+    return t;
+  };
+
+  // superellipse profile weight: p=2 -> circle, higher -> flatter sides
+  G.se = function (c, p) { return Math.sign(c) * Math.pow(Math.abs(c), 2 / p); };
+
+  // ellipse circumference (Ramanujan #2)
+  G.ellipCirc = function (a, b) {
+    const h = Math.pow((a - b) / (a + b + 1e-9), 2);
+    return Math.PI * (a + b) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
+  };
+
+  G.deg = (d) => (d * Math.PI) / 180;
+})(window.G);
+
+
+/* ======================= 15_coat.js ======================= */
+// ---------------------------------------------------------------------------
+// 15_coat.js -- procedural reticulated-giraffe coat atlas.
+// The atlas is a *parameterisation of the animal*, not a per-part UV map:
+//   U = metres travelled along the spine path (tail tip -> nose), 0..ATLAS_LEN
+//   V = metres travelled around the body from the dorsal midline, 0..ATLAS_AROUND
+// Every lofted part samples this one texture, so the patchwork stays the right
+// physical size and continues across the seams between parts.
+// Channels:  R = patch mask (0 cream channel, 1 patch)
+//            G = per-patch colour jitter
+//            B = low-frequency mottling
+// ---------------------------------------------------------------------------
+window.G = window.G || {};
+(function (G) {
+  'use strict';
+
+  G.makeCoatAtlas = function (opts) {
+    opts = opts || {};
+    const W = opts.w || 2048, H = opts.h || 1024;
+    const ML = G.ATLAS_LEN, MA = G.ATLAS_AROUND;
+    const sx = W / ML, sy = H / MA;          // px per metre
+    const r = G.rng(opts.seed || 1337);
+
+    // --- seeds on a jittered lattice (approx. Poisson) ---------------------
+    const cell = 0.168;                       // metres
+    const nx = Math.round(ML / cell), ny = Math.round(MA / cell);
+    const seeds = [];
+    for (let j = 0; j < ny; j++) {
+      for (let i = 0; i < nx; i++) {
+        const px = (i + 0.5 + r.range(-0.42, 0.42)) * cell;
+        const py = (j + 0.5 + r.range(-0.42, 0.42)) * cell;
+        seeds.push(px, py, r());
+      }
+    }
+    const NS = seeds.length / 3;
+    // bucket grid over seeds
+    const BS = 0.34, bnx = Math.ceil((ML + BS * 2) / BS), bny = Math.ceil((MA + BS * 2) / BS);
+    const buckets = new Array(bnx * bny);
+    for (let i = 0; i < bnx * bny; i++) buckets[i] = [];
+    for (let s = 0; s < NS; s++) {
+      const bx = Math.floor((seeds[s * 3] + BS) / BS), by = Math.floor((seeds[s * 3 + 1] + BS) / BS);
+      const k = by * bnx + bx;
+      if (buckets[k]) buckets[k].push(s);
+    }
+
+    // --- low frequency mottle, computed small then sampled ----------------
+    const MW = 192, MH = 96, mot = new Float32Array(MW * MH);
+    for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++)
+      mot[y * MW + x] = G.fbm((x / MW) * 9.0, (y / MH) * 7.0, 3, 71);
+
+    const img = new Uint8ClampedArray(W * H * 4);
+    const dx = 1 / sx, dy = 1 / sy;
+    for (let py = 0; py < H; py++) {
+      const my = py * dy;
+      const by = Math.floor((my + BS) / BS);
+      for (let px = 0; px < W; px++) {
+        const mx = px * dx;
+        const bx = Math.floor((mx + BS) / BS);
+        let d1 = 1e9, d2 = 1e9, js = 0;
+        for (let oy = -1; oy <= 1; oy++) {
+          const gy = by + oy; if (gy < 0 || gy >= bny) continue;
+          for (let ox = -1; ox <= 1; ox++) {
+            const gx = bx + ox; if (gx < 0 || gx >= bnx) continue;
+            const B = buckets[gy * bnx + gx];
+            for (let b = 0; b < B.length; b++) {
+              const s = B[b];
+              const ex = seeds[s * 3] - mx, ey = seeds[s * 3 + 1] - my;
+              const d = ex * ex + ey * ey;
+              if (d < d1) { d2 = d1; d1 = d; js = s; }
+              else if (d < d2) d2 = d;
+            }
+          }
+        }
+        d1 = Math.sqrt(d1); d2 = Math.sqrt(d2);
+        // cream channel width: narrower on the back, wider down the flanks
+        const around = Math.min(my, MA - my);
+        const bw = 0.0075 + 0.0135 * G.smooth(0.3, 1.9, around) + 0.005 * G.noise2(mx * 3.1, my * 3.1, 5);
+        const edge = (d2 - d1);
+        let mask = G.smooth(bw * 0.42, bw * 1.15, edge);
+        // break the patch edges up a little so they are not perfect Voronoi
+        mask *= 0.86 + 0.28 * G.noise2(mx * 14.0, my * 14.0, 21);
+        // rosette splitting: a couple of long patches get a spur
+        const split = G.noise2(mx * 2.2 + 3.3, my * 2.2, 44);
+        if (split > 0.66) mask *= G.smooth(bw * 1.6, bw * 4.0, edge * (1 - (split - 0.66) * 1.8));
+
+        const mi = Math.floor((my / MA) * MH) * MW + Math.floor((mx / ML) * MW);
+        const mo = mot[Math.min(MH - 1, Math.max(0, Math.floor((my / MA) * MH))) * MW + Math.min(MW - 1, Math.max(0, Math.floor((mx / ML) * MW)))];
+        const jitter = seeds[js * 3 + 2];
+        const o = (py * W + px) * 4;
+        img[o] = Math.round(G.clamp(mask, 0, 1) * 255);
+        img[o + 1] = Math.round(jitter * 255);
+        img[o + 2] = Math.round(mo * 255);
+        img[o + 3] = 255;
+      }
+    }
+    const cv = G.canvas(W, H);
+    cv.getContext('2d').putImageData(new ImageData(img, W, H), 0, 0);
+    const tex = G.tex(cv, { wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping, flipY: false, aniso: 8 });
+    tex.generateMipmaps = true;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    return { texture: tex, canvas: cv };
+  };
+})(window.G);
+
+
+/* ======================= 20_loft.js ======================= */
+// ---------------------------------------------------------------------------
+// 20_loft.js -- lofted tube geometry rebuilt each frame from station frames.
+// Everything organic (torso, neck, tail, limbs, muzzle) is a loft, so the
+// whole animal can flex continuously instead of being a bag of rigid boxes.
+// ---------------------------------------------------------------------------
+window.G = window.G || {};
+(function (G) {
+  'use strict';
+
+  // metres of body surface spanned by the coat atlas in U (along the body)
+  G.ATLAS_LEN = 7.4;
+  // metres of body surface spanned by the coat atlas in V (around the body)
+  G.ATLAS_AROUND = 5.2;
+
+  const _v = new THREE.Vector3();
+
+  /**
+   * A loft: rows cross-sections of `radial`+1 vertices each, superellipse
+   * profile, optional pole caps.  Positions / uvs / coat attributes are
+   * rewritten every frame; the index buffer never changes.
+   *
+   * station = {c, dt, dr, du, rx, ry, p, u0, v0,
+   *            topFade, bellyFade, topTone, bellyTone}
+   */
+  class Loft {
+    constructor(rows, radial, opts) {
+      opts = opts || {};
+      this.rows = rows;
+      this.radial = radial || 16;
+      this.capStart = !!opts.capStart;
+      this.capEnd = !!opts.capEnd;
+      const cols = this.radial + 1;
+      this.cols = cols;
+      this.poleStart = this.capStart ? cols : 0;
+      this.nV = rows * cols + this.poleStart + (this.capEnd ? cols : 0);
+      this.position = new Float32Array(this.nV * 3);
+      this.normal = new Float32Array(this.nV * 3);
+      this.uv = new Float32Array(this.nV * 2);
+      this.coat = new Float32Array(this.nV * 2);
+      const idx = [];
+      const rowOff = (r) => this.poleStart + r * cols;
+      if (this.capStart) for (let i = 0; i < this.radial; i++) idx.push(i, rowOff(0) + i + 1, rowOff(0) + i);
+      for (let r = 0; r < rows - 1; r++) {
+        for (let i = 0; i < this.radial; i++) {
+          const a = rowOff(r) + i, b = rowOff(r) + i + 1, c = rowOff(r + 1) + i + 1, d = rowOff(r + 1) + i;
+          idx.push(a, b, c, a, c, d);
+        }
+      }
+      if (this.capEnd) {
+        const pole = this.nV - cols, last = rowOff(rows - 1);
+        for (let i = 0; i < this.radial; i++) idx.push(last + i, last + i + 1, pole + i);
+      }
+      const g = new THREE.BufferGeometry();
+      this.aPos = new THREE.BufferAttribute(this.position, 3);
+      this.aNor = new THREE.BufferAttribute(this.normal, 3);
+      this.aUv = new THREE.BufferAttribute(this.uv, 2);
+      this.aCoat = new THREE.BufferAttribute(this.coat, 2);
+      g.setAttribute('position', this.aPos);
+      g.setAttribute('normal', this.aNor);
+      g.setAttribute('uv', this.aUv);
+      g.setAttribute('aCoat', this.aCoat);
+      g.setIndex(new THREE.BufferAttribute(new Uint32Array(idx), 1));
+      this.geometry = g;
+    }
+
+    update(stations) {
+      const rows = this.rows, cols = this.cols, radial = this.radial;
+      if (stations.length !== rows) throw new Error('loft stations ' + stations.length + ' != ' + rows);
+      const P = this.position, UV = this.uv, CO = this.coat, N = this.normal;
+      const invL = 1 / G.ATLAS_LEN, invA = 1 / G.ATLAS_AROUND;
+      const base = this.poleStart;
+      let w = base * 3;
+      for (let r = 0; r < rows; r++) {
+        const S = stations[r];
+        const p = S.p === undefined ? 2.15 : S.p;
+        const circ = G.ellipCirc(S.rx, S.ry);
+        const vSpan = circ * invA * (S.vScale === undefined ? 1 : S.vScale);
+        const u = S.u0 * invL;
+        for (let i = 0; i < cols; i++) {
+          const t = i / radial;
+          const ang = Math.PI / 2 + t * G.TAU;
+          const cx = Math.cos(ang), cy = Math.sin(ang);
+          // taper: + widens the top of the section, - widens the bottom
+          const tw = 1 + (S.taper || 0) * cy;
+          const wr = G.se(cx, p) * S.rx * tw, wu = G.se(cy, p) * S.ry;
+          P[w] = S.c.x + S.dr.x * wr + S.du.x * wu;
+          P[w + 1] = S.c.y + S.dr.y * wr + S.du.y * wu;
+          P[w + 2] = S.c.z + S.dr.z * wr + S.du.z * wu;
+          UV[(w / 3) * 2] = u;
+          UV[(w / 3) * 2 + 1] = S.v0 + t * vSpan;
+          const bn = Math.exp(-Math.pow((t - 0.5) / 0.17, 2));   // 1 at the belly line
+          CO[(w / 3) * 2] = G.mix(S.topFade === undefined ? 1 : S.topFade, S.bellyFade === undefined ? 1 : S.bellyFade, bn);
+          CO[(w / 3) * 2 + 1] = G.mix(S.topTone === undefined ? 1 : S.topTone, S.bellyTone === undefined ? 1 : S.bellyTone, bn);
+          w += 3;
+        }
+      }
+      // ---- normals from the parametric derivatives, seam welded afterwards
+      const dv = [0, 0, 0], dn = [0, 0, 0], nn = [0, 0, 0];
+      for (let r = 0; r < rows; r++) {
+        const r0 = Math.max(0, r - 1), r1 = Math.min(rows - 1, r + 1);
+        const c = stations[r].c;
+        for (let i = 0; i < cols; i++) {
+          const i0 = Math.max(0, i - 1), i1 = Math.min(cols - 1, i + 1);
+          const a0 = (base + r * cols + i0) * 3, a1 = (base + r * cols + i1) * 3;
+          const b0 = (base + r0 * cols + i) * 3, b1 = (base + r1 * cols + i) * 3;
+          dv[0] = P[a1] - P[a0]; dv[1] = P[a1 + 1] - P[a0 + 1]; dv[2] = P[a1 + 2] - P[a0 + 2];
+          dn[0] = P[b1] - P[b0]; dn[1] = P[b1 + 1] - P[b0 + 1]; dn[2] = P[b1 + 2] - P[b0 + 2];
+          nn[0] = dv[1] * dn[2] - dv[2] * dn[1];
+          nn[1] = dv[2] * dn[0] - dv[0] * dn[2];
+          nn[2] = dv[0] * dn[1] - dv[1] * dn[0];
+          let l = Math.hypot(nn[0], nn[1], nn[2]);
+          if (l < 1e-12) { nn[0] = c.x || 0; nn[1] = 1; nn[2] = 0; l = 1; }
+          const k = (base + r * cols + i) * 3;
+          _v.set(P[k] - c.x, P[k + 1] - c.y, P[k + 2] - c.z);
+          if (_v.x * nn[0] + _v.y * nn[1] + _v.z * nn[2] < 0) { nn[0] = -nn[0]; nn[1] = -nn[1]; nn[2] = -nn[2]; }
+          N[k] = nn[0] / l; N[k + 1] = nn[1] / l; N[k + 2] = nn[2] / l;
+        }
+      }
+      for (let r = 0; r < rows; r++) {           // weld the v = 0 / 1 seam
+        const a = (base + r * cols) * 3, b = a + (cols - 1) * 3;
+        const nx = N[a] + N[b], ny = N[a + 1] + N[b + 1], nz = N[a + 2] + N[b + 2];
+        const l = Math.hypot(nx, ny, nz) || 1;
+        N[a] = N[b] = nx / l; N[a + 1] = N[b + 1] = ny / l; N[a + 2] = N[b + 2] = nz / l;
+      }
+      if (this.capStart) {
+        const S0 = stations[0];
+        for (let i = 0; i < cols; i++) { const k = i * 3; N[k] = -S0.dt.x; N[k + 1] = -S0.dt.y; N[k + 2] = -S0.dt.z; }
+        const e0 = stations[0].c;
+        for (let i = 0; i < cols; i++) {
+          const k = i * 3;
+          P[k] = e0.x; P[k + 1] = e0.y; P[k + 2] = e0.z;
+          UV[i * 2] = stations[0].u0 / G.ATLAS_LEN; UV[i * 2 + 1] = stations[0].v0;
+          CO[i * 2] = stations[0].topFade === undefined ? 1 : stations[0].topFade;
+          CO[i * 2 + 1] = stations[0].topTone === undefined ? 1 : stations[0].topTone;
+        }
+      }
+      if (this.capEnd) {
+        const SE = stations[rows - 1], pb = this.nV - cols;
+        for (let i = 0; i < cols; i++) {
+          const k = (pb + i) * 3;
+          N[k] = SE.dt.x; N[k + 1] = SE.dt.y; N[k + 2] = SE.dt.z;
+          P[k] = SE.c.x; P[k + 1] = SE.c.y; P[k + 2] = SE.c.z;
+          UV[(pb + i) * 2] = SE.u0 / G.ATLAS_LEN; UV[(pb + i) * 2 + 1] = SE.v0;
+          CO[(pb + i) * 2] = SE.topFade === undefined ? 1 : SE.topFade;
+          CO[(pb + i) * 2 + 1] = SE.topTone === undefined ? 1 : SE.topTone;
+        }
+      }
+      this.aPos.needsUpdate = true;
+      this.aUv.needsUpdate = true;
+      this.aCoat.needsUpdate = true;
+      this.aNor.needsUpdate = true;
+      this.geometry.computeBoundingSphere();
+    }
+  }
+
+  G.Loft = Loft;
+
+  // -- station helpers ------------------------------------------------------
+  G.station = function () {
+    return {
+      c: new THREE.Vector3(), dt: new THREE.Vector3(0, 0, 1),
+      dr: new THREE.Vector3(1, 0, 0), du: new THREE.Vector3(0, 1, 0),
+      rx: 0.1, ry: 0.1, p: 2.15, taper: 0, u0: 0, v0: 0,
+      topFade: 1, bellyFade: 1, topTone: 1, bellyTone: 1
+    };
+  };
+  G.stations = function (n) { const a = []; for (let i = 0; i < n; i++) a.push(G.station()); return a; };
+})(window.G);
+
+
+/* ======================= 25_materials.js ======================= */
+// ---------------------------------------------------------------------------
+// 25_materials.js -- skin shader (procedural coat), hair, horn, eye
+// ---------------------------------------------------------------------------
+window.G = window.G || {};
+(function (G) {
+  'use strict';
+
+  const srgb = (h) => new THREE.Color(h).convertSRGBToLinear();
+
+  G.makeSkinMaterial = function (coatTex, opts) {
+    opts = opts || {};
+    const m = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: opts.roughness === undefined ? 0.78 : opts.roughness,
+      metalness: 0.0
+    });
+    m.map = coatTex;
+    m.bumpMap = coatTex;
+    m.bumpScale = opts.bump === undefined ? 0.22 : opts.bump;
+    const U = {
+      uCream: { value: srgb(opts.cream || 0xefe0b8) },
+      uPatchA: { value: srgb(opts.patchA || 0x8e4726) },
+      uPatchB: { value: srgb(opts.patchB || 0x552618) },
+      uLine: { value: opts.line === undefined ? 1.0 : opts.line }
+    };
+    m.userData.uniforms = U;
+    m.customProgramCacheKey = () => 'giraffe-skin';
+    m.onBeforeCompile = function (sh) {
+      Object.assign(sh.uniforms, U);
+      // own UV varying: keeps this working across three versions that renamed
+      // the built-in one (vUv -> vMapUv) and does not depend on USE_UV.
+      sh.vertexShader = 'attribute vec2 aCoat;\nvarying vec2 vCoat;\nvarying vec2 vCoatUv;\n' +
+        sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n\tvCoat = aCoat;\n\tvCoatUv = uv;');
+      sh.fragmentShader = 'uniform vec3 uCream;\nuniform vec3 uPatchA;\nuniform vec3 uPatchB;\nuniform float uLine;\nvarying vec2 vCoat;\nvarying vec2 vCoatUv;\n' +
+        sh.fragmentShader.replace('#include <map_fragment>', [
+          '#ifdef USE_MAP',
+          '  vec4 coatT = texture2D( map, vCoatUv );',
+          '  float pmask = clamp( coatT.r * vCoat.x, 0.0, 1.0 );',
+          '  float mot = coatT.b;',
+          '  vec3 creamC = uCream * ( 0.88 + 0.22 * mot ) * uLine;',
+          '  vec3 patchC = mix( uPatchA, uPatchB, coatT.g ) * ( 0.78 + 0.44 * mot );',
+          '  vec3 coatCol = mix( creamC, patchC, pmask );',
+          '  diffuseColor.rgb *= coatCol * vCoat.y;',
+          '#endif'
+        ].join('\n'));
+      // roughness varies between patch and cream line (must come after the
+      // roughnessmap chunk, which is where roughnessFactor is declared)
+      sh.fragmentShader = sh.fragmentShader.replace('#include <roughnessmap_fragment>',
+        '#include <roughnessmap_fragment>\n#ifdef USE_MAP\n\troughnessFactor = mix( 0.92, 0.62, clamp( texture2D( map, vCoatUv ).r * vCoat.x, 0.0, 1.0 ) );\n#endif');
+    };
+    return m;
+  };
+
+  G.makeHairMaterial = function (hex, rough) {
+    return new THREE.MeshPhysicalMaterial({
+      color: srgb(hex === undefined ? 0x33200f : hex),
+      roughness: rough === undefined ? 0.55 : rough,
+      metalness: 0.0,
+      sheen: 0.6,
+      sheenColor: srgb(0x8a6a45),
+      sheenRoughness: 0.7
+    });
+  };
+
+  G.makeHoofMaterial = function () {
+    return new THREE.MeshStandardMaterial({ color: srgb(0x241a13), roughness: 0.42, metalness: 0.0 });
+  };
+
+  G.makeEyeMaterial = function () {
+    return new THREE.MeshPhysicalMaterial({
+      color: srgb(0x1a0f08), roughness: 0.12, metalness: 0.0,
+      clearcoat: 1.0, clearcoatRoughness: 0.05
+    });
+  };
+})(window.G);
+
+
+/* ======================= 30_giraffe.js ======================= */
+// ---------------------------------------------------------------------------
+// 30_giraffe.js -- procedural giraffe: anatomy tables, rig, gait, rebuild.
+// Units are metres.  +Z forward, +Y up, +X is the animal's left.
+// Every organic part is a Loft whose stations are recomputed each frame, so
+// the animal flexes as one body instead of hinging rigid boxes.
+// ---------------------------------------------------------------------------
+window.G = window.G || {};
+(function (G) {
+  'use strict';
+  const D = G.deg;
+
+  // =====================  anatomy tables  =================================
+  // dorsal line of the trunk [y, z], sacrum .. neck root
+  const SPINE = [
+    [3.13, -1.06], [3.20, -0.55], [3.28, 0.05], [3.40, 0.62],
+    [3.53, 1.08], [3.50, 1.44], [3.42, 1.72]
+  ];
+  // trunk sections: [t, halfWidth, riseAboveDorsal, bellyDepth, taper]
+  const TPRO = [
+    [0.00, 0.292, 0.12, 0.58, -0.06],
+    [0.12, 0.352, 0.13, 0.92, -0.10],
+    [0.30, 0.400, 0.15, 1.16, -0.08],
+    [0.50, 0.418, 0.19, 1.30, 0.02],
+    [0.70, 0.402, 0.29, 1.40, 0.10],
+    [0.86, 0.356, 0.24, 1.32, 0.09],
+    [1.00, 0.338, 0.17, 1.06, 0.05]
+  ];
+  // neck axis [y, z] and sections [t, halfWidth, halfDepth]
+  const NECK = [[3.32, 1.71], [3.56, 1.74], [3.86, 1.80], [4.16, 1.87],
+  [4.46, 1.96], [4.72, 2.06], [4.95, 2.16], [5.14, 2.26]];
+  const NPRO = [[0.00, 0.286, 0.306], [0.20, 0.252, 0.272], [0.50, 0.206, 0.234],
+  [0.75, 0.168, 0.196], [0.90, 0.142, 0.166], [1.00, 0.122, 0.143]];
+  // head, skull-local [z, y, halfWidth, halfHeight]
+  const HEAD = [
+    [0.000, -0.010, 0.056, 0.064],
+    [0.075, 0.010, 0.074, 0.085],
+    [0.160, 0.020, 0.077, 0.084],
+    [0.250, 0.010, 0.070, 0.071],
+    [0.340, -0.006, 0.060, 0.059],
+    [0.430, -0.022, 0.055, 0.054],
+    [0.510, -0.034, 0.053, 0.053],
+    [0.575, -0.042, 0.050, 0.049],
+    [0.620, -0.048, 0.043, 0.041],
+    [0.650, -0.052, 0.032, 0.030]
+  ];
+  // limb sections [t, halfWidth(sideways), halfDepth(in the limb plane)]
+  const P_FUP = [[0, 0.165, 0.205], [0.22, 0.170, 0.225], [0.5, 0.140, 0.190], [0.78, 0.100, 0.135], [1, 0.088, 0.112]];
+  const P_FLO = [[0, 0.092, 0.118], [0.14, 0.104, 0.126], [0.5, 0.082, 0.102], [0.86, 0.063, 0.077], [1, 0.062, 0.074]];
+  const P_CAN = [[0, 0.070, 0.083], [0.2, 0.062, 0.072], [0.6, 0.056, 0.065], [0.9, 0.053, 0.060], [1, 0.058, 0.064]];
+  const P_FOOT = [[0, 0.058, 0.064], [0.35, 0.065, 0.071], [0.72, 0.071, 0.071], [1, 0.063, 0.059]];
+  const P_HUP = [[0, 0.215, 0.200], [0.28, 0.228, 0.212], [0.58, 0.180, 0.170], [0.84, 0.120, 0.120], [1, 0.098, 0.102]];
+  const P_HLO = [[0, 0.108, 0.118], [0.22, 0.100, 0.114], [0.6, 0.074, 0.088], [0.88, 0.058, 0.068], [1, 0.057, 0.065]];
+
+  function seg(P, t, i1, i2) {
+    for (let i = 0; i < P.length - 1; i++) {
+      if (t <= P[i + 1][0] || i === P.length - 2) {
+        const a = P[i], b = P[i + 1], k = G.clamp(G.inv(a[0], b[0], t), 0, 1);
+        return [G.lerp(a[i1], b[i1], k), G.lerp(a[i2], b[i2], k)];
+      }
+    }
+  }
+  function tab(P, t, c) {
+    for (let i = 0; i < P.length - 1; i++) {
+      if (t <= P[i + 1][0] || i === P.length - 2) {
+        const a = P[i], b = P[i + 1];
+        return G.lerp(a[c], b[c], G.clamp(G.inv(a[0], b[0], t), 0, 1));
+      }
+    }
+    return P[P.length - 1][c];
+  }
+  function plen(P) { let L = 0; for (let i = 1; i < P.length; i++) L += P[i].distanceTo(P[i - 1]); return L; }
+
+  // four limbs.  neutral = preferred joint angles, degrees from straight down,
+  // positive toward +Z; limits keep the joints inside a plausible range.
+  const LEGDEF = [
+    { name: 'FL', side: 1, front: true, st: 0.80, off: [0.145, -0.05, -0.26], L: [1.07, 0.62, 0.73, 0.66], neutral: [-3, 11, -5, 9], lim: [26, 32, 30], prof: [P_FUP, P_FLO, P_CAN, P_FOOT], phase: 0.50, joint: [0.100, 0.080, 0.060], footZ: 1.30, footX: 0.185 },
+    { name: 'FR', side: -1, front: true, st: 0.80, off: [0.145, -0.05, -0.26], L: [1.07, 0.62, 0.73, 0.66], neutral: [-3, 11, -5, 9], lim: [26, 32, 30], prof: [P_FUP, P_FLO, P_CAN, P_FOOT], phase: 0.00, joint: [0.100, 0.080, 0.060], footZ: 1.30, footX: 0.185 },
+    { name: 'HL', side: 1, front: false, st: 0.05, off: [0.155, -0.16, 0.06], L: [0.80, 0.68, 0.72, 0.68], neutral: [10, -31, 19, 11], lim: [24, 32, 28], prof: [P_HUP, P_HLO, P_CAN, P_FOOT], phase: 0.58, joint: [0.105, 0.084, 0.060], footZ: -1.00, footX: 0.205 },
+    { name: 'HR', side: -1, front: false, st: 0.05, off: [0.155, -0.16, 0.06], L: [0.80, 0.68, 0.72, 0.68], neutral: [10, -31, 19, 11], lim: [24, 32, 28], prof: [P_HUP, P_HLO, P_CAN, P_FOOT], phase: 0.08, joint: [0.105, 0.084, 0.060], footZ: -1.00, footX: 0.205 }
+  ];
+
+  const TORSO_ROWS = 18, NECK_ROWS = 15, TAIL_ROWS = 10, MANE_ROWS = 30, LEG_ROWS = 7;
+
+  G.buildGiraffe = function (coatTex, opts) {
+    opts = opts || {};
+    const rnd = G.rng(opts.seed || 2024);
+    const root = new THREE.Group();
+    root.rotation.order = 'YXZ';
+
+    const skin = G.makeSkinMaterial(coatTex);
+    const hair = G.makeHairMaterial(0x5c3a1d, 0.62);
+    const hairDark = G.makeHairMaterial(0x23150a);
+    const plain = new THREE.MeshStandardMaterial({ color: new THREE.Color(0x7d5334).convertSRGBToLinear(), roughness: 0.85 });
+    const hoofMat = G.makeHoofMaterial();
+    const eyeMat = G.makeEyeMaterial();
+    const darkSkin = new THREE.MeshStandardMaterial({ color: new THREE.Color(0x2a1c12).convertSRGBToLinear(), roughness: 0.7 });
+
+    const lofts = [];
+    function addLoft(rows, radial, o) {
+      o = o || {};
+      const L = new G.Loft(rows, radial, o);
+      const m = new THREE.Mesh(L.geometry, o.material || skin);
+      m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false;
+      (o.parent || root).add(m);
+      lofts.push({ loft: L, st: G.stations(rows), mesh: m });
+      return lofts[lofts.length - 1];
+    }
+    function mesh(geo, mat, parent) {
+      const m = new THREE.Mesh(geo, mat || skin);
+      m.castShadow = true; m.receiveShadow = true;
+      (parent || root).add(m);
+      return m;
+    }
+    const sphereGeo = new THREE.SphereGeometry(1, 16, 12);
+    // sphere with a small window of the coat atlas baked into its uv, so small
+    // parts (knees, lids) continue the pattern instead of sampling all of it
+    function winSphere(s, around, wS, wA) {
+      const g = sphereGeo.clone();
+      const uv = g.attributes.uv;
+      for (let i = 0; i < uv.count; i++) {
+        uv.setXY(i, (s + (uv.getX(i) - 0.5) * wS) / G.ATLAS_LEN,
+          (around + (uv.getY(i) - 0.5) * wA) / G.ATLAS_AROUND);
+      }
+      return g;
+    }
+
+    // ---- body parts --------------------------------------------------------
+    const torso = addLoft(TORSO_ROWS, 18);
+    const neck = addLoft(NECK_ROWS, 16);
+    const tail = addLoft(TAIL_ROWS, 9, { capEnd: true });
+    const mane = addLoft(MANE_ROWS, 6, { material: hair });
+
+    // ---- head: rigid, built once, driven by the neck's end frame ----------
+    const head = new THREE.Group();
+    root.add(head);
+    const headParts = { ears: [], eyes: [] };
+    (function buildHead() {
+      const hl = addLoft(HEAD.length, 16, { capStart: true, capEnd: true, parent: head });
+      const sHead = 6.55;                       // metres along the body path
+      for (let i = 0; i < HEAD.length; i++) {
+        const S = hl.st[i], H = HEAD[i], t = i / (HEAD.length - 1);
+        S.c.set(0, H[1], H[0]);
+        S.dt.set(0, 0, 1); S.dr.set(1, 0, 0); S.du.set(0, 1, 0);
+        S.rx = H[2]; S.ry = H[3]; S.p = 2.3; S.taper = -0.04;
+        S.u0 = sHead + t * 0.60; S.v0 = 0.0;
+        const f = G.mix(0.95, 0.55, G.smooth(0.2, 1.0, t));
+        S.topFade = f; S.bellyFade = f * 0.92;
+        S.topTone = G.mix(1.0, 0.70, G.smooth(0.42, 1.0, t));
+        S.bellyTone = S.topTone * 0.96;
+      }
+      hl.loft.update(hl.st);
+
+      // ears: flattened leaf lofts, one per side
+      function earGeom(side) {
+        const rows = 9;
+        const L = new G.Loft(rows, 10, { capStart: true, capEnd: true });
+        const st = G.stations(rows);
+        const pr = [[0, 0.011, 0.026], [0.28, 0.016, 0.052], [0.6, 0.017, 0.060], [0.85, 0.012, 0.048], [1, 0.005, 0.028]];
+        for (let i = 0; i < rows; i++) {
+          const t = i / (rows - 1), S = st[i], rr = seg(pr, t, 1, 2);
+          S.c.set(0, Math.pow(t, 1.6) * 0.045, t * 0.195);
+          S.dt.set(0, 0.55, 1).normalize(); S.dr.set(1, 0, 0); S.du.set(0, 1, 0);
+          S.rx = rr[0]; S.ry = rr[1]; S.p = 2.0;
+          S.u0 = 6.35 + t * 0.22; S.v0 = 0.06;
+          const f = G.mix(0.9, 0.55, t);
+          S.topFade = f; S.bellyFade = f;
+          S.topTone = G.mix(0.95, 0.55, G.smooth(0.35, 1, t));
+          S.bellyTone = S.topTone;
+        }
+        L.update(st);
+        return L.geometry;
+      }
+      const eg = earGeom(1);
+      const Z = new THREE.Vector3(), Y = new THREE.Vector3(), X = new THREE.Vector3(), M4 = new THREE.Matrix4();
+      for (const sgn of [1, -1]) {
+        const g = new THREE.Group();
+        const em = new THREE.Mesh(eg, skin);
+        em.castShadow = true;
+        // local blade: length +z, thin along x, wide along y -> point it out/back
+        Z.set(sgn * 0.86, 0.16, -0.48).normalize();
+        Y.set(sgn * 0.30, 0.92, 0.25).normalize();
+        Y.addScaledVector(Z, -Y.dot(Z)).normalize();
+        X.crossVectors(Y, Z);
+        g.quaternion.setFromRotationMatrix(M4.makeBasis(X, Y, Z));
+        g.add(em);
+        const pivot = new THREE.Group();
+        pivot.position.set(sgn * 0.062, 0.030, 0.100);
+        pivot.add(g);
+        head.add(pivot);
+        headParts.ears.push({ pivot, g, sgn, ph: rnd() * 6.28, flick: 0 });
+      }
+
+      // ossicones
+      for (const sgn of [1, -1]) {
+        const g = new THREE.Group();
+        const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.032, 0.082, 12), skin);
+        stalk.position.y = 0.041; stalk.castShadow = true;
+        const knob = new THREE.Mesh(new THREE.SphereGeometry(0.032, 14, 10), hairDark);
+        knob.position.y = 0.090; knob.scale.set(1, 0.82, 1); knob.castShadow = true;
+        const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 8), hair);
+        tuft.position.set(0, 0.082, -0.020); tuft.scale.set(1.05, 0.7, 1.15);
+        g.add(stalk, knob, tuft);
+        g.position.set(sgn * 0.042, 0.058, 0.110);
+        g.rotation.set(D(-15), 0, sgn * D(8));
+        head.add(g);
+      }
+      // eyes
+      for (const sgn of [1, -1]) {
+        const socket = mesh(winSphere(6.72, 0.30, 0.26, 0.26), skin, head);
+        socket.position.set(sgn * 0.049, 0.004, 0.172); socket.scale.set(0.058, 0.066, 0.056);
+        const e = new THREE.Mesh(new THREE.SphereGeometry(0.0225, 16, 12), eyeMat);
+        e.position.set(sgn * 0.0645, 0.006, 0.186); e.scale.set(1, 1.05, 0.72);
+        head.add(e);
+        const lid = mesh(winSphere(6.70, 0.22, 0.2, 0.2), skin, head);
+        lid.position.set(sgn * 0.056, 0.028, 0.180); lid.scale.set(0.046, 0.026, 0.044);
+        headParts.eyes.push(e);
+      }
+      // nostrils + mouth
+      for (const sgn of [1, -1]) {
+        const nz = mesh(sphereGeo, darkSkin, head);
+        nz.position.set(sgn * 0.020, -0.010, 0.610); nz.scale.set(0.010, 0.020, 0.008);
+      }
+      const mouth = mesh(sphereGeo, darkSkin, head);
+      mouth.position.set(0, -0.072, 0.600); mouth.scale.set(0.034, 0.008, 0.018);
+    })();
+
+    // tail brush
+    const brush = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.062, 0.46, 10), hairDark);
+    brush.castShadow = true;
+    root.add(brush);
+
+    // ---- limbs -------------------------------------------------------------
+    const legs = LEGDEF.map((def) => {
+      const parts = [addLoft(LEG_ROWS, 10), addLoft(LEG_ROWS, 10), addLoft(LEG_ROWS, 10), addLoft(LEG_ROWS, 10)];
+      const sJ = def.front ? 3.80 : 1.62;
+      const joints = [0, 1, 2].map((k) => mesh(winSphere(sJ + 0.10 + k * 0.30, 0.34, 0.24, 0.24), skin));
+      const hg = new THREE.CylinderGeometry(0.066, 0.090, 0.17, 16);
+      hg.translate(0, -0.085, 0); hg.scale(1, 1, 1.14);
+      const hoof = new THREE.Mesh(hg, hoofMat);
+      hoof.castShadow = true; hoof.receiveShadow = true;
+      root.add(hoof);
+      return {
+        def, parts, joints, hoof,
+        a: def.neutral.slice(0, 3).map((v) => D(v)),
+        anchor: new THREE.Vector3(), sAnchor: 0, stance: 1, prevStance: 1, land: 0,
+        jp: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()],
+        jpL: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
+      };
+    });
+
+    // =====================  rig  ==========================================
+    const spineXYZ = SPINE.map((p) => new THREE.Vector3(0, p[0], p[1]));
+    const neckXYZ = NECK.map((p) => new THREE.Vector3(0, p[0], p[1]));
+    const S_SPINE = 1.50;                       // tail length ahead of sacrum
+    const S_NECK = S_SPINE + plen(spineXYZ);
+    const NECK_LEN = plen(neckXYZ);
+
+    const rig = {
+      root, skin, head, headParts, legs, lofts, meshes: [],
+      t: 0, phase: 0, stride: 2.2, duty: 0.62, speed: 0,
+      heading: 0, px: 0, pz: 0, bend: 0, bendT: 0,
+      breath: 0, tailSway: 0, tailSwayV: 0, flick: 0,
+      glance: 0, glanceT: 3, glanceTarget: 0,
+      M: new THREE.Matrix4(), Mi: new THREE.Matrix4(), MY: new THREE.Matrix4(),
+      landed: []
+    };
+
+    // scratch
+    const _p = new THREE.Vector3(), _q = new THREE.Vector3(), _r = new THREE.Vector3(),
+      _u = new THREE.Vector3(), _d = new THREE.Vector3(), _side = new THREE.Vector3(), _sl = new THREE.Vector3(),
+      _fwd = new THREE.Vector3(), _perp = new THREE.Vector3(), _w = new THREE.Vector3(),
+      UP = new THREE.Vector3(0, 1, 0), _m4 = new THREE.Matrix4(), _e = new THREE.Euler(),
+      _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _aa = new THREE.Vector3();
+
+    // resample control points into loft stations with orthonormal frames
+    function resample(ctrl, part, profFn, sAt) {
+      const out = part.st, rows = out.length;
+      const cv = G.curve(ctrl, false);
+      for (let i = 0; i < rows; i++) {
+        const t = i / (rows - 1), S = out[i];
+        cv.at(t, S.c);
+        cv.at(Math.min(1, t + 0.012), _p);
+        cv.at(Math.max(0, t - 0.012), _q);
+        S.dt.copy(_p).sub(_q);
+        if (S.dt.lengthSq() < 1e-10) S.dt.set(0, 0, 1);
+        S.dt.normalize();
+        _r.set(UP.y * S.dt.z - UP.z * S.dt.y, UP.z * S.dt.x - UP.x * S.dt.z, UP.x * S.dt.y - UP.y * S.dt.x).normalize();
+        S.dr.copy(_r);
+        S.du.set(S.dt.y * _r.z - S.dt.z * _r.y, S.dt.z * _r.x - S.dt.x * _r.z, S.dt.x * _r.y - S.dt.y * _r.x).normalize();
+        profFn(S, t, i);
+        S.u0 = sAt + arcAt(cv, t);
+      }
+    }
+    const _sa = new THREE.Vector3(), _sb = new THREE.Vector3();
+    function arcAt(cv, t) {
+      let L = 0; cv.at(0, _sa);
+      for (let i = 1; i <= 10; i++) { cv.at((i / 10) * t, _sb); L += _sa.distanceTo(_sb); _sa.copy(_sb); }
+      return L;
+    }
+
+    // ---------------------------------------------------------------------
+    rig.update = function (dt, A) {
+      rig.t += dt;
+      const spd = A.speed, walk = A.walk;
+      rig.landed.length = 0;
+
+      // ---- gait clock
+      const freq = 0.50 * (0.62 + 0.62 * (spd / 1.5));
+      const targetStride = spd > 0.02 ? spd / Math.max(0.08, freq) : 2.2;
+      rig.stride += (targetStride - rig.stride) * Math.min(1, dt * 3);
+      rig.phase += dt * freq * walk;
+      const ph = rig.phase;
+
+      // ---- travel
+      rig.heading += A.turn * dt;
+      rig.speed += (spd - rig.speed) * Math.min(1, dt * 4);
+      rig.px += Math.sin(rig.heading) * rig.speed * walk * dt;
+      rig.pz += Math.cos(rig.heading) * rig.speed * walk * dt;
+      rig.bendT += (A.turn * 1.9 - rig.bendT) * Math.min(1, dt * 2.2);
+      rig.bend += (rig.bendT - rig.bend) * Math.min(1, dt * 5.5);
+
+      // ---- whole-body motion driven by the footfalls
+      const bob = (-0.024 * Math.cos(4 * Math.PI * ph) - 0.010 * Math.cos(2 * Math.PI * ph)) * walk;
+      const roll = 0.030 * Math.sin(2 * Math.PI * ph + 0.3) * walk;
+      const pitch = 0.014 * Math.cos(2 * Math.PI * ph - 1.0) * walk;
+      const yawW = 0.011 * Math.sin(2 * Math.PI * ph + 1.2) * walk;
+
+      rig.root.position.set(rig.px, bob, rig.pz);
+      rig.root.rotation.set(pitch, rig.heading + yawW, roll);
+      rig.root.updateMatrixWorld(true);
+      rig.M.copy(rig.root.matrixWorld);
+      rig.Mi.copy(rig.M).invert();
+      rig.MY.compose(_aa.set(rig.px, 0, rig.pz), _qa.setFromEuler(_e.set(0, rig.heading + yawW, 0)), _w.set(1, 1, 1));
+
+      rig.breath += dt * 0.42;
+      const br = Math.sin(rig.breath * G.TAU) * 0.006 * (1 - 0.5 * walk);
+
+      // ---- trunk
+      const ctrl = [];
+      for (let i = 0; i < SPINE.length; i++) {
+        const z = SPINE[i][1] - 0.4;
+        ctrl.push(new THREE.Vector3(rig.bend * 0.055 * z * Math.abs(z), SPINE[i][0], SPINE[i][1]));
+      }
+      resample(ctrl, torso, (S, t) => {
+        S.rx = tab(TPRO, t, 1) + br * (1 - 0.4 * t);
+        const hTop = tab(TPRO, t, 2), hBot = tab(TPRO, t, 3) + br * 2.4;
+        S.ry = (hTop + hBot) / 2;
+        S.c.addScaledVector(S.du, hTop - S.ry);
+        S.p = 2.3;
+        S.taper = tab(TPRO, t, 4);
+        S.yShift = hTop - S.ry;          // dorsal line = c - du*yShift
+        S.topFade = 1.0;
+        S.bellyFade = G.mix(0.10, 0.45, G.smooth(0.75, 1.0, t));
+        S.topTone = G.mix(0.95, 1.0, G.bump(t, 0.55, 0.4));
+        S.bellyTone = 1.05;
+        S.v0 = 0.0;
+      }, S_SPINE);
+
+      // ---- neck (base frame rides on the last trunk station)
+      const nb = torso.st[TORSO_ROWS - 1];
+      _w.copy(nb.c).addScaledVector(nb.du, -nb.yShift - 0.10);   // on the crest
+      const nbase = _w.clone();
+      const neckPitch = -2.2 * Math.sin(2 * Math.PI * ph + 0.6) * walk + (A.neckPitch || 0);
+      const neckSway = 1.6 * Math.sin(2 * Math.PI * ph + 1.9) * walk + (A.neckYaw || 0);
+      // the neck table is authored in body axes, so only the animated delta
+      // rotation is applied here (not the tilted trunk frame)
+      _qa.setFromEuler(_e.set(D(neckPitch), D(neckSway), 0, 'YXZ'));
+      const nctrl = [];
+      for (let i = 0; i < NECK.length; i++) {
+        const k = i / (NECK.length - 1);
+        _d.set(0, NECK[i][0] - NECK[0][0], NECK[i][1] - NECK[0][1]);
+        _d.y -= 0.022 * Math.sin(Math.PI * k) * (1 + 0.6 * Math.sin(2 * Math.PI * ph)) * walk;
+        _d.applyQuaternion(_qa);
+        nctrl.push(_d.clone().add(nbase));
+      }
+      resample(nctrl, neck, (S, t) => {
+        S.rx = tab(NPRO, t, 1) + br * 1.1;
+        S.ry = tab(NPRO, t, 2) + br * 1.3;
+        S.p = 2.25; S.taper = 0.05; S.v0 = 0.0;
+        S.topFade = 1.0;
+        S.bellyFade = G.mix(0.8, 0.10, G.smooth(0.0, 0.5, t));
+        S.topTone = G.mix(0.95, 1.03, t); S.bellyTone = 1.05;
+      }, 0);
+      for (let i = 0; i < NECK_ROWS; i++) neck.st[i].u0 += S_NECK;
+
+      // ---- tail (hangs from the sacrum, lags and flicks)
+      rig.tailSwayV += ((Math.sin(rig.t * 0.63) * 0.45 + rig.flick * 2.4) - rig.tailSway * 5.5 - rig.tailSwayV * 2.2) * dt * 3.2;
+      rig.tailSway += rig.tailSwayV * dt;
+      rig.flick *= Math.pow(0.3, dt);
+      if (rnd() < dt * 0.10) rig.flick = 1;
+      const rb = torso.st[0];
+      const TL = [[0, -0.02, -0.05], [0, -0.17, -0.15], [0, -0.42, -0.23], [0, -0.70, -0.27], [0, -0.99, -0.25], [0, -1.26, -0.17], [0, -1.47, -0.09]];
+      const tctrl = [];
+      for (let i = 0; i < TL.length; i++) {
+        const k = i / (TL.length - 1);
+        _d.set(rig.tailSway * 0.30 * k + Math.sin(rig.t * 1.9 + k * 2.2) * 0.015 * k,
+          TL[i][1], TL[i][2] - 0.10 * k * k * rig.speed * 0.6);
+        _d.add(rb.c).addScaledVector(rb.du, -0.03).addScaledVector(rb.dt, -0.03);
+        tctrl.push(_d.clone());
+      }
+      resample(tctrl, tail, (S, t) => {
+        S.rx = G.lerp(0.070, 0.019, Math.pow(t, 0.7));
+        S.ry = S.rx * 1.06; S.p = 2.1; S.v0 = 0.14;
+        S.topFade = G.mix(0.9, 0.30, t); S.bellyFade = S.topFade;
+        S.topTone = G.mix(0.92, 0.55, G.smooth(0.35, 1, t)); S.bellyTone = S.topTone;
+      }, 0);
+      let acc = 0; const tl = [0];
+      for (let i = 1; i < TAIL_ROWS; i++) { acc += tail.st[i].c.distanceTo(tail.st[i - 1].c); tl[i] = acc; }
+      const tlen = acc || 1.5;
+      for (let i = 0; i < TAIL_ROWS; i++) tail.st[i].u0 = S_SPINE - tlen + tl[i];
+
+      // ---- dorsal crest (mane) from mid-back over the neck to the poll
+      for (let i = 0; i < MANE_ROWS; i++) {
+        const S = mane.st[i], t = i / (MANE_ROWS - 1);
+        let src, k;
+        if (t < 0.30) { src = torso.st; k = G.lerp(0.40, 1.0, t / 0.30) * (TORSO_ROWS - 1.001); }
+        else { src = neck.st; k = ((t - 0.30) / 0.70) * (NECK_ROWS - 1.001); }
+        const i0 = Math.floor(k), i1 = Math.min(src.length - 1, i0 + 1), kk = k - i0;
+        const A0 = src[i0], A1 = src[i1];
+        S.c.copy(A0.c).lerp(A1.c, kk);
+        S.du.copy(A0.du).lerp(A1.du, kk).normalize();
+        S.dr.copy(A0.dr).lerp(A1.dr, kk).normalize();
+        S.dt.copy(A0.dt).lerp(A1.dt, kk).normalize();
+        const top = A0.ry * (1 + (A0.taper || 0)) * (1 - kk) + A1.ry * (1 + (A1.taper || 0)) * kk;
+        let hh = G.mix(0.014, 0.055, G.smooth(0.0, 0.26, t)) * G.mix(1, 0.7, G.smooth(0.84, 1, t));
+        hh *= 0.82 + 0.36 * G.noise2(t * 40, 3.5, 8);        // ragged crest
+        S.c.addScaledVector(S.du, top + hh * 0.10);
+        S.rx = 0.011; S.ry = hh; S.p = 3.2; S.u0 = 0; S.v0 = 0;
+      }
+
+      // ---- head frame: face stays level while the neck bobs
+      const nEnd = neck.st[NECK_ROWS - 1];
+      _m4.makeBasis(nEnd.dr, nEnd.du, nEnd.dt);
+      _qa.setFromRotationMatrix(_m4);
+      const hPitch = 82 + 2.6 * Math.sin(2 * Math.PI * ph + 1.4) * walk + (A.headPitch || 0);
+      const hRoll = -1.5 * Math.sin(2 * Math.PI * ph + 1.9) * walk;
+      rig.glanceT -= dt * (0.4 + walk);
+      if (rig.glanceT < 0) { rig.glanceT = G.rand(2.5, 7); rig.glanceTarget = G.rand(-0.40, 0.40); }
+      if (A.lookAt) {
+        // slowly aim at something interesting (the camera)
+        _d.copy(A.lookAt).applyMatrix4(rig.Mi);
+        const want = G.clamp(Math.atan2(_d.x, _d.z) - rig.neckEndYaw(), -0.55, 0.55);
+        rig.glanceTarget = rig.glanceTarget * 0.9 + want * 0.1;
+      }
+      rig.glance += (rig.glanceTarget * (0.35 + 0.65 * walk) - rig.glance) * Math.min(1, dt * 1.5);
+      _qb.setFromEuler(_e.set(D(hPitch), rig.glance, D(hRoll), 'ZYX'));
+      head.position.copy(nEnd.c).addScaledVector(nEnd.dt, -0.015).addScaledVector(nEnd.du, 0.01);
+      head.quaternion.copy(_qa.multiply(_qb));
+      head.updateMatrixWorld(true);
+      for (const ear of headParts.ears) {
+        ear.flick *= Math.pow(0.2, dt);
+        if (rnd() < dt * 0.35) ear.flick = 1;
+        const fl = Math.sin(rig.t * 22 + ear.ph) * 0.20 * ear.flick;
+        ear.pivot.rotation.x = Math.sin(rig.t * 0.9 + ear.ph) * 0.08 + fl;
+        ear.pivot.rotation.z = Math.sin(rig.t * 0.7 + ear.ph * 1.7) * 0.06;
+      }
+
+      // ---- limbs
+      for (let li = 0; li < 4; li++) {
+        const leg = legs[li], def = leg.def;
+        // shoulder / hip anchor, carried by the trunk
+        const si = G.clamp(def.st * (TORSO_ROWS - 1), 0, TORSO_ROWS - 1.001);
+        const i0 = Math.floor(si), i1 = i0 + 1, kk = si - i0;
+        const A0 = torso.st[i0], A1 = torso.st[i1];
+        _side.copy(A0.dr).lerp(A1.dr, kk).normalize();
+        _fwd.copy(A0.du).lerp(A1.du, kk).normalize();
+        _perp.copy(A0.dt).lerp(A1.dt, kk).normalize();
+        leg.anchor.copy(A0.c).lerp(A1.c, kk)
+          .addScaledVector(_side, def.side * def.off[0])
+          .addScaledVector(_fwd, def.off[1])
+          .addScaledVector(_perp, def.off[2]);
+        leg.sAnchor = G.lerp(A0.u0, A1.u0, kk);
+
+        // foot path: planted during stance, arcs forward during swing
+        const p = G.fract(ph + def.phase);
+        const duty = rig.duty, Str = rig.stride * walk;
+        let fz, fy, a4, stance;
+        if (p < duty) {
+          const u = p / duty;
+          fz = Str * duty * (0.5 - u); fy = 0; a4 = def.neutral[3]; stance = 1;
+        } else {
+          const u = (p - duty) / (1 - duty), es = u * u * (3 - 2 * u);
+          fz = Str * duty * (es - 0.5);
+          fy = Math.sin(Math.PI * Math.pow(u, 0.8)) * (0.085 + 0.075 * G.clamp(Str / 2.4, 0, 1));
+          a4 = def.neutral[3] + 14 * Math.sin(Math.PI * u) * (u < 0.3 ? u / 0.3 : 1);
+          stance = 0;
+        }
+        leg.prevStance = leg.stance;
+        leg.stance += (stance - leg.stance) * Math.min(1, dt * 12);
+        if (leg.prevStance < 0.5 && leg.stance >= 0.5) { leg.land = 1; rig.landed.push(leg); }
+        leg.land *= Math.pow(0.02, dt);
+
+        // world-space foot target on the flat ground plane
+        _d.set(def.footX * def.side, fy + 0.004, def.footZ + fz);
+        const footW = _d.clone().applyMatrix4(rig.MY);
+        const anchW = leg.anchor.clone().applyMatrix4(rig.M);
+        const dx = footW.x - anchW.x, dz = footW.z - anchW.z;
+        const yaw = Math.atan2(dx, dz);
+        _fwd.set(Math.sin(yaw), 0, Math.cos(yaw));
+        _side.set(_fwd.z, 0, -_fwd.x);
+        // plane coordinates measured from the anchor (u forward, v up)
+        const uT = dx * _fwd.x + dz * _fwd.z, vT = footW.y - anchW.y;
+        const L = def.L;
+        // plane -> root space helpers
+        _m4.extractRotation(rig.Mi);
+        const sideL = _sl.copy(_side).applyMatrix4(_m4).normalize();
+        const toLocal = (v, out) => {
+          _w.set(anchW.x + _fwd.x * v.x, anchW.y + v.y, anchW.z + _fwd.z * v.x);
+          return out.copy(_w).applyMatrix4(rig.Mi);
+        };
+        const jpL = leg.jpL;
+        const tU = uT - L[3] * Math.sin(D(a4)), tV = vT + L[3] * Math.cos(D(a4));
+
+        // ---- 3 joint CCD in the limb plane, biased toward the neutral pose
+        const ang = leg.a, neu = def.neutral, lim = def.lim;
+        for (let it = 0; it < 16; it++) {
+          for (let i = 2; i >= 0; i--) {
+            let cu = 0, cv = 0, cum = 0;
+            for (let k = 0; k <= 2; k++) { cum += ang[k]; cu += L[k] * Math.sin(cum); cv -= L[k] * Math.cos(cum); }
+            let ju = 0, jv = 0; cum = 0;
+            for (let k = 0; k < i; k++) { cum += ang[k]; ju += L[k] * Math.sin(cum); jv -= L[k] * Math.cos(cum); }
+            const vx = cu - ju, vy = cv - jv, wx = tU - ju, wy = tV - jv;
+            ang[i] += Math.atan2(vx * wy - vy * wx, vx * wx + vy * wy) * 0.68;
+            const lm = D(lim[i]);
+            ang[i] = G.clamp(ang[i], -lm, lm);
+            ang[i] -= (ang[i] - D(neu[i])) * (it > 8 ? 0.10 : 0.03);
+          }
+        }
+        // joint positions in plane coords
+        let cu = 0, cv = 0, cum = 0;
+        const cums = [0, 0, 0, 0, 0];
+        leg.jp[0].set(0, 0, 0);
+        for (let k = 0; k <= 2; k++) {
+          cum += ang[k]; cums[k + 1] = cum;
+          cu += L[k] * Math.sin(cum); cv -= L[k] * Math.cos(cum);
+          leg.jp[k + 1].set(cu, cv, 0);
+        }
+        leg.jp[4].set(uT, vT, 0);
+        cums[4] = Math.atan2(uT - cu, vT - cv);
+        for (let k = 0; k < 5; k++) toLocal(leg.jp[k], jpL[k]);
+
+        for (let pi = 0; pi < 4; pi++) {
+          const A = jpL[pi], B = jpL[pi + 1];
+          _d.copy(B).sub(A);
+          const len = _d.length() || 1e-3; _d.multiplyScalar(1 / len);
+          _perp.crossVectors(_d, sideL);                 // in-plane, toward the front
+          const pr = def.prof[pi], part = leg.parts[pi];
+          const u0 = leg.sAnchor + (def.front ? 0.05 : -0.30) + pi * 0.12;
+          for (let i = 0; i < LEG_ROWS; i++) {
+            const t = i / (LEG_ROWS - 1), S = part.st[i], rr = seg(pr, t, 1, 2);
+            S.c.copy(A).addScaledVector(_d, len * t);
+            S.dt.copy(_d); S.dr.copy(sideL); S.du.copy(_perp);
+            S.rx = rr[0]; S.ry = rr[1]; S.p = 2.2; S.taper = 0;
+            S.u0 = u0 + t * len * 0.8; S.v0 = 0.30;
+            const fade = pi === 0 ? G.mix(0.95, 0.88, t)
+              : pi === 1 ? G.mix(0.9, 0.72, t)
+                : pi === 2 ? G.mix(0.72, 0.32, t) : G.mix(0.32, 0.16, t);
+            S.topFade = fade; S.bellyFade = fade;
+            const tone = pi >= 2 ? G.mix(1.0, 0.80, t) : 1.0;
+            S.topTone = tone; S.bellyTone = tone;
+          }
+          part.loft.update(part.st);
+        }
+        for (let k = 0; k < 3; k++) {
+          const j = leg.joints[k], rr = def.joint[k];
+          j.position.copy(jpL[k + 1]);
+          j.scale.set(rr, rr * 1.05, rr * 1.10);
+        }
+        _d.copy(jpL[4]).sub(jpL[3]).normalize();
+        leg.hoof.position.copy(jpL[3]).addScaledVector(_d, L[3] - 0.085);
+        leg.hoof.quaternion.setFromUnitVectors(UP, _d.clone().negate());
+      }
+
+      // ---- commit lofts
+      torso.loft.update(torso.st);
+      neck.loft.update(neck.st);
+      tail.loft.update(tail.st);
+      mane.loft.update(mane.st);
+      // tail brush follows the last tail segment
+      const b0 = tail.st[TAIL_ROWS - 3].c, b1 = tail.st[TAIL_ROWS - 1].c;
+      _d.copy(b1).sub(b0).normalize();
+      brush.position.copy(b1).addScaledVector(_d, 0.20);
+      brush.quaternion.setFromUnitVectors(UP, _d.clone().negate());
+    };
+
+    rig.neckEndYaw = function () {
+      _d.copy(head.position).sub(rig.root.position);
+      return Math.atan2(_d.x, _d.z) - rig.heading;
+    };
+    rig.headWorld = function (out) { return out.copy(head.position).applyMatrix4(rig.M); };
+    rig.heightAt = () => 5.55;
+
+    return rig;
+  };
+})(window.G);
+
+
+/* ======================= 40_world.js ======================= */
+// ---------------------------------------------------------------------------
+// 40_world.js -- sky, sun, ground, grass, acacias, rocks
+// ---------------------------------------------------------------------------
+window.G = window.G || {};
+(function (G) {
+  'use strict';
+  const srgb = (h) => new THREE.Color(h).convertSRGBToLinear();
+
+  // ---------- procedural textures -----------------------------------------
+  G.groundTexture = function () {
+    const S = 512, cv = G.canvas(S, S), c = cv.getContext('2d');
+    const img = c.createImageData(S, S), d = img.data;
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const i = (y * S + x) * 4;
+      const u = x / S * 8, v = y / S * 8;
+      const n = G.fbm(u, v, 4, 3);
+      const n2 = G.fbm(u * 4 + 20, v * 4, 3, 11);
+      const dry = G.smooth(0.35, 0.72, n);
+      // dry straw <-> dusty earth <-> sparse green
+      let r = G.mix(0.55, 0.70, dry), g = G.mix(0.46, 0.56, dry), b = G.mix(0.33, 0.38, dry);
+      const green = G.smooth(0.62, 0.85, n2) * 0.8;
+      r = G.mix(r, 0.36, green); g = G.mix(g, 0.42, green); b = G.mix(b, 0.22, green);
+      const speck = G.noise2(x * 0.9, y * 0.9, 5);
+      const k = 0.86 + 0.3 * speck;
+      d[i] = r * k * 255; d[i + 1] = g * k * 255; d[i + 2] = b * k * 255; d[i + 3] = 255;
+    }
+    c.putImageData(img, 0, 0);
+    // grass strokes
+    c.globalAlpha = 0.5;
+    for (let i = 0; i < 4200; i++) {
+      const x = Math.random() * S, y = Math.random() * S, l = 2 + Math.random() * 7;
+      const t = Math.random();
+      c.strokeStyle = t < 0.55 ? 'rgba(150,138,80,0.55)' : t < 0.8 ? 'rgba(110,116,62,0.5)' : 'rgba(188,172,124,0.5)';
+      c.lineWidth = 0.8 + Math.random();
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x + (Math.random() - 0.5) * 3, y - l); c.stroke();
+    }
+    c.globalAlpha = 1;
+    return G.tex(cv, { wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping, srgb: true, aniso: 8, repeat: [26, 26] });
+  };
+
+  G.grassTuftTexture = function () {
+    const S = 128, cv = G.canvas(S, S), c = cv.getContext('2d');
+    c.clearRect(0, 0, S, S);
+    for (let i = 0; i < 26; i++) {
+      const x = 8 + Math.random() * (S - 16);
+      const h = 40 + Math.random() * 80;
+      const bend = (Math.random() - 0.5) * 34;
+      const w = 1.6 + Math.random() * 2.6;
+      const t = Math.random();
+      const col = t < 0.45 ? [186, 168, 106] : t < 0.75 ? [146, 150, 84] : [210, 192, 138];
+      const grad = c.createLinearGradient(0, S, 0, S - h);
+      grad.addColorStop(0, 'rgba(' + (col[0] * 0.78 | 0) + ',' + (col[1] * 0.76 | 0) + ',' + (col[2] * 0.72 | 0) + ',1)');
+      grad.addColorStop(1, 'rgba(' + Math.min(255, col[0] * 1.18 | 0) + ',' + Math.min(255, col[1] * 1.14 | 0) + ',' + col[2] + ',0.95)');
+      c.strokeStyle = grad; c.lineWidth = w * 1.5; c.lineCap = 'round';
+      c.beginPath(); c.moveTo(x, S);
+      c.quadraticCurveTo(x + bend * 0.3, S - h * 0.55, x + bend, S - h);
+      c.stroke();
+    }
+    return G.tex(cv, { srgb: true });
+  };
+
+  G.barkTexture = function () {
+    const W = 128, H = 256, cv = G.canvas(W, H), c = cv.getContext('2d');
+    const img = c.createImageData(W, H), d = img.data;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      const n = G.fbm(x * 0.10, y * 0.02, 4, 9);
+      const crack = G.smooth(0.42, 0.52, G.noise2(x * 0.35, y * 0.06, 4));
+      const k = (0.5 + 0.5 * n) * (0.55 + 0.45 * crack);
+      d[i] = 0.42 * k * 255; d[i + 1] = 0.35 * k * 255; d[i + 2] = 0.28 * k * 255; d[i + 3] = 255;
+    }
+    c.putImageData(img, 0, 0);
+    return G.tex(cv, { wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping, srgb: true, repeat: [2, 2] });
+  };
+
+  // ---------- sky ----------------------------------------------------------
+  G.Sky = function () {
+    const geo = new THREE.SphereGeometry(1200, 32, 20);
+    const mat = new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false, fog: false,
+      uniforms: {
+        uTop: { value: srgb(0x3f7fc4) },
+        uHor: { value: srgb(0xcfd8cf) },
+        uHaze: { value: srgb(0xd9cdae) },
+        uSun: { value: new THREE.Vector3(0.4, 0.5, 0.3) },
+        uSunCol: { value: srgb(0xfff2d0) },
+        uSunI: { value: 1 }
+      },
+      vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: [
+        'varying vec3 vP;',
+        'uniform vec3 uTop, uHor, uHaze, uSunCol; uniform vec3 uSun; uniform float uSunI;',
+        'void main(){',
+        '  vec3 d = normalize(vP);',
+        '  vec3 col = mix(uHor, uTop, pow(clamp(d.y,0.0,1.0), 0.62));',
+        '  col = mix(col, uHaze, smoothstep(0.06, -0.10, d.y));',
+        '  float s = clamp(dot(d, normalize(uSun)), 0.0, 1.0);',
+        '  col += uSunCol * (pow(s, 1400.0) * 9.0 + pow(s, 22.0) * 0.5 + pow(s, 4.0) * 0.12) * uSunI;',
+        '  gl_FragColor = vec4(col, 1.0);',
+        '}'
+      ].join('\n')
+    });
+    const m = new THREE.Mesh(geo, mat);
+    m.frustumCulled = false;
+    return m;
+  };
+
+  // ---------- vegetation ---------------------------------------------------
+  G.makeGrass = function (n, radius, tex) {
+    // two crossed quads per tuft, instanced
+    const g1 = new THREE.PlaneGeometry(1, 1, 1, 3);
+    g1.translate(0, 0.5, 0);
+    const g2 = g1.clone();
+    g2.rotateY(Math.PI / 2);
+    const merged = mergeGeos([g1, g2]);
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex, alphaTest: 0.42, side: THREE.DoubleSide,
+      roughness: 0.95, metalness: 0
+    });
+    const t = { value: 0 };
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uTime = t;
+      sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace(
+        '#include <begin_vertex>',
+        ['#include <begin_vertex>',
+          '#ifdef USE_INSTANCING',
+          '  float ph = instanceMatrix[3][0]*0.7 + instanceMatrix[3][2]*0.9;',
+          '  float sway = sin(uTime*1.5 + ph) * 0.16 + sin(uTime*3.7 + ph*1.7)*0.05;',
+          '  transformed.x += sway * transformed.y * transformed.y;',
+          '  transformed.z += sway * 0.5 * transformed.y * transformed.y;',
+          '#endif'].join('\n'));
+    };
+    const mesh = new THREE.InstancedMesh(merged, mat, n);
+    mesh.receiveShadow = false; mesh.castShadow = false;
+    const r = G.rng(99);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
+    for (let i = 0; i < n; i++) {
+      const a = r() * G.TAU, rad = Math.sqrt(r()) * radius;
+      p.set(Math.cos(a) * rad, 0, Math.sin(a) * rad);
+      const h = 0.16 + r() * 0.38, w = 0.26 + r() * 0.3;
+      q.setFromEuler(new THREE.Euler(0, r() * G.TAU, 0));
+      s.set(w, h, w);
+      mesh.setMatrixAt(i, m4.compose(p, q, s));
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.frustumCulled = false;
+    mesh.userData.time = t;
+    return mesh;
+  };
+
+  function mergeGeos(list) {
+    let vc = 0, ic = 0;
+    list.forEach((g) => { vc += g.attributes.position.count; ic += g.index.count; });
+    const pos = new Float32Array(vc * 3), nor = new Float32Array(vc * 3), uv = new Float32Array(vc * 2);
+    const idx = new Uint32Array(ic);
+    let vo = 0, io = 0;
+    list.forEach((g) => {
+      pos.set(g.attributes.position.array, vo * 3);
+      nor.set(g.attributes.normal.array, vo * 3);
+      uv.set(g.attributes.uv.array, vo * 2);
+      const ix = g.index.array;
+      for (let i = 0; i < ix.length; i++) idx[io + i] = ix[i] + vo;
+      vo += g.attributes.position.count; io += ix.length;
+    });
+    const out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    out.setIndex(new THREE.BufferAttribute(idx, 1));
+    return out;
+  }
+
+  G.makeAcacia = function (tex, seed) {
+    const r = G.rng(seed);
+    const g = new THREE.Group();
+    const bark = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.95, color: 0xb9ab98 });
+    const H = r.range(4.5, 8.5);
+    // trunk: tapered, slightly bent
+    const pts = [];
+    for (let i = 0; i <= 5; i++) {
+      const t = i / 5;
+      pts.push(new THREE.Vector3(Math.sin(t * 2 + seed) * 0.25 * t, t * H * 0.72, Math.cos(t * 1.7 + seed) * 0.2 * t));
+    }
+    const cv = G.curve(pts, false);
+    const L = new G.Loft(9, 8);
+    const st = G.stations(9);
+    for (let i = 0; i < 9; i++) {
+      const t = i / 8, S = st[i];
+      cv.at(t, S.c);
+      cv.at(Math.min(1, t + 0.02), _a); cv.at(Math.max(0, t - 0.02), _b);
+      S.dt.copy(_a).sub(_b).normalize();
+      S.dr.set(1, 0, 0).addScaledVector(S.dt, S.dt.x).normalize();
+      S.du.crossVectors(S.dt, S.dr).normalize();
+      S.rx = S.ry = G.lerp(0.34, 0.13, t);
+      S.p = 2.2; S.u0 = t * 0.6; S.v0 = 0.1;
+      S.topFade = 1; S.bellyFade = 1; S.topTone = 1; S.bellyTone = 1;
+    }
+    L.update(st);
+    const trunk = new THREE.Mesh(L.geometry, bark);
+    trunk.castShadow = true; trunk.receiveShadow = true;
+    g.add(trunk);
+    // branches + flat canopy
+    const leafMat = new THREE.MeshStandardMaterial({ color: srgb(0x6a7a41), roughness: 1, flatShading: true });
+    const nb = 4 + r.int(0, 3);
+    const canopy = [];
+    for (let i = 0; i < nb; i++) {
+      const a = r() * G.TAU, len = r.range(1.2, 2.6);
+      const bg = new THREE.CylinderGeometry(0.055, 0.13, len, 6);
+      bg.translate(0, len / 2, 0);
+      const bm = new THREE.Mesh(bg, bark);
+      bm.position.set(Math.sin(a) * 0.15, H * 0.70 + r.range(-0.3, 0.5), Math.cos(a) * 0.15);
+      bm.rotation.set(Math.cos(a) * r.range(0.5, 0.9), 0, -Math.sin(a) * r.range(0.5, 0.9));
+      bm.castShadow = true;
+      g.add(bm);
+      canopy.push(new THREE.Vector3(bm.position.x + Math.sin(a) * len * 0.55, bm.position.y + len * 0.5, bm.position.z + Math.cos(a) * len * 0.55));
+    }
+    canopy.push(new THREE.Vector3(0, H * 0.78 + 0.5, 0));
+    canopy.forEach((c) => {
+      const rr = r.range(1.5, 2.8);
+      const sg = new THREE.IcosahedronGeometry(rr, 1);
+      const pa = sg.attributes.position;
+      for (let i = 0; i < pa.count; i++) {
+        const n = 1 + (G.noise2(pa.getX(i) * 1.7 + c.x, pa.getZ(i) * 1.7 + c.z, 3) - 0.5) * 0.6;
+        pa.setXYZ(i, pa.getX(i) * n, pa.getY(i) * n * 0.42, pa.getZ(i) * n);
+      }
+      sg.computeVertexNormals();
+      const m = new THREE.Mesh(sg, leafMat);
+      m.position.copy(c);
+      m.castShadow = true; m.receiveShadow = true;
+      g.add(m);
+    });
+    return g;
+  };
+  const _a = new THREE.Vector3(), _b = new THREE.Vector3();
+
+  G.makeRock = function (seed) {
+    const r = G.rng(seed);
+    const g = new THREE.IcosahedronGeometry(1, 1);
+    const pa = g.attributes.position;
+    for (let i = 0; i < pa.count; i++) {
+      const n = 0.75 + G.noise2(pa.getX(i) * 2 + seed, pa.getZ(i) * 2, 6) * 0.6;
+      pa.setXYZ(i, pa.getX(i) * n, pa.getY(i) * n * 0.6, pa.getZ(i) * n);
+    }
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: srgb(0x8b8477), roughness: 1, flatShading: true }));
+    m.castShadow = true; m.receiveShadow = true;
+    return m;
+  };
+})(window.G);
+
+
+/* ======================= 50_main.js ======================= */
+// ---------------------------------------------------------------------------
+// 50_main.js -- renderer, world assembly, camera, UI, animation loop
+// ---------------------------------------------------------------------------
+(function (G) {
+  'use strict';
+  const srgb = (h) => new THREE.Color(h).convertSRGBToLinear();
+
+  const app = G.app = {};
+  let renderer, scene, camera, rig, sky, sun, hemi, ground, grass, sunHelper;
+  const trees = [], rocks = [];
+  let coat = null, coatSeed = 1337;
+
+  const state = {
+    walk: 1, speedSet: 1.25, follow: true, playing: true,
+    camPreset: 'side', sunEl: 26, sunAz: 118, shadows: true, quality: 1
+  };
+  const A = { speed: 1.25, walk: 1, turn: 0, neckPitch: 0, neckYaw: 0, headPitch: 0, lookAt: null };
+  const beh = { mode: 'walk', tMode: 3, turn: 0, turnT: 0, heading: 0 };
+
+  // camera rig
+  const cam = { azim: Math.PI * 0.5, offset: Math.PI * 0.5, elev: 0.16, dist: 13.5, target: new THREE.Vector3(), tTarget: new THREE.Vector3(), shake: 0 };
+  const PRESET = {
+    side: { elev: 0.115, dist: 16.0, off: Math.PI * 0.5, ty: 2.80, tz: 0.3 },
+    low: { elev: 0.035, dist: 9.5, off: Math.PI * 0.55, ty: 2.2, tz: 0.2 },
+    full: { elev: 0.10, dist: 17.5, off: Math.PI * 0.72, ty: 2.6, tz: 0 },
+    head: { elev: 0.10, dist: 4.2, off: Math.PI * 0.35, ty: 4.9, tz: 1.9, head: true },
+    portrait: { elev: 0.055, dist: 6.0, off: Math.PI * 0.42, ty: 3.3, tz: 1.0 },
+    top: { elev: 0.55, dist: 16, off: Math.PI * 0.5, ty: 2.2, tz: 0 }
+  };
+
+  // ---------------------------------------------------------------------
+  app.init = function () {
+    const canvas = document.getElementById('c');
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.06;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0xcfc7ae, 70, 340);
+    camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.25, 2600);
+    camera.position.set(12, 3, -6);
+
+    sky = G.Sky();
+    scene.add(sky);
+
+    sun = new THREE.DirectionalLight(0xffffff, 2.6);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    const sc = sun.shadow.camera;
+    sc.left = -11; sc.right = 11; sc.top = 11; sc.bottom = -11; sc.near = 1; sc.far = 90;
+    sun.shadow.bias = -0.0009;
+    sun.shadow.normalBias = 0.035;
+    sun.shadow.radius = 1.6;
+    scene.add(sun); scene.add(sun.target);
+    hemi = new THREE.HemisphereLight(0xbcd4f0, 0x6b5a3c, 0.75);
+    scene.add(hemi);
+
+    // ground
+    const gtex = G.groundTexture();
+    ground = new THREE.Mesh(
+      new THREE.CircleGeometry(700, 48),
+      new THREE.MeshStandardMaterial({ map: gtex, bumpMap: gtex, bumpScale: 0.35, roughness: 1, metalness: 0 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // grass
+    grass = G.makeGrass(2600, 85, G.grassTuftTexture());
+    scene.add(grass);
+
+    // trees + rocks, recycled ahead of the animal
+    const bark = G.barkTexture();
+    for (let i = 0; i < 16; i++) {
+      const t = G.makeAcacia(bark, 100 + i * 7);
+      placeAround(t, i * 41 + 13, 55, 190);
+      trees.push(t); scene.add(t);
+    }
+    for (let i = 0; i < 14; i++) {
+      const r = G.makeRock(500 + i * 13);
+      const s = 0.3 + (i % 4) * 0.35;
+      r.scale.setScalar(s);
+      placeAround(r, i * 29 + 5, 18, 150);
+      rocks.push(r); scene.add(r);
+    }
+
+    // giraffe
+    buildGiraffe(coatSeed);
+
+    ui();
+    setTime(state.sunEl);
+    applyPreset(state.camPreset, true);
+    window.addEventListener('resize', onResize);
+    onResize();
+    controls(canvas);
+    app.ready = true;
+    last = performance.now();
+    requestAnimationFrame(loop);
+  };
+
+  function buildGiraffe(seed) {
+    if (rig) { scene.remove(rig.root); }
+    coat = G.makeCoatAtlas({ seed: seed });
+    rig = G.buildGiraffe(coat.texture, { seed: seed });
+    scene.add(rig.root);
+    app.rig = rig;
+  }
+
+  function placeAround(obj, seed, rmin, rmax) {
+    const r = G.rng(seed);
+    const a = r() * G.TAU, rad = rmin + r() * (rmax - rmin);
+    obj.position.set(Math.cos(a) * rad, 0, Math.sin(a) * rad);
+    obj.rotation.y = r() * 6.28;
+    obj.userData.seed = seed;
+  }
+  const _v1 = new THREE.Vector3();
+  function recycle(list, minBehind, near, far) {
+    const h = new THREE.Vector3(Math.sin(rig.heading), 0, Math.cos(rig.heading));
+    for (const o of list) {
+      _v1.copy(o.position).sub(rig.root.position);
+      const along = _v1.dot(h);
+      if (along < -minBehind) {
+        const r = Math.random();
+        const d = near + r * (far - near);
+        const lat = (Math.random() - 0.5) * 2 * (0.35 * d + 22);
+        o.position.copy(rig.root.position).addScaledVector(h, d);
+        o.position.x += h.z * lat; o.position.z += -h.x * lat;
+        o.rotation.y = Math.random() * 6.28;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  function setTime(elDeg) {
+    state.sunEl = elDeg;
+    const el = G.deg(elDeg), az = G.deg(state.sunAz);
+    const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
+    sun.position.copy(dir).multiplyScalar(60);
+    const warm = G.clamp(1 - elDeg / 40, 0, 1);
+    sun.color.copy(new THREE.Color().lerpColors(srgb(0xfff3df), srgb(0xffb066), warm * 0.85));
+    sun.intensity = G.mix(3.1, 1.9, warm);
+    hemi.intensity = G.mix(0.8, 0.5, warm);
+    hemi.color.copy(new THREE.Color().lerpColors(srgb(0xbcd4f0), srgb(0xf0c39a), warm));
+    const hor = new THREE.Color().lerpColors(srgb(0xd3d8cd), srgb(0xe8b184), warm);
+    const top = new THREE.Color().lerpColors(srgb(0x3f7fc4), srgb(0x6f8fb8), warm * 0.7);
+    // the sky is unlit, so its colours are boosted to survive tone mapping;
+    // the fog is boosted by the same amount to keep the horizon seamless
+    sky.material.uniforms.uHor.value.copy(hor).multiplyScalar(2.15);
+    sky.material.uniforms.uTop.value.copy(top).multiplyScalar(2.35);
+    sky.material.uniforms.uHaze.value.copy(hor).lerp(srgb(0xd9cdae), 0.4).multiplyScalar(2.05);
+    sky.material.uniforms.uSun.value.copy(dir);
+    sky.material.uniforms.uSunI.value = G.mix(1.6, 0.8, warm);
+    scene.fog.color.copy(hor).multiplyScalar(2.02);
+    renderer.toneMappingExposure = G.mix(1.02, 1.16, warm);
+    ground.material.color.setRGB(1, 1, 1);
+  }
+
+  // ---------------------------------------------------------------------
+  function applyPreset(name, snap) {
+    state.camPreset = name;
+    const p = PRESET[name];
+    cam.elev = p.elev; cam.dist = p.dist;
+    cam.offset = p.off;
+    cam.azim = (rig ? rig.heading : 0) + p.off;
+    if (snap) { cam.target.set(0, p.ty, 0); }
+    cam.p = p;
+    document.querySelectorAll('#ui .cam button').forEach((b) => b.classList.toggle('on', b.dataset.cam === name));
+  }
+
+  function controls(canvas) {
+    let down = false, px = 0, py = 0, moved = 0;
+    const dn = (e) => { down = true; moved = 0; px = e.clientX; py = e.clientY; };
+    const mv = (e) => {
+      if (!down) return;
+      const dx = e.clientX - px, dy = e.clientY - py;
+      px = e.clientX; py = e.clientY; moved += Math.abs(dx) + Math.abs(dy);
+      cam.azim -= dx * 0.005;
+      cam.elev = G.clamp(cam.elev + dy * 0.003, 0.012, 1.2);
+      cam.offset = cam.azim - rig.heading;
+    };
+    const up = () => { down = false; };
+    canvas.addEventListener('pointerdown', dn);
+    window.addEventListener('pointermove', mv);
+    window.addEventListener('pointerup', up);
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      cam.dist = G.clamp(cam.dist * Math.pow(1.0013, e.deltaY), 2.2, 60);
+    }, { passive: false });
+    canvas.addEventListener('dblclick', () => { state.follow = !state.follow; sync(); });
+  }
+
+  function onResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
+  }
+
+  // ---------------------------------------------------------------------
+  function ui() {
+    const $ = (id) => document.getElementById(id);
+    $('speedV').textContent = state.speedSet.toFixed(2) + ' m/s';
+    $('sunV').textContent = Math.round(state.sunEl) + '\u00b0';
+    $('sunAzV').textContent = state.sunAz + '\u00b0';
+    $('walkBtn').onclick = () => { state.walk = state.walk > 0.5 ? 0 : 1; sync(); };
+    $('speed').oninput = (e) => { state.speedSet = +e.target.value; $('speedV').textContent = state.speedSet.toFixed(2) + ' m/s'; };
+    $('sun').oninput = (e) => { setTime(+e.target.value); $('sunV').textContent = Math.round(state.sunEl) + '\u00b0'; };
+    $('sunAz').oninput = (e) => { state.sunAz = +e.target.value; $('sunAzV').textContent = state.sunAz + '\u00b0'; setTime(state.sunEl); };
+    $('follow').onclick = () => { state.follow = !state.follow; sync(); };
+    $('coatBtn').onclick = () => { coatSeed = (coatSeed * 7919 + 13) % 100000; buildGiraffe(coatSeed); };
+    $('shadowBtn').onclick = () => {
+      state.shadows = !state.shadows;
+      renderer.shadowMap.enabled = state.shadows;
+      scene.traverse((o) => { if (o.material) { const m = Array.isArray(o.material) ? o.material : [o.material]; m.forEach((x) => x.needsUpdate = true); } });
+      sync();
+    };
+    $('pauseBtn').onclick = () => { state.playing = !state.playing; sync(); };
+    document.querySelectorAll('#ui .cam button').forEach((b) => { b.onclick = () => applyPreset(b.dataset.cam, true); });
+    sync();
+  }
+  function sync() {
+    const $ = (id) => document.getElementById(id);
+    $('walkBtn').textContent = state.walk > 0.5 ? 'Stand' : 'Walk';
+    $('follow').classList.toggle('on', state.follow);
+    $('shadowBtn').classList.toggle('on', state.shadows);
+    $('pauseBtn').textContent = state.playing ? 'Pause' : 'Play';
+  }
+
+  // ---------------------------------------------------------------------
+  function behaviour(dt) {
+    beh.tMode -= dt;
+    if (beh.tMode <= 0) {
+      const r = Math.random();
+      if (r < 0.55) { beh.mode = 'walk'; beh.tMode = G.rand(6, 14); }
+      else if (r < 0.78) { beh.mode = 'pause'; beh.tMode = G.rand(2.5, 5); }
+      else { beh.mode = 'turn'; beh.tMode = G.rand(4, 7); beh.turn = (Math.random() < 0.5 ? -1 : 1) * G.rand(0.10, 0.20); }
+    }
+    const d = Math.hypot(rig.root.position.x, rig.root.position.z);
+    let wantTurn = beh.mode === 'turn' ? beh.turn : 0;
+    if (d > 70) {
+      const need = Math.atan2(-rig.root.position.x, -rig.root.position.z);
+      let e = need - rig.heading;
+      while (e > Math.PI) e -= G.TAU; while (e < -Math.PI) e += G.TAU;
+      wantTurn = G.clamp(e * 0.8, -0.25, 0.25);
+      beh.mode = 'walk';
+    }
+    A.turn += (wantTurn - A.turn) * Math.min(1, dt * 1.6);
+    const spd = (beh.mode === 'pause' ? 0 : state.speedSet);
+    A.speed += (spd - A.speed) * Math.min(1, dt * 1.2);
+    A.walk += ((state.walk > 0.5 && spd > 0.05 ? 1 : 0) - A.walk) * Math.min(1, dt * 1.1);
+  }
+
+  // ---------------------------------------------------------------------
+  let last = 0, fps = 60, acc = 0, frames = 0;
+  function step(dt) {
+    behaviour(dt);
+    rig.update(dt, A);
+    // world follows the animal
+    const p = rig.root.position;
+    ground.position.set(p.x, 0, p.z);
+    const tile = 1400 / 26;
+    ground.material.map.offset.set(-p.x / tile, -p.z / tile);
+    ground.material.bumpMap.offset.set(-p.x / tile, -p.z / tile);
+    grass.position.set(Math.round(p.x / 5) * 5, 0, Math.round(p.z / 5) * 5);
+    grass.userData.time.value += dt;
+    recycle(trees, 130, 70, 210);
+    recycle(rocks, 110, 25, 120);
+    // shadow frustum rides along
+    sun.target.position.set(p.x, 1.8, p.z);
+    sun.position.set(p.x, 1.8, p.z).add(sun.userData.dir || (sun.userData.dir = sun.position.clone().normalize().multiplyScalar(60)));
+    sun.target.updateMatrixWorld();
+  }
+
+  function render() {
+    const p = PRESET[state.camPreset];
+    const head = rig.head.getWorldPosition(new THREE.Vector3());
+    if (state.follow) {
+      cam.azim += (rig.heading + cam.offset - cam.azim) * 0.08;
+      const anchor = p.preset === 'head' ? head : rig.root.position;
+      cam.tTarget.set(rig.root.position.x, p.ty, rig.root.position.z).lerp(head, p.head ? 0.55 : 0.0);
+      if (p.head) cam.tTarget.set(head.x, head.y - 0.1, head.z);
+      cam.target.lerp(cam.tTarget, 0.08);
+    } else {
+      cam.target.lerp(cam.tTarget, 0.05);
+    }
+    const cd = cam.dist, ce = Math.cos(cam.elev), se = Math.sin(cam.elev);
+    camera.position.set(
+      cam.target.x + Math.sin(cam.azim) * cd * ce,
+      cam.target.y + cd * se,
+      cam.target.z + Math.cos(cam.azim) * cd * ce
+    );
+    camera.lookAt(cam.target);
+    renderer.render(scene, camera);
+  }
+  app.render = render;
+
+  function loop(now) {
+    const dt = Math.min(0.05, Math.max(0.0005, (now - last) / 1000));
+    last = now;
+    if (state.playing) { step(dt); acc += dt; }
+    frames++; acc += 0;
+    fps = fps * 0.92 + (1 / dt) * 0.08;
+    render();
+    const el = document.getElementById('fps');
+    if (el && frames % 15 === 0) el.textContent = Math.round(fps) + ' fps';
+    requestAnimationFrame(loop);
+  }
+
+  // ---- test hooks -----------------------------------------------------
+  window.__test = {
+    get ready() { return !!app.ready; },
+    info: () => ({
+      tris: renderer.info.render.triangles,
+      calls: renderer.info.render.calls,
+      prog: renderer.info.programs.length,
+      h: rig ? +(rig.head.getWorldPosition(new THREE.Vector3()).y).toFixed(2) : 0,
+      phase: rig ? +rig.phase.toFixed(2) : 0,
+      walk: +A.walk.toFixed(2), speed: +A.speed.toFixed(2)
+    }),
+    run: async (secs) => {
+      const n = Math.round(secs * 60);
+      state.playing = false;
+      for (let i = 0; i < n; i++) { step(1 / 60); if (i % 4 === 3) render(); }
+      render();
+    },
+    snap: () => render(),
+    set: (o) => { Object.assign(state, o); if (o.cam) applyPreset(o.cam, true); },
+    cam: (name, dist, azim) => {
+      applyPreset(name || 'side', true);
+      if (dist) cam.dist = dist;
+      if (azim !== undefined) { cam.azim = azim; cam.offset = azim - rig.heading; }
+      if (azim !== undefined) state.follow = false;
+      render();
+    },
+    phase: (p) => { rig.phase = p; step(0.0001); render(); },
+    freeze: () => { state.playing = false; }
+  };
+})(window.G);
+
+window.G.app.init();
+</script>
+</body>
+</html>

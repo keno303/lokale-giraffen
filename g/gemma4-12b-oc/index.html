@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realistic Walking Giraffe</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #87CEEB; }
+        canvas { display: block; }
+    </style>
+</head>
+<body_content>
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+
+        // Scene Setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(12, 10, 25);
+        camera.lookAt(0, 5, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        sunLight.position.set(15, 30, 15);
+        sunLight.castShadow = true;
+        sunLight.shadow.camera.left = -30;
+        sunLight.shadow.camera.right = 30;
+        sunLight.shadow.camera.top = 30;
+        sunLight.shadow.camera.bottom = -30;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        scene.add(sunLight);
+
+        // Textures (Procedural)
+        function createSpotTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#F5A623'; // Giraffe base color
+            ctx.fillRect(0, 0, 512, 512);
+            
+            for (let i = 0; i < 150; i++) {
+                ctx.fillStyle = '#4B2C20'; // Spot color
+                const x = Math.random() * 512;
+                const y = Math.random() * 512;
+                const r = 10 + Math.random() * 30;
+                ctx.beginPath();
+                ctx.arc(x, y, r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            const texture = new THREE.CanvasTexture(canvas);
+            return texture;
+        }
+        const giraffeTexture = createSpotTexture();
+        const giraffeMat = new THREE.MeshStandardMaterial({ map: giraffeTexture });
+
+        // Environment
+        const groundGeo = new THREE.PlaneGeometry(200, 200);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x567d46 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Simple Trees
+        function createTree(x, z) {
+            const tree = new THREE.Group();
+            const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 6, 16);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4d2d1a });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 3;
+            trunk.castShadow = true;
+            tree.add(trunk);
+
+            const leavesGeo = new THREE.SphereGeometry(2, 16, 16);
+            const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d4d22 });
+            const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+            leaves.position.y = 7;
+            leaves.castShadow = true;
+            tree.add(leaves);
+
+            tree.position.set(x, 0, z);
+            scene.add(tree);
+        }
+
+        for(let i=0; i<20; i++) {
+            createTree(Math.random()*100 - 50, Math.random()*100 - 50);
+        }
+
+        // Giraffe Model Construction
+        const giraffe = new THREE.Group();
+
+        // Body
+        const bodyGeo = new THREE.SphereGeometry(2, 32, 32);
+        const body = new THREE.Mesh(bodyGeo, giraffeMat);
+        body.scale.set(1, 1.2, 1.8);
+        body.position.y = 5;
+        body.castShadow = true;
+        giraffe.add(body);
+
+        // Neck
+        const neckGeo = new THREE.CylinderGeometry(0.7, 0.4, 5, 32);
+        const neck = new THREE.Mesh(neckGeo, giraffeMat);
+        neck.position.set(0, 8, 1.5);
+        neck.rotation.x = -Math.PI / 4.5;
+        neck.castShadow = true;
+        giraffe.add(neck);
+
+        // Head
+        const headGeo = new THREE.SphereGeometry(0.7, 32, 32);
+        const head = new THREE.Mesh(headGeo, giraffeMat);
+        head.position.set(0, 11.5, 2);
+        head.rotation.x = Math.PI / 4;
+        head.castShadow = true;
+        giraffe.add(head);
+
+        // Ears
+        const earGeo = new THREE.ConeGeometry(0.1, 0.4, 16);
+        const earL = new THREE.Mesh(earGeo, giraffeMat);
+        earL.position.set(0.4, 12, 2);
+        earL.rotation.z = -0.5;
+        giraffe.add(earL);
+        const earR = new THREE.Mesh(earGeo, giraffeMat);
+        earR.position.set(-0.4, 12, 2);
+        earR.rotation.z = 0.5;
+        giraffe.add(earR);
+
+        // Legs with jointed structure
+        const legGroup = new THREE.Group();
+        giraffe.add(legGroup);
+
+        function createLeg(x, z, isFront) {
+            const group = new THREE.Group();
+            group.position.set(x, 3.5, z);
+            
+            // Upper leg
+            const upperGeo = new THREE.CylinderGeometry(0.2, 0.25, 2, 16);
+            const upper = new THREE.Mesh(upperGeo, giraffeMat);
+            upper.position.y = -1; // Offset so the pivot is at the "shoulder/hip"
+            upper.castShadow = true;
+            group.add(upper);
+
+            // Lower leg
+            const lowerGeo = new THREE.CylinderGeometry(0.15, 0.18, 2, 16);
+            const lower = new THREE.Mesh(lowerGeo, giraffeMat);
+            lower.position.y = -3; // Offset so the pivot is at the "knee"
+            lower.castShadow = true;
+            group.add(lower);
+
+            return { group, upper, lower, isFront };
+        }
+
+        const legs = [
+            createLeg(0.8, 1.5, true),   // Front Left
+            createLeg(-0.8, 1.5, true),  // Front Right
+            createLeg(0.8, -1.5, false),  // Back Left
+            createLeg(-0.8, -1.5, false)  // Back Right
+        ];
+
+        legs.forEach(l => legGroup.add(l.group));
+
+        // Tail
+        const tailGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.5, 8);
+        const tail = new THREE.Mesh(tailGeo, giraffeMat);
+        tail.position.set(0, 5.5, -1.8);
+        tail.rotation.x = -Math.PI / 4;
+        giraffe.add(tail);
+
+        scene.add(giraffe);
+
+        // Animation
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = clock.getElapsedTime();
+
+            // Move forward
+            giraffe.position.z -= 0.1;
+            if (giraffe.position.z < -60) giraffe.position.z = 60;
+
+            // Bobbing effect
+            const bob = Math.sin(t * 5) * 0.1;
+            giraffe.position.y = 0 + bob;
+            body.position.y = 5 + bob;
+            neck.position.y = 8 + bob;
+            head.position.y = 11.5 + bob;
+            
+            // Leg animation (walking gait)
+            const walkSpeed = 6;
+            const swing = 0.5;
+            const kneeSwing = 0.4;
+
+            // Front Left & Back Right (Phase 1)
+            legs[0].group.rotation.x = Math.sin(t * walkSpeed) * swing;
+            legs[3].group.rotation.x = Math.sin(t * walkSpeed) * swing;
+            // Lower leg rotation for phase 1
+            legs[0].lower.rotation.x = Math.sin(t * walkSpeed) * kneeSwing;
+            legs[3].lower.rotation.x = Math.sin(t * walkSpeed) * kneeSwing;
+
+            // Front Right & Back Left (Phase 2)
+            legs[1].group.rotation.x = Math.sin(t * walkSpeed + Math.PI) * swing;
+            legs[2].group.rotation.x = Math.sin(t * walkSpeed + Math.PI) * swing;
+            // Lower leg rotation for phase 2
+            legs[1].lower.rotation.x = Math.sin(t * walkSpeed + Math.PI) * kneeSwing;
+            legs[2].lower.rotation.x = Math.sin(t * walkSpeed + Math.PI) * kneeSwing;
+
+            // Subtle body sway
+            body.rotation.z = Math.sin(t * walkSpeed) * 0.03;
+            neck.rotation.z = Math.sin(t * walkSpeed) * 0.04;
+            tail.rotation.y = Math.sin(t * walkSpeed) * 0.5;
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

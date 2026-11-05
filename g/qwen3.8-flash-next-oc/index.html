@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giraffe — Walking Simulation</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1611; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+  .panel {
+    position: fixed; z-index: 10;
+    font: 13px/1.5 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #f3ead9; text-shadow: 0 1px 3px rgba(0,0,0,.6);
+    background: rgba(24, 19, 12, .55); backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,240,210,.14); border-radius: 10px;
+  }
+  #title { top: 14px; left: 14px; padding: 10px 14px; max-width: 340px; }
+  #title h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: .3px; }
+  #title p  { margin: 4px 0 0; opacity: .75; font-size: 12px; }
+  #controls { bottom: 14px; left: 14px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  #controls label { display: flex; gap: 7px; align-items: center; }
+  #controls input[type=range] { width: 120px; accent-color: #d9a45a; }
+  #controls button {
+    font: inherit; color: #f3ead9; background: rgba(217,164,90,.18);
+    border: 1px solid rgba(217,164,90,.45); border-radius: 6px; padding: 4px 10px; cursor: pointer;
+  }
+  #controls button:hover { background: rgba(217,164,90,.32); }
+  #hud { top: 14px; right: 14px; padding: 8px 12px; font-variant-numeric: tabular-nums; opacity: .85; }
+  #loading {
+    position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+    font: 15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; color: #e8d9b8;
+    background: radial-gradient(ellipse at 50% 45%, #4a3c28 0%, #241d13 70%);
+    transition: opacity .5s;
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="loading">growing a giraffe&hellip;</div>
+<div id="title" class="panel">
+  <h1>Giraffa camelopardalis</h1>
+  <p>procedural walk · drag = orbit · scroll = zoom · space = pause</p>
+</div>
+<div id="controls" class="panel">
+  <label>speed <input id="speed" type="range" min="0" max="2.6" step="0.05" value="1.35">
+    <span id="speedVal">1.35 m/s</span></label>
+  <button id="pauseBtn">pause</button>
+  <button id="camBtn">camera</button>
+  <button id="wireBtn">wireframe</button>
+</div>
+<div id="hud" class="panel">— fps</div>
+<script src="lib/three.min.js"></script>
+<script src="src/util.js"></script>
+<script src="src/textures.js"></script>
+<script src="src/mesh.js"></script>
+<script src="src/giraffe.js"></script>
+<script src="src/gait.js"></script>
+<script src="src/env.js"></script>
+<script src="src/camera.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>

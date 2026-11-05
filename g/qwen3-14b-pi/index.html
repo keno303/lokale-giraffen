@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Walking Giraffe</title>
+    <style>body { margin: 0; overflow: hidden; }</style>
+</head>
+<body>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script>
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({antialias: true});
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Giraffe body
+    const bodyGeometry = new THREE.CylinderGeometry(0.5, 0.5, 3, 32);
+    const bodyMaterial = new THREE.MeshStandardMaterial({color: 0x8B4513});
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.position.y = 1.5;
+    scene.add(body);
+
+    // Head
+    const headGeometry = new THREE.SphereGeometry(0.5, 32, 32);
+    const headMaterial = new THREE.MeshStandardMaterial({color: 0x8B4513});
+    const head = new THREE.Mesh(headGeometry, headMaterial);
+    head.position.y = 2.5;
+    scene.add(head);
+
+    // Legs
+    const legGeometry = new THREE.CylinderGeometry(0.1, 0.1, 1.5, 32);
+    const legMaterial = new THREE.MeshStandardMaterial({color: 0x8B4513});
+    
+    const legs = [];
+    for (let i = 0; i < 4; i++) {
+        const leg = new THREE.Mesh(legGeometry, legMaterial);
+        leg.position.x = (i % 2 === 0 ? -0.5 : 0.5);
+        leg.position.z = (i < 2 ? -0.5 : 0.5);
+        leg.position.y = 0.2;
+        scene.add(leg);
+        legs.push(leg);
+    }
+
+    // Lighting
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(5, 10, 7.5);
+    scene.add(light);
+
+    camera.position.z = 5;
+
+    // Animation
+    const clock = new THREE.Clock();
+    function animate() {
+        requestAnimationFrame(animate);
+        const time = clock.getElapsedTime();
+        
+        // Head bob
+        head.position.y = 2.5 + Math.sin(time * 2) * 0.1;
+        
+        // Leg animation
+        for (let i = 0; i < legs.length; i++) {
+            const leg = legs[i];
+            const phase = time * 1.5 + i * 0.5;
+            const height = 0.2 + Math.sin(phase) * 0.3;
+            leg.position.y = height;
+            leg.rotation.x = Math.sin(phase) * 0.5;
+        }
+        
+        renderer.render(scene, camera);
+    }
+    animate();
+</script>
+</body>
+</html>

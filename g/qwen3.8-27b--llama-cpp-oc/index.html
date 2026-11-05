@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<title>Savanna Giraffe — Three.js</title>
+<style>
+  html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#14100a; }
+  canvas { display:block; }
+  #hud {
+    position:fixed; top:14px; left:14px; z-index:10;
+    font:12px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color:#fdf6e6; background:rgba(24,16,6,0.44);
+    padding:10px 14px; border-radius:10px; border:1px solid rgba(255,240,200,0.15);
+    user-select:none; pointer-events:none;
+  }
+  #hud .title { font-size:14px; font-weight:600; letter-spacing:0.3px; }
+  #hud .dim { opacity:0.75; }
+  #speed { font-variant-numeric:tabular-nums; margin-top:3px; opacity:0.9; }
+  #fail {
+    position:fixed; inset:0; display:none; place-items:center; z-index:20;
+    color:#f5e9d0; background:#14100a; font:15px/1.6 system-ui, sans-serif;
+    text-align:center; padding:28px;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="title">🦒 Savanna Giraffe</div>
+  <div class="dim">drag — orbit&nbsp;&nbsp;·&nbsp;&nbsp;wheel / pinch — zoom</div>
+  <div class="dim">W / ↑ — faster&nbsp;&nbsp;·&nbsp;&nbsp;S / ↓ — slower</div>
+  <div class="dim">Space — walk / stop</div>
+  <div id="speed"></div>
+</div>
+<div id="fail"></div>
+<script src="three.min.js"></script>
+<script>
+"use strict";
+(function(){
+
+if (typeof THREE === "undefined") {
+  var f = document.getElementById("fail");
+  f.style.display = "grid";
+  f.textContent = "three.min.js not found. Place the three.js r128 build file (three.min.js) in the same folder as index.html and reload.";
+  return;
+}
+
+// ---------------------------------------------------------------- helpers
+var TAU = Math.PI * 2;
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+function smoothstep(a, b, x){ var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+function rand(a, b){ return a + Math.random() * (b - a); }
+
+// ---------------------------------------------------------------- renderer / scene
+var renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+} catch (e) {
+  var ff = document.getElementById("fail");
+  ff.style.display = "grid";
+  ff.textContent = "WebGL is not available in this browser.";
+  return;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.appendChild(renderer.domElement);
+
+var scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xe3cfa0, 28, 150);
+
+var camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 700);
+
+var hemi = new THREE.HemisphereLight(0xbfd9e8, 0x8a6f47, 0.6);
+scene.add(hemi);
+
+var sun = new THREE.DirectionalLight(0xffdca4, 1.3);
+sun.position.set(18, 15, 9);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 2;
+sun.shadow.camera.far = 80;
+sun.shadow.camera.left = -20;
+sun.shadow.camera.right = 20;
+sun.shadow.camera.top = 20;
+sun.shadow.camera.bottom = -20;
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.03;
+scene.add(sun);
+scene.add(sun.target);
+
+// ---------------------------------------------------------------- textures (procedural canvases)
+function makeSkyTexture(){
+  var cv = document.createElement("canvas"); cv.width = 512; cv.height = 512;
+  var g = cv.getContext("2d");
+  var gr = g.createLinearGradient(0, 0, 0, 512);
+  gr.addColorStop(0.00, "#3f7cb6");
+  gr.addColorStop(0.35, "#79aed6");
+  gr.addColorStop(0.62, "#b7cfd8");
+  gr.addColorStop(0.80, "#e8d7ad");
+  gr.addColorStop(1.00, "#e9cd96");
+  g.fillStyle = gr; g.fillRect(0, 0, 512, 512);
+  // a few soft, wispy clouds in the upper sky
+  function cloud(cx, cy, w, h, alpha){
+    for (var k = 0; k < 5; k++){
+      var ox = (k - 2) * w * 0.42 + rand(-w*0.08, w*0.08);
+      var oy = rand(-h*0.25, h*0.25);
+      var r = h * (0.55 + Math.random() * 0.5);
+      var cg = g.createRadialGradient(cx + ox, cy + oy, 0, cx + ox, cy + oy, r);
+      cg.addColorStop(0, "rgba(255,255,255," + alpha + ")");
+      cg.addColorStop(0.6, "rgba(255,255,255," + (alpha * 0.45) + ")");
+      cg.addColorStop(1, "rgba(255,255,255,0)");
+      g.save();
+      g.translate(cx + ox, cy + oy);
+      g.scale(w / r / 2.2, 1);
+      g.translate(-(cx + ox), -(cy + oy));
+      g.fillStyle = cg;
+      g.beginPath(); g.arc(cx + ox, cy + oy, r, 0, TAU); g.fill();
+      g.restore();
+    }
+  }
+  // clouds within the default camera view (u ~0.79–0.98, elevation 5–16°)
+  cloud(512 * 0.85, 512 * 0.375, 175, 24, 0.50);
+  cloud(512 * 0.94, 512 * 0.415, 150, 20, 0.42);
+  cloud(512 * 0.79, 512 * 0.445, 120, 17, 0.34);
+  var t = new THREE.CanvasTexture(cv);
+  t.encoding = THREE.sRGBEncoding;
+  return t;
+}
+var sky = new THREE.Mesh(
+  new THREE.SphereGeometry(500, 32, 16),
+  new THREE.MeshBasicMaterial({ map: makeSkyTexture(), side: THREE.BackSide, fog: false, depthWrite: false })
+);
+scene.add(sky);
+
+// tileable dry-grass ground (periodic value noise)
+function makeGroundTexture(){
+  var size = 512, periods = 6;
+  var grid = new Float32Array(periods * periods);
+  for (var i = 0; i < grid.length; i++) grid[i] = Math.random();
+  function vnoise(px, py){
+    var gx = px * periods, gy = py * periods;
+    var x0 = Math.floor(gx) % periods, y0 = Math.floor(gy) % periods;
+    var x1 = (x0 + 1) % periods, y1 = (y0 + 1) % periods;
+    var fx = gx - Math.floor(gx), fy = gy - Math.floor(gy);
+    var sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    var a = grid[y0 * periods + x0], b = grid[y0 * periods + x1];
+    var c = grid[y1 * periods + x0], d = grid[y1 * periods + x1];
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+  }
+  function fbm(px, py){
+    var v = 0, amp = 0.5, f = 1, n = 0;
+    for (var o = 0; o < 4; o++){ v += amp * vnoise(px * f, py * f); n += amp; amp *= 0.5; f *= 2; }
+    return v / n;
+  }
+  var cv = document.createElement("canvas"); cv.width = size; cv.height = size;
+  var ctx = cv.getContext("2d");
+  var img = ctx.createImageData(size, size), D = img.data;
+  for (var y = 0; y < size; y++){
+    for (var x = 0; x < size; x++){
+      var px = x / size, py = y / size;
+      var n  = fbm(px, py);
+      var np = fbm(px * 2 + 0.31, py * 2 + 0.77);   // integer periods per tile -> seamless
+      var ng = fbm(px * 5 + 3.1, py * 5 + 7.7);     // integer periods per tile -> seamless
+      var r = 176 - 46 * n, gg = 148 - 38 * n, b = 96 - 34 * n;
+      var p = smoothstep(0.58, 0.78, np);           // darker dry patches
+      r *= (1 - 0.20 * p); gg *= (1 - 0.16 * p); b *= (1 - 0.10 * p);
+      var tg = smoothstep(0.64, 0.82, ng) * 0.7;    // sparse olive grass tufts
+      r = r * (1 - tg) + 112 * tg;
+      gg = gg * (1 - tg) + 118 * tg;
+      b = b * (1 - tg) + 66 * tg;
+      var h = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
+      if (h - Math.floor(h) > 0.965){ r *= 0.88; gg *= 0.88; b *= 0.84; }
+      var i4 = (y * size + x) * 4;
+      D[i4] = r; D[i4 + 1] = gg; D[i4 + 2] = b; D[i4 + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return new THREE.CanvasTexture(cv);
+}
+var groundTex = makeGroundTexture();
+groundTex.wrapS = groundTex.wrapT = THREE.RepeatWrapping;
+groundTex.repeat.set(60, 60);
+groundTex.encoding = THREE.sRGBEncoding;
+groundTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+var GROUND_TILE_M = 20; // 1200 m / 60 repeats
+
+var ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(1200, 1200),
+  new THREE.MeshStandardMaterial({ map: groundTex, roughness: 1, metalness: 0 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// giraffe coat: irregular brown patches on cream, tiled seamlessly
+// opts: { count, rMin, rMax, sx, sy } — sx/sy stretch the blobs (u/v)
+function makeSpotTexture(opts){
+  var size = 1024;
+  var cv = document.createElement("canvas"); cv.width = size; cv.height = size;
+  var g = cv.getContext("2d");
+  g.fillStyle = "#e7cd9c"; g.fillRect(0, 0, size, size);
+  for (var m = 0; m < 46; m++){
+    var mx = Math.random() * size, my = Math.random() * size, mr = 60 + Math.random() * 140;
+    var grd = g.createRadialGradient(mx, my, 0, mx, my, mr);
+    grd.addColorStop(0, "rgba(206,170,115,0.10)");
+    grd.addColorStop(1, "rgba(206,170,115,0)");
+    g.fillStyle = grd;
+    g.beginPath(); g.arc(mx, my, mr, 0, TAU); g.fill();
+  }
+  function blobAt(cx, cy, rel, sx, sy){
+    var n = rel.length;
+    g.beginPath();
+    g.moveTo(cx + (rel[0][0] + rel[n - 1][0]) / 2 * sx, cy + (rel[0][1] + rel[n - 1][1]) / 2 * sy);
+    for (var i = 0; i < n; i++){
+      var p = rel[i], q = rel[(i + 1) % n];
+      g.quadraticCurveTo(cx + p[0] * sx, cy + p[1] * sy,
+        cx + (p[0] + q[0]) / 2 * sx, cy + (p[1] + q[1]) / 2 * sy);
+    }
+    g.closePath(); g.fill();
+  }
+  var cols = ["#9a5a2b", "#8c4e24", "#a8683a", "#7c431f", "#b17543", "#8f5527"];
+  var sx = opts.sx || 1, sy = opts.sy || 1;
+  for (var i = 0; i < opts.count; i++){
+    var x = Math.random() * size, y = Math.random() * size;
+    var r = opts.rMin + Math.random() * (opts.rMax - opts.rMin);
+    var n = 7 + ((Math.random() * 5) | 0);
+    var rel = [];
+    for (var k = 0; k < n; k++){
+      var a = (k / n) * TAU + (Math.random() - 0.5) * 0.35;
+      var rr = r * (0.55 + Math.random() * 0.55);
+      rel.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+    }
+    g.fillStyle = cols[(Math.random() * cols.length) | 0];
+    for (var dx = -size; dx <= size; dx += size)
+      for (var dy = -size; dy <= size; dy += size)
+        blobAt(x + dx, y + dy, rel, sx, sy);
+  }
+  for (var s = 0; s < 1800; s++){
+    g.fillStyle = "rgba(120,80,40," + (Math.random() * 0.05).toFixed(3) + ")";
+    g.fillRect(Math.random() * size, Math.random() * size, 2, 2);
+  }
+  var t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+function makeBladeTexture(){
+  var cv = document.createElement("canvas"); cv.width = 128; cv.height = 128;
+  var g = cv.getContext("2d");
+  g.clearRect(0, 0, 128, 128);
+  var cols = ["#c2ba7a", "#b8b170", "#cabf80", "#ada868", "#beb676"];
+  for (var i = 0; i < 8; i++){
+    var bx = 30 + Math.random() * 68;
+    // mixed heights -> ragged clump silhouette, ground shows between blades
+    var h = (Math.random() < 0.45) ? 30 + Math.random() * 28 : 70 + Math.random() * 58;
+    var lean = (Math.random() - 0.5) * 26;
+    var w = 3 + Math.random() * 3;
+    g.fillStyle = cols[(Math.random() * cols.length) | 0];
+    g.beginPath();
+    g.moveTo(bx - w / 2, 128);
+    g.quadraticCurveTo(bx + lean * 0.25 - w * 0.15, 128 - h * 0.6, bx + lean, 128 - h);
+    g.quadraticCurveTo(bx + lean * 0.25 + w * 0.15, 128 - h * 0.6, bx + w / 2, 128);
+    g.closePath();
+    g.fill();
+  }
+  var t = new THREE.CanvasTexture(cv);
+  t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+function makeDustTexture(){
+  var cv = document.createElement("canvas"); cv.width = 64; cv.height = 64;
+  var g = cv.getContext("2d");
+  var gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, "rgba(255,240,210,0.9)");
+  gr.addColorStop(0.4, "rgba(230,205,160,0.45)");
+  gr.addColorStop(1, "rgba(230,205,160,0)");
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(cv);
+}
+
+// ---------------------------------------------------------------- scenery (trees, rocks) — scrolls past, wraps around
+var trunkMat = new THREE.MeshStandardMaterial({ color: 0x5d452c, roughness: 1 });
+var rockMat  = new THREE.MeshStandardMaterial({ color: 0x8b7c66, roughness: 1 });
+var wrapItems = [];
+
+function makeTree(){
+  var grp = new THREE.Group();
+  var h = 2.6 + Math.random() * 2.2;
+  var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.26, h, 7), trunkMat);
+  trunk.position.y = h / 2;
+  trunk.rotation.z = rand(-0.09, 0.09);
+  trunk.castShadow = true;
+  grp.add(trunk);
+  if (Math.random() < 0.7){
+    var br = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.10, 1.2, 5), trunkMat);
+    br.position.set(0.28, h * 0.74, 0.1);
+    br.rotation.z = -0.7;
+    br.castShadow = true;
+    grp.add(br);
+  }
+  var cc = new THREE.Color().setHSL(0.20 + rand(-0.02, 0.04), 0.38 + rand(0, 0.12), 0.20 + rand(-0.02, 0.05));
+  var crownMat = new THREE.MeshStandardMaterial({ color: cc, roughness: 1 });
+  var crownY = h + 0.2;
+  var n = 5 + ((Math.random() * 3) | 0);
+  for (var i = 0; i < n; i++){
+    var r = 1.0 + Math.random() * 1.3;
+    var m = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 7), crownMat);
+    // broad, flat umbrella: wide in x, low in y
+    m.position.set(rand(-1.6, 1.6), crownY + rand(-0.3, 0.35), rand(-1.1, 1.1));
+    m.scale.set(1.4 + Math.random() * 0.5, 0.30 + Math.random() * 0.14, 1.1 + Math.random() * 0.4);
+    m.castShadow = true;
+    grp.add(m);
+  }
+  return grp;
+}
+function scatter(){
+  for (var i = 0; i < 16; i++){
+    var tr = makeTree();
+    tr.position.set(rand(-75, 75), 0, rand(-105, 100));
+    if (Math.abs(tr.position.x) < 7) tr.position.x += (tr.position.x < 0 ? -9 : 9);
+    scene.add(tr);
+    wrapItems.push(tr);
+  }
+  for (var j = 0; j < 10; j++){
+    var rk = new THREE.Mesh(new THREE.DodecahedronGeometry(rand(0.3, 0.9), 0), rockMat);
+    rk.scale.set(1, 0.65, rand(0.7, 1.1));
+    rk.position.set(rand(-70, 70), 0.1, rand(-105, 100));
+    if (Math.abs(rk.position.x) < 4) rk.position.x += (rk.position.x < 0 ? -6 : 6);
+    rk.rotation.y = rand(0, TAU);
+    rk.castShadow = true;
+    rk.receiveShadow = true;
+    scene.add(rk);
+    wrapItems.push(rk);
+  }
+}
+scatter();
+function updateScenery(dt){
+  var dz = speed * dt;
+  if (dz <= 0) return;
+  for (var i = 0; i < wrapItems.length; i++){
+    var o = wrapItems[i];
+    o.position.z -= dz;
+    if (o.position.z < -105){
+      o.position.z += 210;
+      o.position.x = rand(-75, 75);
+      if (Math.abs(o.position.x) < 7) o.position.x += (o.position.x < 0 ? -9 : 9);
+    }
+  }
+}
+
+// ---------------------------------------------------------------- grass field (instanced, periodic in z so it can scroll seamlessly)
+var GRASS_P = 50, GRASS_N = 420;
+function crossedPlaneGeo(w, h){
+  var g1 = new THREE.PlaneGeometry(w, h);
+  var g2 = new THREE.PlaneGeometry(w, h);
+  g2.rotateY(Math.PI / 2);
+  var geo = new THREE.BufferGeometry();
+  var n1 = g1.attributes.position.array.length;
+  var pos = new Float32Array(n1 * 2), uv = new Float32Array(n1 * 2), nor = new Float32Array(n1 * 2);
+  pos.set(g1.attributes.position.array, 0);
+  pos.set(g2.attributes.position.array, n1);
+  uv.set(g1.attributes.uv.array, 0);
+  uv.set(g2.attributes.uv.array, n1);
+  nor.set(g1.attributes.normal.array, 0);
+  nor.set(g2.attributes.normal.array, n1);
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  geo.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+  geo.translate(0, h / 2, 0);
+  return geo;
+}
+var grassGroup = (function(){
+  var geo = crossedPlaneGeo(0.45, 0.45);
+  var mat = new THREE.MeshStandardMaterial({ map: makeBladeTexture(), alphaTest: 0.5, side: THREE.DoubleSide, roughness: 1, metalness: 0 });
+  var count = GRASS_N * 5;
+  var im = new THREE.InstancedMesh(geo, mat, count);
+  var M = new THREE.Matrix4(), Q = new THREE.Quaternion(), S = new THREE.Vector3(), P = new THREE.Vector3();
+  var E = new THREE.Euler(), C = new THREE.Color();
+  var i = 0;
+  for (var k = 0; k < GRASS_N; k++){
+    var x = rand(-80, 80), z0 = rand(-2 * GRASS_P, -GRASS_P);
+    var sc = rand(0.45, 1.05);
+    E.set(rand(-0.12, 0.12), rand(0, TAU), rand(-0.12, 0.12));
+    Q.setFromEuler(E);
+    for (var c = 0; c < 5; c++){
+      P.set(x, 0, z0 + c * GRASS_P);
+      S.set(sc, sc * rand(0.85, 1.15), sc);
+      M.compose(P, Q, S);
+      im.setMatrixAt(i, M);
+      C.setHSL(rand(0.20, 0.27), rand(0.12, 0.26), rand(0.68, 0.86));
+      im.setColorAt(i, C);
+      i++;
+    }
+  }
+  im.instanceMatrix.needsUpdate = true;
+  if (im.instanceColor) im.instanceColor.needsUpdate = true;
+  var grp = new THREE.Group();
+  grp.add(im);
+  return grp;
+})();
+scene.add(grassGroup);
+
+// ---------------------------------------------------------------- giraffe
+// body coat: ~0.1-0.2 m patches over the ~3 m torso
+var spotTex = makeSpotTexture({ count: 170, rMin: 16, rMax: 44, sx: 1, sy: 1 });
+// legs: same world patch scale — fewer, larger blobs, seamless u wrap around the limb
+var legSpotTex = makeSpotTexture({ count: 9, rMin: 90, rMax: 150, sx: 0.7, sy: 1.35 });
+legSpotTex.repeat.set(1, 3);
+// neck: intermediate scale
+var neckSpotTex = makeSpotTexture({ count: 14, rMin: 70, rMax: 115, sx: 0.8, sy: 1.1 });
+neckSpotTex.repeat.set(1, 3);
+
+var skinBodyMat = new THREE.MeshStandardMaterial({ map: spotTex,       roughness: 0.88, metalness: 0 });
+var skinLegMat  = new THREE.MeshStandardMaterial({ map: legSpotTex,    roughness: 0.88, metalness: 0 });
+var skinNeckMat = new THREE.MeshStandardMaterial({ map: neckSpotTex,   roughness: 0.88, metalness: 0 });
+var creamMat = new THREE.MeshStandardMaterial({ color: 0xdcc49a, roughness: 0.9 });
+var darkMat  = new THREE.MeshStandardMaterial({ color: 0x33241a, roughness: 0.95 });
+var hoofMat  = new THREE.MeshStandardMaterial({ color: 0x241c15, roughness: 0.55 });
+var eyeMat   = new THREE.MeshStandardMaterial({ color: 0x14100b, roughness: 0.3 });
+
+function buildGiraffe(){
+  var root = new THREE.Group();
+  var body = new THREE.Group();
+  root.add(body);
+
+  // ---- torso: lathe profile, axis rotated onto Z (front = +z)
+  var prof = [
+    [-1.35, 0.02], [-1.28, 0.26], [-1.12, 0.40], [-0.90, 0.46],
+    [-0.55, 0.50], [-0.15, 0.52], [0.25, 0.545], [0.60, 0.53],
+    [0.90, 0.46], [1.12, 0.34], [1.28, 0.14], [1.32, 0.02]
+  ].map(function(p){ return new THREE.Vector2(p[1], p[0]); });
+  var torso = new THREE.Mesh(new THREE.LatheGeometry(prof, 28), skinBodyMat);
+  torso.rotation.x = Math.PI / 2;
+  torso.position.y = 1.55;
+  torso.scale.set(1.06, 1, 0.94);
+  torso.castShadow = true;
+  body.add(torso);
+
+  // ---- back mane (two strips following the back line)
+  var mane1 = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.05, 1.7), darkMat);
+  mane1.position.set(0, 2.09, -0.10);
+  body.add(mane1);
+  var mane2 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, 0.95), darkMat);
+  mane2.position.set(0, 1.96, -0.95);
+  mane2.rotation.x = -0.22;
+  body.add(mane2);
+
+  // ---- neck: 4 jointed segments with a slight S curve
+  var neckBase = new THREE.Group();
+  neckBase.position.set(0, 2.0, 0.92);
+  neckBase.rotation.x = 0.52;
+  body.add(neckBase);
+  var neckSegs = [
+    { len: 0.55, r: 0.215, tilt: 0.00 },
+    { len: 0.55, r: 0.190, tilt: -0.14 },
+    { len: 0.50, r: 0.168, tilt: 0.10 },
+    { len: 0.45, r: 0.148, tilt: -0.06 }
+  ];
+  var parent = neckBase;
+  for (var i = 0; i < neckSegs.length; i++){
+    var seg = neckSegs[i];
+    var joint = (i === 0) ? parent : new THREE.Group();
+    if (i > 0){
+      joint.position.y = neckSegs[i - 1].len;
+      joint.rotation.x = seg.tilt;
+      parent.add(joint);
+    }
+    var mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(seg.r - 0.028, seg.r, seg.len, 12), skinNeckMat);
+    mesh.position.y = seg.len / 2;
+    mesh.castShadow = true;
+    joint.add(mesh);
+    // dorsal mane ribbon + tufts (dorsal = -z side of the neck)
+    var ribbon = new THREE.Mesh(new THREE.BoxGeometry(0.085, seg.len * 0.92, 0.05), darkMat);
+    ribbon.position.set(0, seg.len * 0.5, -(seg.r - 0.015));
+    joint.add(ribbon);
+    for (var k = 0; k < 4; k++){
+      var tuft = new THREE.Mesh(new THREE.SphereGeometry(0.028, 6, 5), darkMat);
+      tuft.position.set(rand(-0.03, 0.03), seg.len * (k + 0.5) / 4, -(seg.r - 0.005));
+      tuft.scale.set(1, 1.6, 0.8);
+      joint.add(tuft);
+    }
+    parent = joint;
+  }
+
+  // ---- head
+  var head = new THREE.Group();
+  head.position.y = neckSegs[3].len;
+  head.rotation.x = -0.35;
+  parent.add(head);
+
+  var skull = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), skinBodyMat);
+  skull.scale.set(0.95, 0.88, 1.30);
+  skull.position.set(0, 0.02, 0.04);
+  skull.castShadow = true;
+  head.add(skull);
+
+  var muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.125, 14, 10), creamMat);
+  muzzle.scale.set(1.0, 0.82, 1.22);
+  muzzle.position.set(0, -0.05, 0.235);
+  head.add(muzzle);
+
+  var nostrilGeo = new THREE.SphereGeometry(0.017, 6, 5);
+  [-1, 1].forEach(function(sx){
+    var n = new THREE.Mesh(nostrilGeo, darkMat);
+    n.position.set(0.045 * sx, -0.005, 0.345);
+    n.scale.set(1, 0.7, 0.9);
+    head.add(n);
+  });
+  var mouth = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.011, 0.015), darkMat);
+  mouth.position.set(0, -0.115, 0.30);
+  mouth.rotation.x = 0.5;
+  head.add(mouth);
+
+  var eyeGeo = new THREE.SphereGeometry(0.033, 10, 8);
+  var eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+  eyeL.position.set(-0.148, 0.05, 0.115);
+  var eyeR = eyeL.clone();
+  eyeR.position.x = 0.148;
+  head.add(eyeL); head.add(eyeR);
+
+  var earGeo = new THREE.SphereGeometry(0.095, 10, 8);
+  function makeEar(sx){
+    var eg = new THREE.Group();
+    eg.position.set(0.165 * sx, 0.10, -0.035);
+    var ear = new THREE.Mesh(earGeo, creamMat);
+    ear.scale.set(1.35, 0.42, 1.05);
+    ear.rotation.z = -0.5 * sx;
+    ear.rotation.y = 0.35 * sx;
+    eg.add(ear);
+    head.add(eg);
+    return eg;
+  }
+  var earLg = makeEar(-1), earRg = makeEar(1);
+
+  var ossGeo = new THREE.CylinderGeometry(0.02, 0.026, 0.13, 6);
+  var ossTuftGeo = new THREE.SphereGeometry(0.042, 8, 6);
+  [-1, 1].forEach(function(sx){
+    var oss = new THREE.Mesh(ossGeo, skinBodyMat);
+    oss.position.set(0.055 * sx, 0.155, -0.015);
+    oss.rotation.z = 0.12 * sx;
+    head.add(oss);
+    var tuft = new THREE.Mesh(ossTuftGeo, darkMat);
+    tuft.position.set(0.062 * sx, 0.225, -0.015);
+    tuft.scale.set(1, 1.15, 1);
+    head.add(tuft);
+  });
+
+  // ---- legs
+  function makeLeg(cfg){
+    var hip = new THREE.Group();
+    hip.position.copy(cfg.pos);
+    hip.rotation.z = cfg.side * 0.03; // slight outward splay
+    var upper = new THREE.Mesh(new THREE.CylinderGeometry(cfg.upRT, cfg.upRB, cfg.upLen, 10), skinLegMat);
+    upper.position.y = -cfg.upLen / 2;
+    upper.castShadow = true;
+    hip.add(upper);
+
+    var knee = new THREE.Group();
+    knee.position.y = -cfg.upLen;
+    hip.add(knee);
+    var cap = new THREE.Mesh(new THREE.SphereGeometry(cfg.upRB * 0.95, 8, 6), skinLegMat);
+    cap.scale.set(0.9, 1, 1.15);
+    knee.add(cap);
+
+    var lower = new THREE.Mesh(new THREE.CylinderGeometry(cfg.loRT, cfg.loRB, cfg.loLen, 10), skinLegMat);
+    lower.position.y = -cfg.loLen / 2;
+    lower.castShadow = true;
+    knee.add(lower);
+
+    var ankle = new THREE.Group();
+    ankle.position.y = -cfg.loLen;
+    knee.add(ankle);
+    var foot = ankle;
+    if (cfg.hock){
+      var heel = new THREE.Mesh(new THREE.SphereGeometry(cfg.loRB * 0.9, 8, 6), skinLegMat);
+      heel.position.set(0, 0.02, 0.045);
+      ankle.add(heel);
+      foot = new THREE.Group();
+      ankle.add(foot);
+    }
+    var hoof = new THREE.Mesh(new THREE.CylinderGeometry(cfg.hoofRT, cfg.hoofRB, cfg.hoofH, 10), hoofMat);
+    hoof.position.y = -cfg.hoofH / 2;
+    hoof.castShadow = true;
+    foot.add(hoof);
+
+    var tip = new THREE.Object3D();
+    tip.position.y = -cfg.hoofH;
+    foot.add(tip);
+
+    return { hip: hip, knee: knee, ankle: ankle, foot: foot, tip: tip, isBack: !!cfg.hock, cfg: cfg };
+  }
+
+  var legCfgs = [
+    { name: "FL", side: -1, pos: new THREE.Vector3(-0.27, 1.75,  0.78),
+      upLen: 0.84, upRT: 0.105, upRB: 0.085, loLen: 0.84, loRT: 0.075, loRB: 0.055,
+      hoofH: 0.08, hoofRT: 0.052, hoofRB: 0.046, phase: 0.0 },
+    { name: "HL", side: -1, pos: new THREE.Vector3(-0.27, 1.70, -0.95),
+      upLen: 0.78, upRT: 0.15, upRB: 0.115, loLen: 0.84, loRT: 0.08, loRB: 0.055,
+      hoofH: 0.10, hoofRT: 0.058, hoofRB: 0.05, phase: 0.30, hock: true },
+    { name: "FR", side: 1, pos: new THREE.Vector3(0.27, 1.75,  0.78),
+      upLen: 0.84, upRT: 0.105, upRB: 0.085, loLen: 0.84, loRT: 0.075, loRB: 0.055,
+      hoofH: 0.08, hoofRT: 0.052, hoofRB: 0.046, phase: Math.PI },
+    { name: "HR", side: 1, pos: new THREE.Vector3(0.27, 1.70, -0.95),
+      upLen: 0.78, upRT: 0.15, upRB: 0.115, loLen: 0.84, loRT: 0.08, loRB: 0.055,
+      hoofH: 0.10, hoofRT: 0.058, hoofRB: 0.05, phase: Math.PI + 0.30, hock: true }
+  ];
+  var legs = legCfgs.map(function(cfg){
+    var leg = makeLeg(cfg);
+    body.add(leg.hip);
+    return leg;
+  });
+
+  // ---- tail
+  var tailBase = new THREE.Group();
+  tailBase.position.set(0, 1.90, -1.28);
+  body.add(tailBase);
+  var tailSeg1 = new THREE.Group();
+  tailSeg1.rotation.x = -0.45;
+  tailBase.add(tailSeg1);
+  var tMesh1 = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.034, 0.42, 8), skinLegMat);
+  tMesh1.position.y = -0.21;
+  tailSeg1.add(tMesh1);
+  var tailSeg2 = new THREE.Group();
+  tailSeg2.position.y = -0.42;
+  tailSeg2.rotation.x = -0.35;
+  tailSeg1.add(tailSeg2);
+  var tMesh2 = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.02, 0.36, 8), skinLegMat);
+  tMesh2.position.y = -0.18;
+  tailSeg2.add(tMesh2);
+  var tailTuft = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), darkMat);
+  tailTuft.position.y = -0.40;
+  tailTuft.scale.set(0.85, 1.9, 0.85);
+  tailSeg2.add(tailTuft);
+
+  return {
+    root: root, body: body, torso: torso,
+    neckBase: neckBase, head: head,
+    eyes: [eyeL, eyeR], ears: [earLg, earRg],
+    legs: legs,
+    tailBase: tailBase, tailSeg1: tailSeg1, tailSeg2: tailSeg2
+  };
+}
+
+var G = buildGiraffe();
+scene.add(G.root);
+if (location.hash.indexOf("debug") >= 0) window.__g = G;
+
+// ---------------------------------------------------------------- gait (2-bone IK per leg — feet stay on the ground)
+//  Front legs: hip -> knee -> ankle (knee bends forward).
+//  Hind legs:  hip -> stifle -> hock -> foot (stifle forward, hock backward).
+//  Foot path:  x = ampX * sin(phase + 0.5),  lift = liftH * max(0, -sin(phase)).
+//  Foot strikes occur at phase = 0 (front) and phase = pi (back).
+var STRIDE = 1.5; // metres of ground travel per gait cycle
+var gaitPhase = 0;
+var speed = 1.2, targetSpeed = 1.2;
+var worldDist = 0;
+
+function ik2(xT, hipY, yT, L1, L2){
+  var dx = xT;
+  var dy = Math.max(0.05, hipY - yT);
+  var d = Math.hypot(dx, dy);
+  var dmax = L1 + L2 - 0.01, dmin = Math.abs(L1 - L2) + 0.02;
+  d = clamp(d, dmin, dmax);
+  var a = Math.atan2(dx, dy); // direction from hip to target, 0 = straight down, + = forward
+  var cosA = (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d);
+  var th1 = a + Math.acos(clamp(cosA, -1, 1));
+  var cosG = (L1 * L1 + L2 * L2 - d * d) / (2 * L1 * L2);
+  var knee = Math.PI - Math.acos(clamp(cosG, -1, 1)); // flexion amount, 0 = straight
+  return { th1: th1, knee: knee };
+}
+
+// per-leg gait parameters
+var legGait = [
+  { ampX: 0.72, lift: 0.24, hipY: 1.75, L1: 0.84, L2: 0.84, ankY: 0.08 }, // FL (L2 = lower leg; target = ankle)
+  { ampX: 0.85, lift: 0.30, hipY: 1.70, L1: 0.78, L2: 0.84, ankY: 0.10 }, // HL (L2 = shank; target = hock)
+  { ampX: 0.72, lift: 0.24, hipY: 1.75, L1: 0.84, L2: 0.84, ankY: 0.08 }, // FR
+  { ampX: 0.85, lift: 0.30, hipY: 1.70, L1: 0.78, L2: 0.84, ankY: 0.10 }  // HR
+];
+// neutral standing pose (IK at x=0, lift=0)
+var legStand = legGait.map(function(g){
+  return ik2(0, g.hipY, g.ankY, g.L1, g.L2);
+});
+var legState = G.legs.map(function(){ return { prevF: 0 }; });
+
+function updateGiraffe(t, dt){
+  var wf = smoothstep(0.05, 0.45, speed);
+  var idle = 1 - wf;
+  var pb = gaitPhase;
+
+  // body bob / pitch / roll (2x gait frequency)
+  G.body.position.y = 0.055 * Math.sin(2 * pb + 1.0) * wf;
+  G.body.rotation.x = 0.022 * Math.sin(2 * pb + 2.2) * wf + 0.012 * idle * Math.sin(t * 0.9);
+  G.body.rotation.z = 0.03 * Math.sin(2 * pb + 0.4) * wf;
+
+  // breathing (subtle torso inflation when standing)
+  var br = 1 + 0.013 * Math.sin(t * 1.15) * idle;
+  G.torso.scale.set(1.06, 1, 0.94 * br);
+
+  // neck sway (counter to body bob)
+  G.neckBase.rotation.x = 0.52 + 0.05 * Math.sin(2 * pb + 1.5) * wf;
+  G.neckBase.rotation.y = 0.05 * Math.sin(2 * pb + 0.2) * wf + 0.02 * Math.sin(t * 0.5) * idle;
+
+  // head: slow look-around + gait bob
+  headTurnTimer -= dt;
+  if (headTurnTimer <= 0){
+    headTurnTarget = rand(-0.55, 0.55);
+    headTurnTimer = rand(3.5, 8);
+  }
+  headTurn += (headTurnTarget - headTurn) * (1 - Math.exp(-dt * 1.3));
+  G.head.rotation.y = headTurn * (0.35 + 0.65 * idle) + 0.05 * Math.sin(2 * pb + 0.9) * wf;
+  G.head.rotation.x = -0.35 + 0.035 * Math.sin(2 * pb + 1.8) * wf + 0.02 * Math.sin(t * 0.6 + 1) * idle;
+
+  updateEars(dt);
+  updateBlink(dt);
+
+  // tail swing
+  G.tailBase.rotation.y = 0.32 * Math.sin(t * 2.3 + 1.2) * wf + 0.10 * Math.sin(t * 0.7 + 0.4) * idle;
+  G.tailSeg1.rotation.x = -0.45 + 0.10 * Math.sin(t * 2.3) * wf;
+  G.tailSeg2.rotation.x = -0.35 + 0.12 * Math.sin(t * 2.3 + 1.1) * wf;
+
+  // legs: IK
+  for (var i = 0; i < G.legs.length; i++){
+    var leg = G.legs[i], g = legGait[i], st = legState[i];
+    var ph = gaitPhase + leg.cfg.phase;
+    var swing = Math.max(0, -Math.sin(ph));
+    var pw = ik2(g.ampX * Math.sin(ph + 0.5), g.hipY, g.ankY + g.lift * swing, g.L1, g.L2);
+    var ps = legStand[i];
+    var th1 = ps.th1 + (pw.th1 - ps.th1) * wf;
+    var knee = ps.knee + (pw.knee - ps.knee) * wf;
+    var hock = 0;
+    if (leg.isBack){
+      hock = (0.40 + 0.28 * swing) * (0.55 + 0.45 * wf) + 0.10 * idle;
+    }
+    // Front legs: carpus bends forward -> knee rotation.x = -knee
+    // Hind legs:  stifle bends forward (like a human knee) -> shank swings back, rotation.x = +knee
+    leg.hip.rotation.x = -th1;
+    leg.knee.rotation.x = leg.isBack ? knee : -knee;
+    if (leg.isBack){
+      leg.ankle.rotation.x = hock;
+      leg.foot.rotation.x = th1 - knee - hock + 0.05;
+    } else {
+      leg.ankle.rotation.x = th1 + knee + 0.05;
+    }
+    // foot-strike detection (phase crosses multiples of pi) -> dust
+    var f = ((ph % Math.PI) + Math.PI) % Math.PI;
+    if (st.prevF - f > Math.PI * 0.5) spawnDust(leg.tip);
+    st.prevF = f;
+  }
+}
+
+// head look-around
+var headTurn = 0, headTurnTarget = 0, headTurnTimer = 3;
+
+// ear twitches
+var earState = { l: -1, r: -1, next: 2 };
+function updateEars(dt){
+  earState.next -= dt;
+  if (earState.next <= 0){
+    if (Math.random() < 0.5){ earState.l = 0; earState.r = -1; }
+    else { earState.r = 0; earState.l = -1; }
+    earState.next = rand(2.5, 8);
+  }
+  function upd(eg, sgn, key){
+    var v = earState[key];
+    if (v >= 0){
+      v += dt;
+      if (v > 0.5) v = -1;
+      earState[key] = v;
+      eg.rotation.z = sgn * Math.sin(v * 32) * Math.exp(-v * 5.5) * 0.30;
+    } else {
+      eg.rotation.z = 0;
+    }
+  }
+  upd(G.ears[0], 1, "l");
+  upd(G.ears[1], -1, "r");
+}
+
+// blinking
+var blinkT = 2.5, blinkDur = 0.13, blinking = -1;
+function updateBlink(dt){
+  if (blinking >= 0){
+    blinking += dt;
+    if (blinking >= blinkDur){
+      blinking = -1;
+      G.eyes[0].scale.set(1, 1, 1);
+      G.eyes[1].scale.set(1, 1, 1);
+    } else {
+      var s = 1 - 0.85 * Math.sin((blinking / blinkDur) * Math.PI);
+      G.eyes[0].scale.set(1, Math.max(0.08, s), 1);
+      G.eyes[1].scale.set(1, Math.max(0.08, s), 1);
+    }
+    return;
+  }
+  blinkT -= dt;
+  if (blinkT <= 0){
+    blinking = 0;
+    blinkT = rand(2.2, 6);
+  }
+}
+
+// ---------------------------------------------------------------- dust puffs at foot strikes
+var dustTex = makeDustTexture();
+var dustPool = [];
+(function(){
+  for (var i = 0; i < 36; i++){
+    var m = new THREE.SpriteMaterial({ map: dustTex, color: 0xd8c39a, transparent: true, opacity: 0, depthWrite: false });
+    var sp = new THREE.Sprite(m);
+    sp.visible = false;
+    scene.add(sp);
+    dustPool.push({ sp: sp, life: 0, max: 1, vx: 0, vy: 0, vz: 0, size: 0.3 });
+  }
+})();
+var dustCursor = 0;
+var dustTmp = new THREE.Vector3();
+function spawnDust(tipObj){
+  tipObj.getWorldPosition(dustTmp);
+  for (var n = 0; n < 2; n++){
+    var d = dustPool[dustCursor];
+    dustCursor = (dustCursor + 1) % dustPool.length;
+    d.life = 0;
+    d.max = rand(0.55, 1.0);
+    d.sp.visible = true;
+    d.sp.position.set(dustTmp.x + rand(-0.08, 0.08), 0.04, dustTmp.z + rand(-0.08, 0.08));
+    d.vx = rand(-0.25, 0.25);
+    d.vy = rand(0.2, 0.55);
+    d.vz = rand(-0.3, 0.1) - speed * 0.25;
+    d.size = rand(0.18, 0.34);
+  }
+}
+function updateDust(dt){
+  for (var i = 0; i < dustPool.length; i++){
+    var d = dustPool[i];
+    if (!d.sp.visible) continue;
+    d.life += dt;
+    var k = d.life / d.max;
+    if (k >= 1){
+      d.sp.visible = false;
+      d.sp.material.opacity = 0;
+      continue;
+    }
+    d.sp.position.x += d.vx * dt;
+    d.sp.position.y += d.vy * dt;
+    d.sp.position.z += d.vz * dt;
+    d.vy *= (1 - 1.5 * dt);
+    var s = d.size * (1 + k * 3.2);
+    d.sp.scale.set(s, s, 1);
+    d.sp.material.opacity = 0.38 * (1 - k) * (1 - k);
+  }
+}
+
+// ---------------------------------------------------------------- camera: damped orbit around the giraffe
+var camState = { yaw: 0.85, pitch: 0.22, dist: 9.5, yawT: 0.85, pitchT: 0.22, distT: 9.5 };
+var camTarget = new THREE.Vector3(0, 2.05, 0);
+if (location.hash.indexOf("close") >= 0){
+  camState.dist = camState.distT = 4.2;
+  camState.pitch = camState.pitchT = 0.10;
+  camState.yaw = camState.yawT = 0.35;
+}
+if (location.hash.indexOf("head") >= 0){
+  camTarget.set(0, 3.9, 1.5);
+  camState.dist = camState.distT = 2.3;
+  camState.pitch = camState.pitchT = 0.02;
+  camState.yaw = camState.yawT = 0.55;
+}
+if (location.hash.indexOf("side") >= 0){
+  camState.dist = camState.distT = 7.5;
+  camState.pitch = camState.pitchT = 0.15;
+  camState.yaw = camState.yawT = Math.PI / 2 - 0.15;
+}
+function updateCamera(dt){
+  var k = 1 - Math.exp(-dt * 8);
+  camState.yaw += (camState.yawT - camState.yaw) * k;
+  camState.pitch += (camState.pitchT - camState.pitch) * k;
+  camState.dist += (camState.distT - camState.dist) * k;
+  var cp = Math.cos(camState.pitch), sp = Math.sin(camState.pitch);
+  camera.position.set(
+    camTarget.x + camState.dist * cp * Math.sin(camState.yaw),
+    camTarget.y + camState.dist * sp,
+    camTarget.z + camState.dist * cp * Math.cos(camState.yaw)
+  );
+  camera.lookAt(camTarget);
+}
+
+var el = renderer.domElement;
+el.style.touchAction = "none";
+var pointers = new Map();
+var pinchDist = 0;
+el.addEventListener("pointerdown", function(e){
+  el.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  pinchDist = 0;
+});
+el.addEventListener("pointermove", function(e){
+  var p = pointers.get(e.pointerId);
+  if (!p) return;
+  var dx = e.clientX - p.x, dy = e.clientY - p.y;
+  p.x = e.clientX; p.y = e.clientY;
+  if (pointers.size === 1){
+    camState.yawT -= dx * 0.005;
+    camState.pitchT = clamp(camState.pitchT + dy * 0.004, -0.06, 1.25);
+  } else if (pointers.size === 2){
+    var pts = [];
+    pointers.forEach(function(v){ pts.push(v); });
+    var d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    if (pinchDist > 0) camState.distT = clamp(camState.distT * pinchDist / d, 4.5, 28);
+    pinchDist = d;
+  }
+});
+function endPtr(e){ pointers.delete(e.pointerId); pinchDist = 0; }
+el.addEventListener("pointerup", endPtr);
+el.addEventListener("pointercancel", endPtr);
+el.addEventListener("wheel", function(e){
+  e.preventDefault();
+  camState.distT = clamp(camState.distT * Math.pow(1.0015, e.deltaY), 4.5, 28);
+}, { passive: false });
+
+// ---------------------------------------------------------------- input: speed control
+var keys = {};
+window.addEventListener("keydown", function(e){
+  if (e.code === "Space"){
+    e.preventDefault();
+    targetSpeed = targetSpeed > 0 ? 0 : 1.4;
+    return;
+  }
+  keys[e.code] = true;
+});
+window.addEventListener("keyup", function(e){ keys[e.code] = false; });
+
+window.addEventListener("resize", function(){
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ---------------------------------------------------------------- main loop
+var speedEl = document.getElementById("speed");
+updateGiraffe(0, 0); // pose legs before first frame
+
+var last = performance.now();
+function tick(now){
+  requestAnimationFrame(tick);
+  var dt = Math.min(0.05, (now - last) / 1000) || 0.016;
+  last = now;
+  var t = now / 1000;
+
+  if (keys.KeyW || keys.ArrowUp) targetSpeed = clamp(targetSpeed + dt * 1.6, 0, 2.6);
+  if (keys.KeyS || keys.ArrowDown) targetSpeed = clamp(targetSpeed - dt * 1.6, 0, 2.6);
+  speed += (targetSpeed - speed) * (1 - Math.exp(-dt * 2.0));
+  if (Math.abs(speed - targetSpeed) < 0.002) speed = targetSpeed;
+
+  gaitPhase += dt * (speed / STRIDE) * TAU;
+  worldDist += speed * dt;
+
+  // treadmill: ground texture + grass scroll, scenery wraps
+  groundTex.offset.y -= speed * dt / GROUND_TILE_M;
+  grassGroup.position.z = -((worldDist % GRASS_P));
+  updateScenery(dt);
+
+  updateGiraffe(t, dt);
+  updateDust(dt);
+  updateCamera(dt);
+
+  speedEl.textContent = "speed: " + speed.toFixed(1) + " m/s" + (speed < 0.05 ? "  (standing)" : "");
+  renderer.render(scene, camera);
+}
+requestAnimationFrame(tick);
+
+})();
+</script>
+</body>
+</html>

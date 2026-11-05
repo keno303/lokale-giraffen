@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giraffe — Three.js</title>
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #e9d8ae; }
+  #scene { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: grab; }
+  #scene:active { cursor: grabbing; }
+  #ui {
+    position: fixed; top: 14px; left: 14px; z-index: 10;
+    background: rgba(20, 14, 6, 0.55); color: #f5ead2;
+    font: 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 10px 14px; border-radius: 10px;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    user-select: none; pointer-events: none; max-width: 340px;
+  }
+  #ui h1 { font-size: 15px; margin: 0 0 4px; font-weight: 650; letter-spacing: 0.2px; }
+  #ui .keys { opacity: 0.85; font-size: 12px; }
+  #ui .keys b { font-weight: 600; color: #ffd98a; }
+  #status {
+    margin-top: 6px; font-size: 12px; color: #9fe0a0; font-variant-numeric: tabular-nums;
+  }
+  #nogl {
+    display: none; position: fixed; inset: 0; z-index: 20;
+    background: #3a2c18; color: #f5ead2;
+    font: 16px/1.6 system-ui, sans-serif; padding: 40px;
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="ui">
+  <h1>Giraffe <span style="opacity:.6;font-weight:400">· Three.js procedural model</span></h1>
+  <div class="keys">
+    <b>Space</b> walk / stand &nbsp;·&nbsp; <b>1–4</b> gait speed &nbsp;·&nbsp; <b>←/→</b> steer<br>
+    <b>drag</b> camera &nbsp;·&nbsp; <b>wheel</b> zoom &nbsp;·&nbsp; <b>double-click</b> walk / stand
+  </div>
+  <div id="status">…</div>
+</div>
+<div id="nogl">WebGL is not available in this browser, so the giraffe cannot be displayed.</div>
+<script src="three.min.js"></script>
+<script src="giraffe.js"></script>
+</body>
+</html>

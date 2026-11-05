@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Walking Giraffe - Three.js</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #87CEEB; }
+        canvas { display: block; }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            font-family: sans-serif;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">Realistic Walking Giraffe</div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(15, 10, 25);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        sunLight.position.set(10, 20, 10);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.left = -20;
+        sunLight.shadow.camera.right = 20;
+        sunLight.shadow.camera.top = 20;
+        sunLight.shadow.camera.bottom = -20;
+        scene.add(sunLight);
+
+        // Ground
+        const groundGeo = new THREE.PlaneGeometry(200, 200);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x3a5f0b });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Giraffe Group
+        const giraffe = new THREE.Group();
+        scene.add(giraffe);
+
+        // Materials
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xffcc66 });
+        const spotMat = new THREE.MeshStandardMaterial({ color: 0x663300 });
+
+        // Body
+        const bodyGeo = new THREE.CapsuleGeometry(1.5, 3, 8, 16);
+        const body = new THREE.Mesh(bodyGeo, skinMat);
+        body.rotation.x = Math.PI / 2;
+        body.position.y = 3;
+        body.castShadow = true;
+        giraffe.add(body);
+
+        // Neck
+        const neckGeo = new THREE.CapsuleGeometry(0.7, 4, 8, 16);
+        const neck = new THREE.Mesh(neckGeo, skinMat);
+        neck.position.set(1.5, 5.5, 0);
+        neck.rotation.x = -Math.PI / 4;
+        neck.castShadow = true;
+        giraffe.add(neck);
+
+        // Head
+        const headGeo = new THREE.SphereGeometry(0.8, 16, 16);
+        const head = new THREE.Mesh(headGeo, skinMat);
+        head.position.set(1.8, 8.5, 0);
+        head.rotation.x = Math.PI / 4;
+        head.castShadow = true;
+        giraffe.add(head);
+
+        // Ears
+        const earGeo = new THREE.BoxGeometry(0.2, 0.3, 0.2);
+        const ear1 = new THREE.Mesh(earGeo, skinMat);
+        ear1.position.set(1.7, 9, 0.5);
+        giraffe.add(ear1);
+        const ear2 = new THREE.Mesh(earGeo, skinMat);
+        ear2.position.set(1.7, 9, -0.5);
+        giraffe.add(ear2);
+
+        // Horns (Ossicones)
+        const hornGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.3, 8);
+        const horn1 = new THREE.Mesh(hornGeo, spotMat);
+        horn1.position.set(1.8, 9.3, 0.3);
+        horn1.rotation.x = -Math.PI/4;
+        giraffe.add(horn1);
+        const horn2 = new THREE.Mesh(hornGeo, spotMat);
+        horn2.position.set(1.8, 9.3, -0.3);
+        horn2.rotation.x = -Math.PI/4;
+        giraffe.add(horn2);
+
+        // Legs
+        const legGeo = new THREE.CapsuleGeometry(0.2, 2.5, 4, 8);
+        
+        const createLeg = (x, z, rotY) => {
+            const group = new THREE.Group();
+            group.position.set(x, 1.5, z);
+            const leg = new THREE.Mesh(legGeo, skinMat);
+            leg.rotation.x = Math.PI / 2;
+            leg.castShadow = true;
+            group.add(leg);
+            return { group, leg, offsetRotY: rotY };
+        };
+
+        const leg1 = createLeg(1.2, 1.2, 0);
+        const leg2 = createLeg(1.2, -1.2, Math.PI);
+        const leg3 = createLeg(-1.2, 1.2, Math.PI);
+        const leg4 = createLeg(-1.2, -1.2, 0);
+
+        giraffe.add(leg1.group);
+        giraffe.add(leg2.group);
+        giraffe.add(leg3.group);
+        giraffe.add(leg4.group);
+
+        const legs = [leg1, leg2, leg3, leg4];
+
+        // Tail
+        const tailGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.5, 8);
+        const tail = new THREE.Mesh(tailGeo, skinMat);
+        tail.position.set(-2, 3.5, 0);
+        tail.rotation.x = Math.PI / 3;
+        tail.castShadow = true;
+        giraffe.add(tail);
+
+        // Spots (Simple logic to add some spots)
+        const spotGeo = new THREE.SphereGeometry(0.3, 8, 8);
+        for (let i = 0; i < 10; i++) {
+            const spot = new THREE.Mesh(spotGeo, spotMat);
+            spot.scale.set(1, 0.1, 1);
+            spot.position.set(
+                (Math.random() - 0.5) * 2,
+                2.5 + Math.random() * 1,
+                (Math.random() - 0.5) * 1.5
+            );
+            body.add(spot);
+        }
+
+        // Animation loop
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = clock.getElapsedTime();
+
+            // Walking movement
+            const walkSpeed = 2;
+            const walkAmplitude = 0.5;
+            
+            // Body bobbing
+            giraffe.position.y = Math.sin(t * walkSpeed) * 0.1;
+            
+            // Leg rotation
+            legs.forEach((leg, i) => {
+                const phase = (i % 2 === 0) ? 0 : Math.PI;
+                leg.leg.rotation.z = Math.sin(t * walkSpeed + phase) * walkAmplitude;
+                leg.group.rotation.x = Math.sin(t * walkSpeed + phase) * 0.1;
+            });
+
+            // Tail wagging
+            tail.rotation.y = Math.sin(t * walkSpeed * 2) * 0.5;
+            tail.rotation.z = Math.PI / 3 + Math.sin(t * walkSpeed) * 0.2;
+
+            // Move giraffe forward slightly
+            giraffe.position.z += Math.sin(t * walkSpeed) * 0.01;
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

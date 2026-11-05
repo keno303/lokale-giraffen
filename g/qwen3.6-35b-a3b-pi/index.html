@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Walking Giraffe - Three.js</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { overflow: hidden; background: #000; font-family: Arial, sans-serif; }
+  canvas { display: block; }
+  #info {
+    position: absolute; top: 12px; left: 12px;
+    color: #fff; background: rgba(0,0,0,0.55);
+    padding: 10px 16px; border-radius: 8px;
+    font-size: 13px; line-height: 1.5;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="info">🦒 Walking Giraffe<br><small>Drag to orbit · Scroll to zoom</small></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ─── Scene Setup ─────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0xc9a96e, 0.006);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
+camera.position.set(8, 5, 12);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.maxPolarAngle = Math.PI / 2.1;
+controls.target.set(0, 3, 0);
+controls.minDistance = 4;
+controls.maxDistance = 40;
+
+// ─── Sky ─────────────────────────────────────────────────────
+const skyGeo = new THREE.SphereGeometry(200, 32, 32);
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  uniforms: {
+    topColor: { value: new THREE.Color(0x4a90d9) },
+    bottomColor: { value: new THREE.Color(0xf5deb3) },
+    offset: { value: 20 },
+    exponent: { value: 0.4 }
+  },
+  vertexShader: `
+    varying vec3 vWorldPosition;
+    void main() {
+      vec4 worldPos = modelMatrix * vec4(position, 1.0);
+      vWorldPosition = worldPos.xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform vec3 topColor;
+    uniform vec3 bottomColor;
+    uniform float offset;
+    uniform float exponent;
+    varying vec3 vWorldPosition;
+    void main() {
+      float h = normalize(vWorldPosition + offset).y;
+      gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+    }
+  `
+});
+scene.add(new THREE.Mesh(skyGeo, skyMat));
+
+// ─── Lighting ────────────────────────────────────────────────
+const ambientLight = new THREE.AmbientLight(0xffeedd, 0.4);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xfff4e0, 1.8);
+sunLight.position.set(15, 25, 10);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(2048, 2048);
+sunLight.shadow.camera.near = 1;
+sunLight.shadow.camera.far = 80;
+sunLight.shadow.camera.left = -20;
+sunLight.shadow.camera.right = 20;
+sunLight.shadow.camera.top = 20;
+sunLight.shadow.camera.bottom = -20;
+sunLight.shadow.bias = -0.001;
+scene.add(sunLight);
+
+const fillLight = new THREE.DirectionalLight(0x8899bb, 0.3);
+fillLight.position.set(-10, 8, -5);
+scene.add(fillLight);
+
+const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0xc4a35a, 0.5);
+scene.add(hemiLight);
+
+// ─── Materials ───────────────────────────────────────────────
+function createSpotTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+
+  // Base color
+  ctx.fillStyle = '#d4a44a';
+  ctx.fillRect(0, 0, 512, 512);
+
+  // Generate spots
+  const rng = (seed) => {
+    let s = seed;
+    return () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+  };
+  const r = rng(42);
+
+  ctx.fillStyle = '#5c3a1e';
+  for (let i = 0; i < 80; i++) {
+    const x = r() * 512;
+    const y = r() * 512;
+    const w = 15 + r() * 40;
+    const h = 15 + r() * 40;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(r() * Math.PI);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+const bodyTexture = createSpotTexture();
+
+const bodyMaterial = new THREE.MeshStandardMaterial({
+  map: bodyTexture,
+  color: 0xd4a44a,
+  roughness: 0.8,
+  metalness: 0.05,
+  bumpScale: 0.02
+});
+
+const bellyMaterial = new THREE.MeshStandardMaterial({
+  color: 0xf0dca0,
+  roughness: 0.85,
+  metalness: 0.02
+});
+
+const darkMaterial = new THREE.MeshStandardMaterial({
+  color: 0x3d2810,
+  roughness: 0.9,
+  metalness: 0.05
+});
+
+const eyeWhiteMaterial = new THREE.MeshStandardMaterial({
+  color: 0xf5f0e0,
+  roughness: 0.3,
+  metalness: 0.1
+});
+
+const eyePupilMaterial = new THREE.MeshStandardMaterial({
+  color: 0x1a0f00,
+  roughness: 0.2,
+  metalness: 0.3
+});
+
+const hoofMaterial = new THREE.MeshStandardMaterial({
+  color: 0x1a1008,
+  roughness: 0.7,
+  metalness: 0.1
+});
+
+const tailTuftMaterial = new THREE.MeshStandardMaterial({
+  color: 0x2a1a08,
+  roughness: 0.95,
+  metalness: 0.0
+});
+
+const tongueMaterial = new THREE.MeshStandardMaterial({
+  color: 0x8b3a5c,
+  roughness: 0.5,
+  metalness: 0.05
+});
+
+const earMaterial = new THREE.MeshStandardMaterial({
+  color: 0x4a2e14,
+  roughness: 0.8,
+  side: THREE.DoubleSide
+});
+
+// ─── Giraffe Class ───────────────────────────────────────────
+class Giraffe {
+  constructor() {
+    this.mesh = new THREE.Group();
+    this.legs = {};
+    this.neckAngle = 0;
+    this.build();
+  }
+
+  build() {
+    this.createBody();
+    this.createNeck();
+    this.createHead();
+    this.createEyes();
+    this.createEars();
+    this.createOssicones();
+    this.createMouth();
+    this.createLegs();
+    this.createTail();
+    this.createMane();
+  }
+
+  createBody() {
+    // Main body - ellipsoid
+    const bodyGeo = new THREE.SphereGeometry(1, 24, 24);
+    bodyGeo.scale(1.8, 1.1, 1.2);
+    const body = new THREE.Mesh(bodyGeo, bodyMaterial);
+    body.position.set(0, 3.2, 0);
+    body.castShadow = true;
+    body.receiveShadow = true;
+    this.mesh.add(body);
+
+    // Belly
+    const bellyGeo = new THREE.SphereGeometry(1, 24, 24);
+    bellyGeo.scale(1.7, 0.7, 1.15);
+    const belly = new THREE.Mesh(bellyGeo, bellyMaterial);
+    belly.position.set(0, 2.6, 0);
+    this.mesh.add(belly);
+
+    // Rump
+    const rumpGeo = new THREE.SphereGeometry(0.9, 16, 16);
+    rumpGeo.scale(1.0, 1.2, 1.0);
+    const rump = new THREE.Mesh(rumpGeo, bodyMaterial);
+    rump.position.set(-1.6, 3.3, 0);
+    rump.castShadow = true;
+    this.mesh.add(rump);
+
+    // Shoulder hump
+    const humpGeo = new THREE.SphereGeometry(0.7, 16, 16);
+    humpGeo.scale(1.2, 1.1, 0.9);
+    const hump = new THREE.Mesh(humpGeo, bodyMaterial);
+    hump.position.set(1.0, 3.7, 0);
+    hump.castShadow = true;
+    this.mesh.add(hump);
+  }
+
+  createNeck() {
+    this.neckGroup = new THREE.Group();
+    this.neckGroup.position.set(1.6, 3.4, 0);
+
+    // Neck segments with slight curve
+    const neckSegments = 6;
+    const neckHeight = 4.5;
+    const segHeight = neckHeight / neckSegments;
+
+    let prevY = 0;
+    for (let i = 0; i < neckSegments; i++) {
+      const t = i / neckSegments;
+      const radius = 0.45 * (1 - t * 0.4);
+      const y = prevY + segHeight;
+
+      const segGeo = new THREE.CylinderGeometry(radius * 0.95, radius, segHeight + 0.05, 12);
+      const seg = new THREE.Mesh(segGeo, bodyMaterial);
+      seg.position.set(0, y + segHeight / 2, 0);
+      seg.castShadow = true;
+      this.neckGroup.add(seg);
+
+      // Side spots for neck
+      for (let s = 0; s < 3; s++) {
+        const spotGeo = new THREE.CircleGeometry(0.08 + Math.random() * 0.06, 8);
+        const spot = new THREE.Mesh(spotGeo, darkMaterial);
+        const angle = (s === 0 ? 0 : s === 1 ? Math.PI : Math.PI / 2);
+        spot.position.set(
+          Math.cos(angle) * (radius + 0.01),
+          y + segHeight * 0.5 + (i * 0.3),
+          Math.sin(angle) * (radius + 0.01)
+        );
+        spot.lookAt(new THREE.Vector3(0, y + segHeight * 0.5, 0));
+        this.neckGroup.add(spot);
+      }
+
+      prevY = y;
+    }
+
+    // Slight forward tilt
+    this.neckGroup.rotation.x = -0.25;
+    this.mesh.add(this.neckGroup);
+  }
+
+  createHead() {
+    this.headGroup = new THREE.Group();
+    this.headGroup.position.set(0, 4.8, 0);
+    this.headGroup.rotation.x = -0.15;
+
+    // Main head
+    const headGeo = new THREE.SphereGeometry(0.45, 16, 16);
+    headGeo.scale(1.0, 0.9, 0.85);
+    const head = new THREE.Mesh(headGeo, bodyMaterial);
+    head.castShadow = true;
+    this.headGroup.add(head);
+
+    // Snout
+    const snoutGeo = new THREE.SphereGeometry(0.32, 12, 12);
+    snoutGeo.scale(0.8, 0.7, 0.75);
+    const snout = new THREE.Mesh(snoutGeo, bodyMaterial);
+    snout.position.set(0, -0.05, 0.35);
+    snout.castShadow = true;
+    this.headGroup.add(snout);
+
+    // Muzzle (dark)
+    const muzzleGeo = new THREE.SphereGeometry(0.2, 12, 12);
+    muzzleGeo.scale(0.9, 0.6, 0.7);
+    const muzzle = new THREE.Mesh(muzzleGeo, darkMaterial);
+    muzzle.position.set(0, -0.08, 0.52);
+    this.headGroup.add(muzzle);
+
+    // Nostrils
+    for (let side of [-1, 1]) {
+      const nostrilGeo = new THREE.SphereGeometry(0.035, 8, 8);
+      const nostril = new THREE.Mesh(nostrilGeo, new THREE.MeshStandardMaterial({ color: 0x1a0f05, roughness: 0.5 }));
+      nostril.position.set(side * 0.08, -0.06, 0.62);
+      this.headGroup.add(nostril);
+    }
+
+    // Top of head
+    const topGeo = new THREE.SphereGeometry(0.42, 12, 12);
+    topGeo.scale(1.0, 0.6, 1.0);
+    const top = new THREE.Mesh(topGeo, bodyMaterial);
+    top.position.set(0, 0.25, 0);
+    this.headGroup.add(top);
+
+    this.neckGroup.add(this.headGroup);
+  }
+
+  createEyes() {
+    for (let side of [-1, 1]) {
+      const eyeGroup = new THREE.Group();
+
+      // Eye socket
+      const socketGeo = new THREE.SphereGeometry(0.12, 12, 12);
+      const socket = new THREE.Mesh(socketGeo, eyeWhiteMaterial);
+      socket.position.set(side * 0.38, 0.12, 0.2);
+      eyeGroup.add(socket);
+
+      // Iris
+      const irisGeo = new THREE.SphereGeometry(0.08, 12, 12);
+      const iris = new THREE.Mesh(irisGeo, new THREE.MeshStandardMaterial({
+        color: 0x5c3a1e, roughness: 0.2
+      }));
+      iris.position.set(side * 0.42, 0.12, 0.28);
+      eyeGroup.add(iris);
+
+      // Pupil
+      const pupilGeo = new THREE.SphereGeometry(0.045, 12, 12);
+      const pupil = new THREE.Mesh(pupilGeo, eyePupilMaterial);
+      pupil.position.set(side * 0.44, 0.12, 0.32);
+      eyeGroup.add(pupil);
+
+      // Eyelid
+      const lidGeo = new THREE.SphereGeometry(0.13, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2);
+      const lid = new THREE.Mesh(lidGeo, bodyMaterial);
+      lid.position.set(side * 0.38, 0.12, 0.2);
+      lid.rotation.x = -0.3;
+      eyeGroup.add(lid);
+
+      this.headGroup.add(eyeGroup);
+    }
+  }
+
+  createEars() {
+    for (let side of [-1, 1]) {
+      const earGeo = new THREE.ConeGeometry(0.12, 0.25, 4);
+      earGeo.rotateZ(side * 0.3);
+      earGeo.rotateY(side > 0 ? -0.5 : 0.5);
+      const ear = new THREE.Mesh(earGeo, earMaterial);
+      ear.position.set(side * 0.35, 0.35, 0.05);
+      ear.castShadow = true;
+      this.headGroup.add(ear);
+
+      // Inner ear
+      const innerGeo = new THREE.ConeGeometry(0.07, 0.18, 4);
+      innerGeo.rotateZ(side * 0.3);
+      innerGeo.rotateY(side > 0 ? -0.5 : 0.5);
+      const inner = new THREE.Mesh(innerGeo, darkMaterial);
+      inner.position.set(side * 0.35, 0.35, 0.05);
+      this.headGroup.add(inner);
+    }
+  }
+
+  createOssicones() {
+    for (let side of [-1, 1]) {
+      const ossGroup = new THREE.Group();
+
+      // Base
+      const baseGeo = new THREE.CylinderGeometry(0.04, 0.05, 0.12, 8);
+      const base = new THREE.Mesh(baseGeo, bodyMaterial);
+      ossGroup.add(base);
+
+      // Horn
+      const hornGeo = new THREE.CylinderGeometry(0.025, 0.04, 0.35, 8);
+      const horn = new THREE.Mesh(hornGeo, darkMaterial);
+      horn.position.y = 0.2;
+      horn.castShadow = true;
+      ossGroup.add(horn);
+
+      // Tip
+      const tipGeo = new THREE.SphereGeometry(0.025, 8, 8);
+      const tip = new THREE.Mesh(tipGeo, darkMaterial);
+      tip.position.y = 0.38;
+      ossGroup.add(tip);
+
+      ossGroup.position.set(side * 0.18, 0.42, 0.05);
+      ossGroup.rotation.z = side * 0.15;
+      ossGroup.rotation.x = -0.2;
+      this.headGroup.add(ossGroup);
+    }
+  }
+
+  createMouth() {
+    // Subtle mouth line
+    const mouthGeo = new THREE.TorusGeometry(0.1, 0.015, 8, 12, Math.PI);
+    const mouth = new THREE.Mesh(mouthGeo, darkMaterial);
+    mouth.position.set(0, -0.18, 0.45);
+    mouth.rotation.x = 0.2;
+    this.headGroup.add(mouth);
+
+    // Tongue (sometimes visible)
+    const tongueGeo = new THREE.CapsuleGeometry(0.03, 0.2, 4, 8);
+    tongueGeo.rotateX(Math.PI / 2);
+    this.tongue = new THREE.Mesh(tongueGeo, tongueMaterial);
+    this.tongue.position.set(0, -0.15, 0.5);
+    this.tongue.scale.set(1, 1, 0.3);
+    this.headGroup.add(this.tongue);
+  }
+
+  createLegs() {
+    const legPositions = [
+      { x: 0.9, z: 0.45, name: 'frontRight' },
+      { x: 0.9, z: -0.45, name: 'frontLeft' },
+      { x: -0.9, z: 0.45, name: 'backRight' },
+      { x: -0.9, z: -0.45, name: 'backLeft' }
+    ];
+
+    legPositions.forEach(({ x, z, name }) => {
+      const legGroup = new THREE.Group();
+      legGroup.position.set(x, 2.6, z);
+
+      // Upper leg
+      const upperLegGeo = new THREE.CylinderGeometry(0.18, 0.15, 1.6, 10);
+      const upperLeg = new THREE.Mesh(upperLegGeo, bodyMaterial);
+      upperLeg.position.y = -0.8;
+      upperLeg.castShadow = true;
+      legGroup.add(upperLeg);
+
+      // Knee joint
+      const kneeGeo = new THREE.SphereGeometry(0.16, 10, 10);
+      const knee = new THREE.Mesh(kneeGeo, bodyMaterial);
+      knee.position.y = -1.6;
+      legGroup.add(knee);
+
+      // Lower leg
+      const lowerLegGeo = new THREE.CylinderGeometry(0.14, 0.12, 1.5, 10);
+      const lowerLeg = new THREE.Mesh(lowerLegGeo, bodyMaterial);
+      lowerLeg.position.y = -2.35;
+      lowerLeg.castShadow = true;
+      legGroup.add(lowerLeg);
+
+      // Cannon bone area (dark band)
+      const bandGeo = new THREE.CylinderGeometry(0.13, 0.11, 0.4, 10);
+      const band = new THREE.Mesh(bandGeo, darkMaterial);
+      band.position.y = -2.8;
+      legGroup.add(band);
+
+      // Hoof
+      const hoofGeo = new THREE.CylinderGeometry(0.13, 0.11, 0.25, 10);
+      const hoof = new THREE.Mesh(hoofGeo, hoofMaterial);
+      hoof.position.y = -3.2;
+      hoof.castShadow = true;
+      legGroup.add(hoof);
+
+      // Hoof split line
+      for (let i = 0; i < 2; i++) {
+        const lineGeo = new THREE.BoxGeometry(0.015, 0.26, 0.11);
+        const line = new THREE.Mesh(lineGeo, new THREE.MeshStandardMaterial({ color: 0x0d0804 }));
+        line.position.set((i === 0 ? -0.04 : 0.04), -3.2, 0);
+        legGroup.add(line);
+      }
+
+      this.mesh.add(legGroup);
+      this.legs[name] = legGroup;
+    });
+  }
+
+  createTail() {
+    this.tailGroup = new THREE.Group();
+    this.tailGroup.position.set(-1.8, 3.6, 0);
+
+    // Tail base
+    const tailGeo = new THREE.CylinderGeometry(0.03, 0.02, 0.8, 8);
+    const tail = new THREE.Mesh(tailGeo, bodyMaterial);
+    tail.position.y = -0.4;
+    this.tailGroup.add(tail);
+
+    // Tail tuft
+    const tuftGeo = new THREE.ConeGeometry(0.1, 0.3, 8);
+    const tuft = new THREE.Mesh(tuftGeo, tailTuftMaterial);
+    tuft.position.y = -0.9;
+    tuft.castShadow = true;
+    this.tailGroup.add(tuft);
+
+    // Tuft strands
+    for (let i = 0; i < 5; i++) {
+      const strandGeo = new THREE.CylinderGeometry(0.01, 0.005, 0.2, 4);
+      const strand = new THREE.Mesh(strandGeo, tailTuftMaterial);
+      const angle = (i / 5) * Math.PI * 2;
+      strand.position.set(
+        Math.cos(angle) * 0.05,
+        -1.05,
+        Math.sin(angle) * 0.05
+      );
+      strand.rotation.z = Math.cos(angle) * 0.3;
+      strand.rotation.x = Math.sin(angle) * 0.3;
+      this.tailGroup.add(strand);
+    }
+
+    this.mesh.add(this.tailGroup);
+  }
+
+  createMane() {
+    // Mane going down the back of the neck
+    const maneSegments = 8;
+    for (let i = 0; i < maneSegments; i++) {
+      const t = i / maneSegments;
+      const maneGeo = new THREE.BoxGeometry(0.08, 0.12, 0.05);
+      const mane = new THREE.Mesh(maneGeo, darkMaterial);
+      mane.position.set(
+        0,
+        1.5 + t * 3.5,
+        -0.35 - t * 0.1
+      );
+      mane.rotation.x = -0.25;
+      this.neckGroup.add(mane);
+    }
+  }
+
+  walk(time, speed) {
+    const cycleSpeed = speed * 3;
+    const legPhase = time * cycleSpeed;
+
+    // Walk gait pattern (diagonal pairs)
+    // Front-right & back-left move together, then front-left & back-right
+    const frontRightPhase = legPhase;
+    const frontLeftPhase = legPhase + Math.PI;
+    const backRightPhase = legPhase + Math.PI;
+    const backLeftPhase = legPhase;
+
+    const maxLift = 0.35;
+    const maxSwing = 0.45;
+
+    // Set leg rotations
+    this.setLeg(this.legs.frontRight, frontRightPhase, maxLift, maxSwing);
+    this.setLeg(this.legs.frontLeft, frontLeftPhase, maxLift, maxSwing);
+    this.setLeg(this.legs.backRight, backRightPhase, maxLift, maxSwing);
+    this.setLeg(this.legs.backLeft, backLeftPhase, maxLift, maxSwing);
+
+    // Body bob
+    const bobAmount = 0.06 * Math.abs(Math.sin(legPhase));
+    this.mesh.position.y = bobAmount;
+
+    // Body slight rotation (weight shift)
+    this.mesh.rotation.z = Math.sin(legPhase) * 0.015;
+    this.mesh.rotation.x = Math.sin(legPhase * 0.5) * 0.02;
+
+    // Neck sway
+    this.neckGroup.rotation.z = Math.sin(legPhase * 0.5) * 0.05;
+    this.neckGroup.rotation.x = -0.25 + Math.sin(legPhase * 0.75) * 0.03;
+
+    // Head bob with neck
+    this.headGroup.rotation.x = -0.15 + Math.sin(legPhase * 0.75 + 0.5) * 0.04;
+
+    // Tail swish
+    this.tailGroup.rotation.z = Math.sin(time * 2) * 0.3;
+    this.tailGroup.rotation.x = Math.sin(time * 1.5) * 0.2;
+
+    // Tongue occasional flick
+    if (Math.sin(time * 0.3) > 0.95) {
+      this.tongue.scale.z += 2;
+      this.tongue.position.z = 0.7;
+    } else {
+      this.tongue.scale.z = Math.max(1, this.tongue.scale.z - 5);
+      this.tongue.position.z = Math.max(0.5, this.tongue.position.z - 0.02);
+    }
+  }
+
+  setLeg(legGroup, phase, maxLift, maxSwing) {
+    // Walking motion: leg swings forward and lifts
+    const swing = Math.sin(phase) * maxSwing;
+    const lift = Math.max(0, Math.sin(phase)) * maxLift;
+
+    legGroup.rotation.x = swing;
+
+    // Slight abduction/adduction for natural movement
+    legGroup.rotation.z = Math.sin(phase) * 0.05;
+
+    // Subtle knee bend at swing peak
+    if (legGroup.children[2]) {
+      legGroup.children[2].position.x = -Math.abs(swing) * 0.15;
+    }
+  }
+}
+
+// ─── Environment ─────────────────────────────────────────────
+
+// Ground
+const groundGeo = new THREE.PlaneGeometry(200, 200, 64, 64);
+// Add some terrain variation
+const posAttr = groundGeo.attributes.position;
+for (let i = 0; i < posAttr.count; i++) {
+  const x = posAttr.getX(i);
+  const y = posAttr.getY(i);
+  const z = Math.sin(x * 0.1) * Math.cos(y * 0.15) * 0.3 +
+            Math.sin(x * 0.05 + y * 0.07) * 0.5;
+  posAttr.setZ(i, z);
+}
+groundGeo.computeVertexNormals();
+
+const groundMat = new THREE.MeshStandardMaterial({
+  color: 0xb8943e,
+  roughness: 0.95,
+  metalness: 0.02,
+  side: THREE.DoubleSide
+});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Grass patches
+for (let i = 0; i < 300; i++) {
+  const grassGeo = new THREE.ConeGeometry(0.03, 0.15 + Math.random() * 0.2, 4);
+  const grassMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color().setHSL(0.12 + Math.random() * 0.05, 0.5 + Math.random() * 0.3, 0.3 + Math.random() * 0.2)
+  });
+  const grass = new THREE.Mesh(grassGeo, grassMat);
+  grass.position.set(
+    (Math.random() - 0.5) * 80,
+    0,
+    (Math.random() - 0.5) * 80
+  );
+  grass.rotation.y = Math.random() * Math.PI;
+  grass.rotation.x = (Math.random() - 0.5) * 0.2;
+  scene.add(grass);
+}
+
+// Acacia-like trees
+function createTree(x, z, scale = 1) {
+  const treeGroup = new THREE.Group();
+
+  // Trunk
+  const trunkGeo = new THREE.CylinderGeometry(0.15 * scale, 0.25 * scale, 3 * scale, 8);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.y = 1.5 * scale;
+  trunk.castShadow = true;
+  treeGroup.add(trunk);
+
+  // Branch
+  const branchGeo = new THREE.CylinderGeometry(0.04 * scale, 0.08 * scale, 2 * scale, 6);
+  const branch = new THREE.Mesh(branchGeo, trunkMat);
+  branch.position.set(0.6 * scale, 2.8 * scale, 0);
+  branch.rotation.z = -0.6;
+  branch.castShadow = true;
+  treeGroup.add(branch);
+
+  // Canopy (flat umbrella shape)
+  const canopyGeo = new THREE.SphereGeometry(2 * scale, 16, 8);
+  canopyGeo.scale(2.5, 0.3, 1.5);
+  const canopyMat = new THREE.MeshStandardMaterial({
+    color: 0x3a6b2a,
+    roughness: 0.8
+  });
+  const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+  canopy.position.set(0.3 * scale, 3.5 * scale, 0);
+  canopy.castShadow = true;
+  treeGroup.add(canopy);
+
+  // Sub-canopies
+  for (let i = 0; i < 3; i++) {
+    const subGeo = new THREE.SphereGeometry(1.2 * scale, 12, 8);
+    subGeo.scale(1.8, 0.25, 1.2);
+    const sub = new THREE.Mesh(subGeo, canopyMat);
+    const angle = (i / 3) * Math.PI * 2;
+    sub.position.set(
+      Math.cos(angle) * 1.2 * scale,
+      3.3 * scale + Math.sin(i * 2) * 0.2,
+      Math.sin(angle) * 1.2 * scale
+    );
+    sub.castShadow = true;
+    treeGroup.add(sub);
+  }
+
+  treeGroup.position.set(x, 0, z);
+  scene.add(treeGroup);
+}
+
+createTree(-12, -8, 1.2);
+createTree(15, -5, 0.9);
+createTree(-8, 15, 0.8);
+createTree(20, 12, 1.1);
+createTree(-18, 5, 0.7);
+createTree(5, -20, 1.0);
+
+// Rocks
+for (let i = 0; i < 20; i++) {
+  const rockGeo = new THREE.DodecahedronGeometry(0.2 + Math.random() * 0.4, 1);
+  // Deform vertices for natural look
+  const posA = rockGeo.attributes.position;
+  for (let j = 0; j < posA.count; j++) {
+    posA.setX(j, posA.getX(j) + (Math.random() - 0.5) * 0.1);
+    posA.setY(j, posA.getY(j) * (0.5 + Math.random() * 0.5));
+    posA.setZ(j, posA.getZ(j) + (Math.random() - 0.5) * 0.1);
+  }
+  rockGeo.computeVertexNormals();
+
+  const rockMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(0.45 + Math.random() * 0.1, 0.38 + Math.random() * 0.08, 0.28 + Math.random() * 0.05),
+    roughness: 0.9,
+    flatShading: true
+  });
+  const rock = new THREE.Mesh(rockGeo, rockMat);
+  rock.position.set(
+    (Math.random() - 0.5) * 60,
+    0.1,
+    (Math.random() - 0.5) * 60
+  );
+  rock.rotation.set(Math.random(), Math.random(), Math.random());
+  rock.castShadow = true;
+  rock.receiveShadow = true;
+  scene.add(rock);
+}
+
+// Dust particles (ground level)
+const dustCount = 200;
+const dustGeo = new THREE.BufferGeometry();
+const dustPositions = new Float32Array(dustCount * 3);
+const dustSizes = new Float32Array(dustCount);
+for (let i = 0; i < dustCount; i++) {
+  dustPositions[i * 3] = (Math.random() - 0.5) * 40;
+  dustPositions[i * 3 + 1] = 0.1 + Math.random() * 0.5;
+  dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 40;
+  dustSizes[i] = 0.02 + Math.random() * 0.04;
+}
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+dustGeo.setAttribute('size', new THREE.BufferAttribute(dustSizes, 1));
+
+const dustMat = new THREE.PointsMaterial({
+  color: 0xc4a86a,
+  size: 0.08,
+  transparent: true,
+  opacity: 0.3,
+  sizeAttenuation: true
+});
+const dust = new THREE.Points(dustGeo, dustMat);
+scene.add(dust);
+
+// ─── Build Giraffe ───────────────────────────────────────────
+const giraffe = new Giraffe();
+giraffe.mesh.position.set(0, 0, 0);
+scene.add(giraffe.mesh);
+
+// Shadow catcher on ground
+const shadowGeo = new THREE.PlaneGeometry(4, 3);
+const shadowMat = new THREE.MeshBasicMaterial({
+  color: 0x000000,
+  transparent: true,
+  opacity: 0.15,
+  depthWrite: false
+});
+const shadowPlane = new THREE.Mesh(shadowGeo, shadowMat);
+shadowPlane.rotation.x = -Math.PI / 2;
+shadowPlane.position.y = 0.02;
+scene.add(shadowPlane);
+
+// ─── Animation Loop ─────────────────────────────────────────
+const clock = new THREE.Clock();
+const walkSpeed = 1.5;
+const giraffeSpeed = 1.0;
+let giraffeAngle = 0;
+const walkRadius = 5;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const delta = clock.getDelta();
+  const elapsed = clock.getElapsedTime();
+
+  // Giraffe walking in a circle
+  giraffeAngle += delta * giraffeSpeed * 0.4;
+  giraffe.mesh.position.x = Math.cos(giraffeAngle) * walkRadius;
+  giraffe.mesh.position.z = Math.sin(giraffeAngle) * walkRadius;
+
+  // Face direction of movement
+  giraffe.mesh.rotation.y = -giraffeAngle + Math.PI / 2;
+
+  // Walk animation
+  giraffe.walk(elapsed, walkSpeed);
+
+  // Update shadow position
+  shadowPlane.position.x = giraffe.mesh.position.x;
+  shadowPlane.position.z = giraffe.mesh.position.z;
+
+  // Dust particles drift
+  const dustPos = dust.geometry.attributes.position;
+  for (let i = 0; i < dustCount; i++) {
+    let y = dustPos.getY(i);
+    y += delta * 0.05;
+    if (y > 2) y = 0.1;
+    dustPos.setY(i, y);
+    dustPos.setX(i, dustPos.getX(i) + Math.sin(elapsed + i) * delta * 0.02);
+  }
+  dustPos.needsUpdate = true;
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// ─── Resize Handler ──────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Start
+animate();
+
+</script>
+</body>
+</html>

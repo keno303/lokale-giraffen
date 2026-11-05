@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Giraffe — walking in Three.js</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0b0d; }
+  canvas { display: block; }
+  #hud, #bar {
+    font: 13px/1.4 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7);
+    position: fixed; z-index: 10; user-select: none;
+  }
+  #hud { top: 14px; left: 16px; }
+  #hud h1 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: .3px; }
+  #hud p  { margin: 2px 0 0; opacity: .8; font-size: 12px; }
+  #fps { position: fixed; top: 14px; right: 16px; z-index: 10;
+         font: 12px -apple-system, monospace; color: #fff;
+         text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+  #bar {
+    bottom: 14px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(20,18,14,.55); padding: 8px 14px; border-radius: 10px;
+    backdrop-filter: blur(6px);
+  }
+  #bar button {
+    width: 34px; height: 28px; border: 0; border-radius: 6px; cursor: pointer;
+    background: rgba(255,255,255,.14); color: #fff; font-size: 14px;
+  }
+  #bar label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  #bar input[type=range] { width: 110px; accent-color: #d9a45b; }
+  #err {
+    display: none; position: fixed; z-index: 20; top: 40%; left: 50%;
+    transform: translate(-50%,-50%); max-width: 80%;
+    background: #5a1e1e; color: #ffd9d0; padding: 12px 18px; border-radius: 8px;
+    font: 13px monospace;
+  }
+  #loading {
+    position: fixed; inset: 0; z-index: 30; display: flex;
+    align-items: center; justify-content: center;
+    background: #201c16; color: #e8d9b0;
+    font: 15px -apple-system, sans-serif; letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+  <div id="loading">building giraffe&hellip;</div>
+  <div id="err"></div>
+  <div id="hud">
+    <h1>Giraffa camelopardalis</h1>
+    <p>drag to orbit &middot; scroll to zoom &middot; space to pause</p>
+  </div>
+  <div id="fps"></div>
+  <div id="bar">
+    <button id="pause" title="pause / play (space)">&#9208;</button>
+    <label>speed <input id="speed" type="range" min="0.3" max="2.5" step="0.1" value="1">
+      <span id="spd">&times;1.0</span></label>
+    <label><input id="orbit" type="checkbox" checked> auto-orbit</label>
+  </div>
+
+  <script src="three.min.js"></script>
+  <script src="OrbitControls.js"></script>
+  <script src="textures.js"></script>
+  <script src="giraffe.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

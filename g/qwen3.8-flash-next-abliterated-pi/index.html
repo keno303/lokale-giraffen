@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Giraffa camelopardalis &mdash; reticulated giraffe, walking</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --ink: #efe6d4;
+    --dim: #b7a98f;
+    --amber: #e0a94a;
+    --bg: #14110d;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); overflow: hidden; }
+  body {
+    font: 13px/1.45 "Avenir Next", "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+  }
+  #stage { position: absolute; inset: 0; }
+  #stage canvas { display: block; }
+
+  .plate {
+    position: absolute; z-index: 5;
+    background: rgba(18, 15, 11, .72);
+    border: 1px solid rgba(224, 169, 74, .28);
+    border-radius: 10px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  #title { top: 14px; left: 16px; padding: 10px 14px; max-width: 300px; }
+  #title h1 { margin: 0; font-size: 17px; letter-spacing: .3px; font-weight: 600; }
+  #title h1 em { color: var(--amber); font-style: italic; }
+  #title p { margin: 5px 0 0; color: var(--dim); font-size: 11.5px; }
+  #stats { top: 14px; right: 16px; padding: 8px 12px; text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
+  #stats b { color: var(--ink); font-weight: 600; }
+
+  #panel {
+    bottom: 14px; left: 50%; transform: translateX(-50%);
+    padding: 9px 13px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+    justify-content: center; max-width: 96vw;
+  }
+  #panel .grp { display: flex; gap: 8px; align-items: center; }
+  #panel label { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .7px; }
+  input[type=range] { width: 116px; accent-color: var(--amber); }
+  select, button {
+    font: inherit; font-size: 12px; color: var(--ink);
+    background: rgba(240, 225, 200, .07);
+    border: 1px solid rgba(224, 169, 74, .32);
+    border-radius: 7px; padding: 4px 9px; cursor: pointer;
+  }
+  button:hover, select:hover { background: rgba(240, 225, 200, .16); }
+  button.off { background: rgba(224, 169, 74, .28); color: #fff2da; }
+  #panel input[type=checkbox] { accent-color: var(--amber); }
+  #hint { bottom: 16px; left: 16px; padding: 6px 10px; color: var(--dim); font-size: 11px; }
+  @media (max-width: 720px) { #hint { display: none; } #title p { display: none; } }
+</style>
+</head>
+<body>
+  <div id="stage"></div>
+
+  <div id="title" class="plate">
+    <h1><em>Giraffa camelopardalis</em> &mdash; reticulated</h1>
+    <p>Fully procedural: lofted anatomy, canvas coat pattern, four ground-anchored
+       limb solvers in a pacing gait.</p>
+  </div>
+
+  <div id="stats" class="plate">
+    <b id="fps">&ndash;</b> fps<br><span id="read">&ndash;</span>
+  </div>
+
+  <div id="panel" class="plate">
+    <div class="grp">
+      <label for="speed">speed</label>
+      <input id="speed" type="range" min="0.30" max="2.00" step="0.01" value="0.85">
+      <span id="speedv" style="width:2.6em">0.85</span>
+    </div>
+    <div class="grp">
+      <label for="gait">gait</label>
+      <select id="gait">
+        <option value="pace">pace (natural)</option>
+        <option value="trot">diagonal trot</option>
+        <option value="still">standing</option>
+      </select>
+    </div>
+    <div class="grp">
+      <button id="halt">Halt</button>
+      <button id="coat">New coat</button>
+    </div>
+    <div class="grp">
+      <label>view</label>
+      <button class="view" data-v="side">side</button>
+      <button class="view" data-v="three">3/4</button>
+      <button class="view" data-v="front">front</button>
+      <button class="view" data-v="high">high</button>
+      <button class="view" data-v="head">head</button>
+    </div>
+    <div class="grp">
+      <label for="orbit">orbit</label>
+      <input id="orbit" type="checkbox">
+    </div>
+  </div>
+
+  <div id="hint" class="plate">drag = orbit &middot; wheel = zoom &middot; space = halt/walk &middot; &uarr;/&darr; = speed</div>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="js/coat.js"></script>
+  <script src="js/giraffe.js"></script>
+  <script src="js/gait.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

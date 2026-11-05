@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Giraffa reticulata — walking giraffe in Three.js</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>
+  html,body{margin:0;height:100%;background:#0b0d0c;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#e8e2d4}
+  #c{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+  #c:active{cursor:grabbing}
+  #ui{position:fixed;left:14px;top:14px;width:250px;padding:11px 12px 10px;border-radius:12px;
+      background:rgba(16,18,17,.52);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+      border:1px solid rgba(255,255,255,.13);font-size:11.5px;line-height:1.5;user-select:none;z-index:5}
+  #ui .hdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+  #ui b{font-size:13px;letter-spacing:.3px}
+  #ui .hdr span{opacity:.6;font-variant-numeric:tabular-nums}
+  .row{display:flex;gap:5px;align-items:center;margin:5px 0;flex-wrap:wrap}
+  .row label{display:flex;align-items:center;gap:6px;flex:1;opacity:.9}
+  .row span{opacity:.65;min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
+  button{font:inherit;color:#efe9db;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);
+      border-radius:7px;padding:3px 8px;cursor:pointer}
+  button:hover{background:rgba(255,255,255,.18)}
+  button.on{background:#a7762f;border-color:#d0a055;color:#fff}
+  .cam button{padding:2px 6px;font-size:10.5px}
+  .cam{opacity:.95;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px}
+  input[type=range]{flex:1;height:14px;accent-color:#c78f3e;margin:0}
+  .hint{margin-top:7px;opacity:.45;font-size:10px}
+  #credit{position:fixed;right:14px;bottom:11px;font-size:10px;opacity:.4;z-index:5}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div class="hdr"><b>Giraffa reticulata</b><span id="fps"></span></div>
+  <div class="row">
+    <button id="walkBtn">Stand</button>
+    <button id="pauseBtn">Pause</button>
+    <button id="follow" class="on">Follow</button>
+  </div>
+  <div class="row"><label>speed<input id="speed" type="range" min="0" max="2.4" step="0.05" value="1.25"></label><span id="speedV"></span></div>
+  <div class="row cam">camera
+    <button data-cam="side">side</button>
+    <button data-cam="low">low</button>
+    <button data-cam="full">full</button>
+    <button data-cam="head">head</button>
+    <button data-cam="portrait">near</button>
+    <button data-cam="top">high</button>
+  </div>
+  <div class="row"><label>sun<input id="sun" type="range" min="4" max="72" step="1" value="26"></label><span id="sunV"></span></div>
+  <div class="row"><label>azimuth<input id="sunAz" type="range" min="0" max="360" step="1" value="118"></label><span id="sunAzV"></span></div>
+  <div class="row"><button id="coatBtn">New coat</button><button id="shadowBtn" class="on">Shadows</button></div>
+  <div class="hint">drag to orbit &middot; wheel to zoom &middot; double-click toggles follow</div>
+</div>
+<div id="credit">procedural geometry &amp; coat &mdash; three.js, no build step</div>
+<!--THREE-->
+<!--APP-->
+</body>
+</html>
