@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Walking Giraffe in Three.js</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f0f0f0; }
+        canvas { display: block; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+<script>
+    // --- Setup ---
+    let scene, camera, renderer;
+    let giraffeGroup;
+    const clock = new THREE.Clock();
+
+    // Simplified giraffe parts
+    let body, neck, legs = [];
+    const LEG_COUNT = 4;
+    const BODY_HEIGHT = 3;
+    const BODY_WIDTH = 1;
+    const NECK_HEIGHT = 5;
+
+    init();
+    animate();
+
+    function init() {
+        // Scene
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Sky blue background
+
+        // Camera
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(10, 5, 15);
+        camera.lookAt(0, 2, 0);
+
+        // Renderer
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 15, 10);
+        scene.add(directionalLight);
+
+        // Giraffe construction
+        giraffeGroup = new THREE.Group();
+        
+        // Body (Cylinder)
+        const bodyGeometry = new THREE.CylinderGeometry(BODY_WIDTH / 2, BODY_WIDTH / 2, BODY_HEIGHT, 12);
+        const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0xb8860b }); // Giraffe brown
+        body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.position.y = BODY_HEIGHT / 2;
+        giraffeGroup.add(body);
+
+        // Neck (Cylinder, positioned on the body)
+        const neckGeometry = new THREE.CylinderGeometry(0.5, 0.5, NECK_HEIGHT, 12);
+        const neckMaterial = new THREE.MeshPhongMaterial({ color: 0xb8860b });
+        neck = new THREE.Mesh(neckGeometry, neckMaterial);
+        neck.position.set(0, BODY_HEIGHT / 2 + NECK_HEIGHT / 2 + 1, 0); // Offset from body center
+        giraffeGroup.add(neck);
+
+        // Legs (Simple cylinders/boxes, positioned under the body)
+        const legGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.5, 8);
+        const legMaterial = new THREE.MeshPhongMaterial({ color: 0xb8860b });
+
+        const legPositions = [
+            { x: -BODY_WIDTH / 2, z: BODY_WIDTH / 2 }, // Front Left
+            { x: BODY_WIDTH / 2, z: BODY_WIDTH / 2 },  // Front Right
+            { x: -BODY_WIDTH / 2, z: -BODY_WIDTH / 2 }, // Back Left
+            { x: BODY_WIDTH / 2, z: -BODY_WIDTH / 2 }  // Back Right
+        ];
+
+        legPositions.forEach(pos => {
+            const leg = new THREE.Mesh(legGeometry, legMaterial);
+            // Position relative to the body center (y=0 is the base plane)
+            leg.position.set(pos.x, 1.5 / 2, pos.z); 
+            giraffeGroup.add(leg);
+            legs.push(leg);
+        });
+
+        scene.add(giraffeGroup);
+
+        // Initial ground plane
+        const planeGeometry = new THREE.PlaneGeometry(20, 20);
+        const planeMaterial = new THREE.MeshPhongMaterial({ color: 0x4caf50, side: THREE.DoubleSide });
+        const ground = new THREE.Mesh(planeGeometry, planeMaterial);
+        ground.rotation.x = Math.PI / 2;
+        ground.position.y = 0;
+        scene.add(ground);
+
+        // Event listener for resizing
+        window.addEventListener('resize', onWindowResize, false);
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // --- Animation Logic (Walking) ---
+    function animate() {
+        requestAnimationFrame(animate);
+
+        const delta = clock.getDelta();
+        
+        // Simple walking motion (gait cycle)
+        const walkSpeed = 2.0 * delta; // Speed multiplier
+        const gaitPhase = clock.getElapsedTime() * 3; // Cycle speed
+
+        // Control leg rotation/position for walking
+        // Front legs (0, 1) and Back legs (2, 3)
+        
+        // Front Left (0) and Front Right (1) swing
+        const frontSwing = Math.sin(gaitPhase * 2) * 0.3;
+        legs[0].position.x = -BODY_WIDTH / 2 + frontSwing;
+        legs[1].position.x = BODY_WIDTH / 2 - frontSwing;
+
+        // Back Left (2) and Back Right (3) swing
+        const backSwing = Math.cos(gaitPhase * 2) * 0.3;
+        legs[2].position.x = -BODY_WIDTH / 2 + backSwing;
+        legs[3].position.x = BODY_WIDTH / 2 - backSwing;
+
+        // Translate the whole giraffe group forward to simulate movement
+        giraffeGroup.position.z = Math.cos(clock.getElapsedTime() * 0.5) * 15;
+        giraffeGroup.rotation.y = Math.sin(clock.getElapsedTime() * 0.3) * 0.1;
+
+
+        renderer.render(scene, camera);
+    }
+</script>
+</body>
+</html>

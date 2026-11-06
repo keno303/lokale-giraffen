@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Walking Giraffe in Three.js</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <!-- Three.js will inject the canvas here -->
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.165.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.165.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- Scene Setup ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(1, 1, 1).normalize();
+        scene.add(directionalLight);
+
+        // --- Giraffe Representation (Simplified Geometry) ---
+        // For simplicity, we'll use a tall cylinder/box approximation for the body and legs.
+        const giraffeGroup = new THREE.Group();
+        scene.add(giraffeGroup);
+
+        // Body (Simplified)
+        const bodyGeometry = new THREE.BoxGeometry(1, 3, 1);
+        const bodyMaterial = new THREE.MeshPhongMaterial({ color: 0xffa500 });
+        const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+        body.position.y = 1.5;
+        giraffeGroup.add(body);
+
+        // Legs (Simplified - will be animated)
+        const legMaterial = new THREE.MeshPhongMaterial({ color: 0x555555 });
+        const legLength = 1.5;
+        const legWidth = 0.3;
+
+        // Front Left Leg
+        const leg1Geo = new THREE.BoxGeometry(legWidth, legLength, legWidth);
+        const leg1 = new THREE.Mesh(leg1Geo, legMaterial);
+        leg1.position.set(-0.3, 0.75, 0.5);
+        giraffeGroup.add(leg1);
+
+        // Front Right Leg
+        const leg2Geo = new THREE.BoxGeometry(legWidth, legLength, legWidth);
+        const leg2 = new THREE.Mesh(leg2Geo, legMaterial);
+        leg2.position.set(0.3, 0.75, 0.5);
+        giraffeGroup.add(leg2);
+
+        // Back Left Leg
+        const leg3Geo = new THREE.BoxGeometry(legWidth, legLength, legWidth);
+        const leg3 = new THREE.Mesh(leg3Geo, legMaterial);
+        leg3.position.set(-0.3, 0.75, -0.5);
+        giraffeGroup.add(leg3);
+
+        // Back Right Leg
+        const leg4Geo = new THREE.BoxGeometry(legWidth, legLength, legWidth);
+        const leg4 = new THREE.Mesh(leg4Geo, legMaterial);
+        leg4.position.set(0.3, 0.75, -0.5);
+        giraffeGroup.add(leg4);
+
+
+        // --- Animation Logic (Walking) ---
+        const walkCycle = [];
+        const stepTime = 1.5; // Time for one step cycle
+
+        function animateWalk(time) {
+            // Simple walking cycle based on time
+            const phase = Math.abs(Math.sin(time * 0.002));
+
+            // Define positions for legs based on the phase
+            const legPositions = {
+                // Front Legs (Swing forward/back)
+                leg1: new THREE.Vector3(-0.3, 0.75, 0.5 + Math.cos(time * 0.005) * 0.3),
+                leg2: new THREE.Vector3(0.3, 0.75, 0.5 + Math.cos(time * 0.005) * 0.3),
+                // Back Legs (Swing forward/back)
+                leg3: new THREE.Vector3(-0.3, 0.75, -0.5 + Math.cos(time * 0.005) * 0.3),
+                leg4: new THREE.Vector3(0.3, 0.75, -0.5 + Math.cos(time * 0.005) * 0.3),
+            };
+
+            leg1.position.copy(legPositions.leg1);
+            leg2.position.copy(legPositions.leg2);
+            leg3.position.copy(legPositions.leg3);
+            leg4.position.copy(legPositions.leg4);
+
+            // Rotate the whole group slightly to simulate movement direction (optional)
+            giraffeGroup.rotation.y = Math.sin(time * 0.001) * 0.1;
+
+
+            renderer.render(scene, camera);
+            requestAnimationFrame(animateWalk);
+        }
+
+        // --- Camera Controls ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 1.5, 0);
+        controls.update();
+
+
+        // --- Resize Handler ---
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start the animation
+        animateWalk(0);
+    </script>
+</body>
+</html>

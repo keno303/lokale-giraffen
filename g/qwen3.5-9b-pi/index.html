@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Walking Giraffe - Three.js</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #87CEEB; }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>Walking Giraffe</h3>
+        <p>Use arrow keys to control camera</p>
+        <p>Press R to reset view</p>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 3, 8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+        sunLight.position.set(10, 20, 10);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 0.5;
+        sunLight.shadow.camera.far = 100;
+        sunLight.shadow.camera.left = -20;
+        sunLight.shadow.camera.right = 20;
+        sunLight.shadow.camera.top = 20;
+        sunLight.shadow.camera.bottom = -20;
+        scene.add(sunLight);
+
+        // Ground
+        const groundGeometry = new THREE.PlaneGeometry(200, 200);
+        const groundMaterial = new THREE.MeshStandardMaterial({
+            color: 0x228B22,
+            roughness: 0.8,
+            metalness: 0.1
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Giraffe builder
+        const giraffeGroup = new THREE.Group();
+        scene.add(giraffeGroup);
+
+        // Materials
+        const bodyMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8B4513,
+            roughness: 0.7,
+            metalness: 0.1
+        });
+
+        const lightMaterial = new THREE.MeshStandardMaterial({
+            color: 0xFFFFFF,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+
+        const darkMaterial = new THREE.MeshStandardMaterial({
+            color: 0x3d2614,
+            roughness: 0.7,
+            metalness: 0.1
+        });
+
+        const hornMaterial = new THREE.MeshStandardMaterial({
+            color: 0x8B0000,
+            roughness: 0.6,
+            metalness: 0.1
+        });
+
+        const eyeMaterial = new THREE.MeshStandardMaterial({
+            color: 0x000000,
+            roughness: 0.9,
+            metalness: 0.1
+        });
+
+        const whitePatchMaterial = new THREE.MeshStandardMaterial({
+            color: 0xFFFFFF,
+            roughness: 0.7,
+            metalness: 0.1
+        });
+
+        // Neck
+        const neck = new THREE.Group();
+        neck.position.y = 3;
+        giraffeGroup.add(neck);
+
+        const neckGeometry = new THREE.CylinderGeometry(0.25, 0.35, 6, 8, 5);
+        neck.add(new THREE.Mesh(neckGeometry, bodyMaterial));
+        neck.add(new THREE.Mesh(neckGeometry, bodyMaterial));
+        neck.add(new THREE.Mesh(neckGeometry, bodyMaterial));
+        neck.add(new THREE.Mesh(neckGeometry, bodyMaterial));
+        neck.add(new THREE.Mesh(neckGeometry, bodyMaterial));
+        neck.add(new THREE.Mesh(neckGeometry, bodyMaterial));
+        neck.add(new THREE.Mesh(neckGeometry, bodyMaterial));
+        neck.add(new THREE.Mesh(neckGeometry, bodyMaterial));
+
+        // Head
+        const head = new THREE.Group();
+        head.position.y = 1.8;
+        neck.add(head);
+
+        // Main head shape
+        const headGeometry = new THREE.SphereGeometry(0.35, 16, 16, 0, Math.PI * 0.8, 0, Math.PI * 0.5);
+        head.add(new THREE.Mesh(headGeometry, bodyMaterial));
+
+        // White cheek patches
+        const cheekL = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8, 0, Math.PI * 0.4, 0, Math.PI * 0.5), whitePatchMaterial);
+        cheekL.position.set(-0.2, 0, -0.05);
+        head.add(cheekL);
+
+        const cheekR = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 8, 0, Math.PI * 0.4, 0, Math.PI * 0.5), whitePatchMaterial);
+        cheekR.position.set(0.2, 0, -0.05);
+        head.add(cheekR);
+
+        // Horns (ossicones)
+        const hornGeometry = new THREE.CylinderGeometry(0.04, 0.05, 0.4, 6);
+        
+        const hornL = new THREE.Mesh(hornGeometry, hornMaterial);
+        hornL.position.set(-0.15, 0.35, 0.25);
+        hornL.rotation.z = 0.3;
+        hornL.rotation.x = -0.2;
+        head.add(hornL);
+
+        const hornR = new THREE.Mesh(hornGeometry, hornMaterial);
+        hornR.position.set(0.15, 0.35, 0.25);
+        hornR.rotation.z = -0.3;
+        hornR.rotation.x = -0.2;
+        head.add(hornR);
+
+        // Horn tufts
+        const tuftGeometry = new THREE.CylinderGeometry(0.02, 0.03, 0.15, 4);
+        
+        const tuftL = new THREE.Mesh(tuftGeometry, bodyMaterial);
+        tuftL.position.set(-0.15, 0.5, 0.25);
+        tuftL.rotation.z = 0.3;
+        head.add(tuftL);
+
+        const tuftR = new THREE.Mesh(tuftGeometry, bodyMaterial);
+        tuftR.position.set(0.15, 0.5, 0.25);
+        tuftR.rotation.z = -0.3;
+        head.add(tuftR);
+
+        // Ears
+        const earGeometry = new THREE.SphereGeometry(0.12, 8, 8, 0, Math.PI * 0.2, 0, Math.PI * 0.6);
+        
+        const earL = new THREE.Mesh(earGeometry, bodyMaterial);
+        earL.position.set(-0.18, 0.45, 0.2);
+        earL.rotation.z = 0.2;
+        head.add(earL);
+
+        const earR = new THREE.Mesh(earGeometry, bodyMaterial);
+        earR.position.set(0.18, 0.45, 0.2);
+        earR.rotation.z = -0.2;
+        head.add(earR);
+
+        // Eyes
+        const eyeGeometry = new THREE.SphereGeometry(0.06, 8, 8);
+        
+        const eyeL = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        eyeL.position.set(-0.18, 0.15, 0.22);
+        head.add(eyeL);
+
+        const eyeR = new THREE.Mesh(eyeGeometry, eyeMaterial);
+        eyeR.position.set(0.18, 0.15, 0.22);
+        head.add(eyeR);
+
+        // Eye whites
+        const eyeWhiteL = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), whitePatchMaterial);
+        eyeWhiteL.position.set(-0.18, 0.15, 0.23);
+        head.add(eyeWhiteL);
+
+        const eyeWhiteR = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), whitePatchMaterial);
+        eyeWhiteR.position.set(0.18, 0.15, 0.23);
+        head.add(eyeWhiteR);
+
+        // Nose/muzzle
+        const noseGeometry = new THREE.SphereGeometry(0.12, 12, 8, 0, Math.PI * 0.2, 0, Math.PI * 0.8);
+        const nose = new THREE.Mesh(noseGeometry, darkMaterial);
+        nose.position.set(0, 0.15, 0.45);
+        head.add(nose);
+
+        // Snout
+        const snoutGeometry = new THREE.BoxGeometry(0.12, 0.15, 0.18);
+        const snout = new THREE.Mesh(snoutGeometry, darkMaterial);
+        snout.position.set(0, 0.12, 0.48);
+        head.add(snout);
+
+        // Body
+        const body = new THREE.Group();
+        body.position.y = 1.5;
+        neck.add(body);
+
+        // Main body
+        const bodyGeometry = new THREE.SphereGeometry(0.75, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.6);
+        body.add(new THREE.Mesh(bodyGeometry, bodyMaterial));
+
+        // Tail
+        const tailGroup = new THREE.Group();
+        tailGroup.position.set(0, 0.2, 0.85);
+        body.add(tailGroup);
+
+        const tailGeometry = new THREE.CylinderGeometry(0.03, 0.04, 1.2, 6);
+        tailGroup.add(new THREE.Mesh(tailGeometry, bodyMaterial));
+
+        const tailTuft = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.2, 6), bodyMaterial);
+        tailTuft.position.set(0, 0.6, 0);
+        tailGroup.add(tailTuft);
+
+        // Legs (4 legs)
+        const legPositions = [
+            { x: -0.25, z: 0.3, isFront: true, isLeft: true },
+            { x: 0.25, z: 0.3, isFront: true, isLeft: false },
+            { x: -0.25, z: -0.3, isFront: false, isLeft: true },
+            { x: 0.25, z: -0.3, isFront: false, isLeft: false }
+        ];
+
+        const legs = [];
+        const legGeometry = new THREE.CylinderGeometry(0.08, 0.09, 3.5, 8);
+
+        legPositions.forEach((pos, i) => {
+            const legGroup = new THREE.Group();
+            legGroup.position.set(pos.x, 1.5, pos.z);
+            body.add(legGroup);
+
+            // Upper leg
+            const upperLeg = new THREE.Mesh(legGeometry, bodyMaterial);
+            upperLeg.position.y = 1.75;
+            legGroup.add(upperLeg);
+
+            // Lower leg
+            const lowerLeg = new THREE.Mesh(legGeometry, bodyMaterial);
+            lowerLeg.position.y = 0.8;
+            lowerLeg.rotation.x = 0.1;
+            legGroup.add(lowerLeg);
+
+            // Hoof
+            const hoof = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), darkMaterial);
+            hoof.position.y = -1.75;
+            legGroup.add(hoof);
+
+            legs.push({
+                group: legGroup,
+                upper: upperLeg,
+                lower: lowerLeg,
+                hoof: hoof,
+                isFront: pos.isFront,
+                isLeft: pos.isLeft,
+                angle: 0,
+                verticalOffset: 0
+            });
+        });
+
+        // Add some body spots
+        for (let i = 0; i < 12; i++) {
+            const spotSize = 0.15 + Math.random() * 0.15;
+            const spotGeometry = new THREE.SphereGeometry(spotSize, 8, 6);
+            const spot = new THREE.Mesh(spotGeometry, darkMaterial);
+            spot.position.set(
+                (Math.random() - 0.5) * 1.2,
+                (Math.random() - 0.5) * 0.5,
+                (Math.random() - 0.5) * 0.8 + 0.4
+            );
+            spot.scale.set(1, 1, 0.3);
+            body.add(spot);
+        }
+
+        // Add neck spots
+        for (let i = 0; i < 5; i++) {
+            const spotSize = 0.1 + Math.random() * 0.1;
+            const spotGeometry = new THREE.SphereGeometry(spotSize, 8, 6);
+            const spot = new THREE.Mesh(spotGeometry, darkMaterial);
+            spot.position.set(
+                (Math.random() - 0.5) * 0.5,
+                0.3 + i * 0.5,
+                0.2
+            );
+            spot.scale.set(1, 1, 0.3);
+            neck.add(spot);
+        }
+
+        // Add environment elements (trees)
+        function createTree(x, z) {
+            const treeGroup = new THREE.Group();
+            treeGroup.position.set(x, 0, z);
+
+            // Trunk
+            const trunkGeometry = new THREE.CylinderGeometry(0.2, 0.3, 4, 6);
+            const trunkMaterial = new THREE.MeshStandardMaterial({
+                color: 0x654321,
+                roughness: 0.9
+            });
+            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+            trunk.position.y = 2;
+            trunk.castShadow = true;
+            treeGroup.add(trunk);
+
+            // Leaves
+            const leavesGeometry = new THREE.DodecahedronGeometry(1.5);
+            const leavesMaterial = new THREE.MeshStandardMaterial({
+                color: 0x228B22,
+                roughness: 0.8,
+                metalness: 0.1
+            });
+            const leaves = new THREE.Mesh(leavesGeometry, leavesMaterial);
+            leaves.position.y = 4;
+            leaves.castShadow = true;
+            treeGroup.add(leaves);
+
+            scene.add(treeGroup);
+        }
+
+        // Create some trees around
+        for (let i = 0; i < 8; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 15 + Math.random() * 20;
+            createTree(Math.cos(angle) * dist, Math.sin(angle) * dist);
+        }
+
+        // Animation state
+        let walkSpeed = 0.1;
+        let walkDirection = 1;
+        let legPhase = 0;
+        let neckOscillation = 0;
+        let bodyOscillation = 0;
+
+        // Walking animation function
+        function animateWalking(delta) {
+            legPhase += 0.02;
+
+            legs.forEach((leg, i) => {
+                const isFront = leg.isFront;
+                const isLeft = leg.isLeft;
+                
+                // Different phases for each leg
+                let phaseOffset = 0;
+                if (isFront) phaseOffset = 0;
+                else if (!isFront && isLeft) phaseOffset = 1;
+                else if (!isFront && !isLeft) phaseOffset = 2;
+                else phaseOffset = 3;
+
+                // Calculate leg angle
+                const angle = Math.sin(legPhase + phaseOffset * Math.PI * 0.5) * 0.3;
+                leg.group.rotation.x = angle * (isFront ? 1 : -1);
+
+                // Vertical movement
+                leg.verticalOffset = Math.sin(legPhase + phaseOffset * Math.PI * 0.5) * 0.15;
+                leg.group.position.y = 1.5 + leg.verticalOffset;
+            });
+
+            // Neck bobbing
+            neckOscillation += 0.02;
+            neck.rotation.x = Math.sin(neckOscillation) * 0.05;
+            neck.rotation.z = Math.cos(neckOscillation) * 0.02;
+
+            // Body movement
+            bodyOscillation += 0.02;
+            body.rotation.x = Math.sin(bodyOscillation) * 0.03;
+            body.rotation.z = Math.cos(bodyOscillation) * 0.02;
+
+            // Head following neck
+            head.position.x = neck.position.x + Math.sin(neckOscillation) * 0.1;
+            head.position.z = neck.position.z + Math.cos(neckOscillation) * 0.05;
+            head.rotation.x = neck.rotation.x * 0.5;
+            head.rotation.z = neck.rotation.z * 0.5;
+
+            // Forward movement
+            giraffeGroup.position.x += walkSpeed * walkDirection;
+
+            // Camera follow
+            camera.position.x = giraffeGroup.position.x + Math.sin(Date.now() * 0.001) * 5;
+            camera.position.z = giraffeGroup.position.z + 8;
+            camera.lookAt(giraffeGroup.position.x, 3, giraffeGroup.position.z);
+
+            // Wrap around
+            if (giraffeGroup.position.x > 40) {
+                giraffeGroup.position.x = -35;
+                walkDirection *= -1;
+            }
+            if (giraffeGroup.position.z > 40) {
+                giraffeGroup.position.z = -35;
+                walkDirection *= -1;
+            }
+        }
+
+        // Controls
+        let mouseX = 0;
+        let mouseY = 0;
+        let targetRotationX = 0;
+        let targetRotationY = 0;
+
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowUp':
+                    walkSpeed = Math.min(walkSpeed + 0.02, 0.3);
+                    break;
+                case 'ArrowDown':
+                    walkSpeed = Math.max(walkSpeed - 0.02, 0);
+                    break;
+                case 'ArrowLeft':
+                    walkDirection = -1;
+                    break;
+                case 'ArrowRight':
+                    walkDirection = 1;
+                    break;
+                case 'r':
+                case 'R':
+                    giraffeGroup.position.set(0, 0, 0);
+                    targetRotationX = 0;
+                    targetRotationY = 0;
+                    break;
+            }
+        });
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            animateWalking();
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start animation
+        animate();
+
+        // Initial walk speed
+        walkSpeed = 0.08;
+    </script>
+</body>
+</html>

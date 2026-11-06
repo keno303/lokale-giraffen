@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Walking Giraffe — Three.js</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #20242e;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  #app { position: fixed; inset: 0; width: 100%; height: 100%; }
+  .hud {
+    position: fixed;
+    left: 18px;
+    bottom: 16px;
+    color: #f5efe2;
+    background: rgba(20, 24, 32, 0.55);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    pointer-events: none;
+    max-width: 72%;
+  }
+  .hud button {
+    margin-top: 8px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .hud button:hover { background: rgba(255, 255, 255, 0.25); }
+  .hud code { color: #ffd9a8; }
+</style>
+</head>
+<body>
+<canvas id="app"></canvas>
+
+<div class="hud">
+  <div>
+    Walking giraffe &middot; Three.js &middot; runs straight from <code>index.html</code> (no server, no build)</div>
+  </div>
+  <div>
+    <button id="pauseBtn">Pause</button>
+    <button id="soundBtn">Footstep sound: off</button>
+  </div>
+</div>
+
+<!-- Three.js r159 (last version that ships the non-module build), loaded over CDN so the file runs directly from disk -->
+<script src="https://unpkg.com/three@0.159.0/build/three.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  if (typeof THREE === "undefined") {
+    document.getElementById("app").style.display = "none";
+    var msg = document.createElement("div");
+    msg.style.cssText =
+      "position:fixed;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;background:#20242e;";
+    msg.textContent = "Three.js could not be loaded (CDN unavailable). Open the file with internet access.";
+    document.body.appendChild(msg);
+    return;
+  }
+
+  // ------------------------------------------------------------------
+  // Renderer / scene / camera
+  // ------------------------------------------------------------------
+  var canvas = document.getElementById("app");
+  var renderer = new THREE.WebGLRenderer({
+    canvas: canvas,
+    antialias: true,
+    alpha: false
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.08;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+  var scene = new THREE.Scene();
+
+  var camera = new THREE.PerspectiveCamera(
+    50,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    100
+  );
+  camera.position.set(0, 1.7, 7.2);
+
+  // ------------------------------------------------------------------
+  // Background: warm sky gradient with a soft sun glow
+  // ------------------------------------------------------------------
+  var bgCanvas = document.createElement("canvas");
+  bgCanvas.width = bgCanvas.height = 256;
+  var bgCtx = bgCanvas.getContext("2d");
+  var bgGrad = bgCtx.createLinearGradient(0, 0, 0, 256);
+  bgGrad.addColorStop(0.00, "#fdf6e8");
+  bgGrad.addColorStop(0.45, "#f6e7d2");
+  bgGrad.addColorStop(0.75, "#b9c8dd");
+  bgGrad.addColorStop(1.00, "#7f93b0");
+  bgCtx.fillStyle = bgGrad;
+  bgCtx.fillRect(0, 0, 256, 256);
+  var sunGlow = bgCtx.createRadialGradient(150, 60, 0, 150, 60, 140);
+  sunGlow.addColorStop(0.0, "rgba(255, 244, 214, 0.75)");
+  sunGlow.addColorStop(1.0, "rgba(255, 244, 214, 0)");
+  bgCtx.fillStyle = sunGlow;
+  bgCtx.fillRect(0, 0, 256, 256);
+
+  var bgTexture = new THREE.CanvasTexture(bgCanvas);
+  bgTexture.colorSpace = THREE.SRGBColorSpace;
+  scene.background = bgTexture;
+  scene.fog = new THREE.Fog(0xa9b4c8, 9, 26);
+
+  // ------------------------------------------------------------------
+  // Lights
+  // ------------------------------------------------------------------
+  scene.add(new THREE.AmbientLight(0xffffff, 0.30));
+  var hemi = new THREE.HemisphereLight(0xbcd0ff, 0x6b6048, 0.55);
+  scene.add(hemi);
+
+  var sunLight = new THREE.DirectionalLight(0xfff2dc, 2.4);
+  sunLight.position.set(6, 10, 5);
+  sunLight.castShadow = true;
+  sunLight.shadow.mapSize.set(2048, 2048);
+  sunLight.shadow.camera.near = 1;
+  sunLight.shadow.camera.far = 32;
+  sunLight.shadow.camera.left = -13;
+  sunLight.shadow.camera.right = 13;
+  sunLight.shadow.camera.top = 13;
+  sunLight.shadow.camera.bottom = -13;
+  sunLight.shadow.bias = -0.0004;
+  sunLight.shadow.normalBias = 0.02;
+  scene.add(sunLight);
+
+  // ------------------------------------------------------------------
+  // Texture helpers: procedural fur / grass noise textures
+  // ------------------------------------------------------------------
+  function makeNoiseTexture(base, spread, darkScale) {
+    var S = 256;
+    var c = document.createElement("canvas");
+    c.width = S;
+    c.height = S;
+    var ctx = c.getContext("2d");
+
+    var img = ctx.createImageData(S, S);
+    var data = img.data;
+    for (var y = 0; y < S; y++) {
+      for (var x = 0; x < S; x++) {
+        var v = base
+          + spread * (
+              Math.sin(x * 0.22 + 1.3) +
+              Math.sin(y * 0.28 + 0.7) +
+              Math.sin((x + y) * 0.31 + 2.1)
+            )
+          + (Math.random() - 0.5) * 0.35;
+        v = Math.max(0.15, Math.min(0.98, v));
+        if (darkScale > 0) {
+          v = v * darkScale + (1 - darkScale) * 0.55;
+        }
+        var i = (y * S + x) * 4;
+        data[i] = data[i + 1] = data[i + 2] = v * 255;
+        data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+
+    // small 3x3 box blur to smooth the noise (soft fur / grass look)
+    var blurC = document.createElement("canvas");
+    blurC.width = S;
+    blurC.height = S;
+    var bctx = blurC.getContext("2d");
+    var bo = bctx.createImageData(S, S);
+    var bd = bo.data;
+    var src = ctx.getImageData(0, 0, S, S);
+    var sd = src.data;
+    for (var yy = 0; yy < S; yy++) {
+      for (var xx = 0; xx < S; xx++) {
+        var sum = 0;
+        for (var dy = -1; dy <= 1; dy++) {
+          for (var dx = -1; dx <= 1; dx++) {
+            var x2 = xx + dx;
+            var y2 = yy + dy;
+            if (x2 < 0 || x2 >= S || y2 < 0 || y2 >= S) {
+              x2 += 2;
+              y2 += 2;
+            }
+            sum += sd[(y2 * S + x2) * 4];
+          }
+        }
+        var v = sum / 9;
+        var i = (yy * S + xx) * 4;
+        bd[i] = bd[i + 1] = bd[i + 2] = v;
+        bd[i + 3] = 255;
+      }
+    }
+    bctx.putImageData(bo, 0, 0);
+
+    var tex = new THREE.CanvasTexture(blurC);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }
+
+  var furTex = makeNoiseTexture(0.82, 0.16, 0.80);
+  var lightFurTex = makeNoiseTexture(0.82, 0.16, 0.80);
+  var darkFurTex = makeNoiseTexture(0.70, 0.08, 0.92);
+
+  var furMat = new THREE.MeshStandardMaterial({
+    map: furTex,
+    roughness: 0.92,
+    metalness: 0.0,
+    color: 0xc9a878
+  });
+  var lightFurMat = new THREE.MeshStandardMaterial({
+    map: lightFurTex,
+    roughness: 0.92,
+    metalness: 0.0,
+    color: 0xe3d3b4
+  });
+  var darkFurMat = new THREE.MeshStandardMaterial({
+    map: darkFurTex,
+    roughness: 0.9,
+    metalness: 0.0,
+    color: 0x7d6347
+  });
+
+  // Grass texture for the ground
+  var grassTex = makeNoiseTexture(0.42, 0.40, 0.72);
+  grassTex.colorSpace = THREE.SRGBColorSpace;
+
+  // ------------------------------------------------------------------
+  // Ground
+  // ------------------------------------------------------------------
+  var ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(140, 140),
+    new THREE.MeshStandardMaterial({ map: grassTex, roughness: 0.97, metalness: 0.0 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // ------------------------------------------------------------------
+  // Giraffe construction
+  // ------------------------------------------------------------------
+  var walkFreq = 2.4; // walking stride frequency (steps per second)
+  var legs = [];
+  var body;      // torso group (assigned inside assemble)
+  var neck;      // neck group (assigned inside assemble)
+  var head;      // head group (assigned inside assemble)
+
+  // One leg: foot at y=0, built upward (thigh -> knee -> shin -> foot)
+  function buildLeg(x) {
+    var leg = new THREE.Group();
+    leg.position.set(x, 0, 0);
+    leg.rotation.y = -0.14; // slight outward stance
+
+    // foot sole
+    var sole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.26, 0.26, 0.09, 12),
+      darkFurMat
+    );
+    sole.position.y = 0.045;
+    sole.rotation.x = Math.PI / 2;
+    sole.rotation.y = -0.12;
+    leg.add(sole);
+
+    // toe
+    var toe = new THREE.Mesh(
+      new THREE.ConeGeometry(0.14, 0.19, 8),
+      furMat
+    );
+    toe.position.y = 0.185;
+    toe.rotation.x = 0.32;
+    toe.rotation.y = 0.15;
+    leg.add(toe);
+
+    // shin
+    var shin = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.235 * 0.9, 0.235 * 1.06, 0.50, 12),
+      furMat
+    );
+    shin.position.y = 0.53;
+    shin.castShadow = true;
+    leg.add(shin);
+
+    // knee joint
+    var knee = new THREE.Mesh(
+      new THREE.SphereGeometry(0.185, 14, 12),
+      furMat
+    );
+    knee.position.y = 1.11;
+    knee.scale.set(1, 0.82, 1);
+    leg.add(knee);
+
+    // thigh
+    var thigh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.185 * 0.9, 0.185 * 1.08, 0.66, 14),
+      furMat
+    );
+    thigh.position.y = 1.33;
+    thigh.castShadow = true;
+    leg.add(thigh);
+
+    return leg;
+  }
+
+  // ------------------------------------------------------------------
+  // Torso
+  // ------------------------------------------------------------------
+  function buildTorso() {
+    var body = new THREE.Group();
+
+    var torso = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.345, 0.295, 1.15, 16),
+      furMat
+    );
+    torso.position.y = 0.575;
+    torso.castShadow = true;
+    body.add(torso);
+
+    // chest bulge
+    var chest = new THREE.Mesh(
+      new THREE.SphereGeometry(0.355, 16, 14),
+      furMat
+    );
+    chest.position.y = 0.95;
+    chest.scale.set(0.96, 1.06, 0.96);
+    chest.castShadow = true;
+    body.add(chest);
+
+    // belly
+    var belly = new THREE.Mesh(
+      new THREE.SphereGeometry(0.33, 16, 14),
+      furMat
+    );
+    belly.position.y = 0.70;
+    belly.scale.set(1.15, 0.75, 1.0);
+    belly.castShadow = true;
+    body.add(belly);
+
+    // back humps
+    function buildHump(x) {
+      var h = new THREE.Mesh(
+        new THREE.SphereGeometry(0.21, 16, 12),
+        furMat
+      );
+      h.position.set(x, 1.02, 0);
+      h.scale.set(0.92, 0.96, 0.92);
+      h.castShadow = true;
+      return h;
+    }
+    body.add(buildHump(-0.13));
+    body.add(buildHump(0.13));
+
+    // a subtle dark patch on the back
+    var patch = new THREE.Mesh(
+      new THREE.SphereGeometry(0.14, 12, 10),
+      darkFurMat
+    );
+    patch.position.set(0, 0.80, 0.06);
+    patch.scale.set(0.85, 0.95, 0.85);
+    patch.castShadow = true;
+    body.add(patch);
+
+    // back-mane strip
+    var backMane = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.075, 0.06, 1.15, 8),
+      darkFurMat
+    );
+    backMane.position.set(-0.165, 0.62, 0);
+    backMane.rotation.x = 0.12;
+    backMane.rotation.z = -0.22;
+    body.add(backMane);
+
+    return body;
+  }
+
+  // ------------------------------------------------------------------
+  // Neck (chain of vertebra-like cylinders)
+  // ------------------------------------------------------------------
+  function buildNeck() {
+    var neck = new THREE.Group();
+    neck.position.set(0, 1.16, 0); // attach neck top to torso top
+
+    var segN = 5;
+    var segH = 0.30;
+    var segTopR = 0.26;
+    var ySum = 0;
+    for (var s = 0; s < segN; s++) {
+      var r = segTopR * (1 - s * 0.036); // 0.26 -> 0.18
+      var seg = new THREE.Mesh(
+        new THREE.CylinderGeometry(r * 0.95, r, segH, 12),
+        furMat
+      );
+      seg.position.y = ySum + segH / 2;
+      seg.castShadow = true;
+      neck.add(seg);
+      ySum += segH;
+    }
+
+    neck.rotation.y = -0.05; // slight neck bend
+    return neck;
+  }
+
+  // ------------------------------------------------------------------
+  // Head
+  // ------------------------------------------------------------------
+  function buildHead() {
+    var head = new THREE.Group(); // y-position is set after the neck is built
+
+    // head body (rounded skull)
+    var headBody = new THREE.Mesh(
+      new THREE.SphereGeometry(0.275, 20, 16),
+      lightFurMat
+    );
+    headBody.scale.set(1, 1.12, 0.94);
+    headBody.castShadow = true;
+    head.add(headBody);
+
+    // lighter cheek / face patch (front of the face)
+    var cheek = new THREE.Mesh(
+      new THREE.SphereGeometry(0.22, 16, 14),
+      lightFurMat
+    );
+    cheek.position.set(0, 0.06, 0.21);
+    cheek.scale.set(0.9, 0.8, 1.1);
+    head.add(cheek);
+
+    // two ears
+    function buildEar(side) {
+      var ear = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.075, 0.095, 0.24, 10),
+        darkFurMat
+      );
+      ear.position.set(side * 0.26, 0.14, 0);
+      ear.rotation.y = side * Math.PI / 2;
+      ear.castShadow = true;
+      return ear;
+    }
+    head.add(buildEar(-1));
+    head.add(buildEar(1));
+
+    // two ossicones (giraffe's long, thin ossicones)
+    function buildOssicone(side) {
+      var oc = new THREE.Mesh(
+        new THREE.ConeGeometry(0.075, 0.34, 6),
+        lightFurMat
+      );
+      oc.position.set(side * 0.055, 0.28, 0);
+      oc.rotation.x = 0.24; // tilt slightly upward
+      oc.rotation.y = side * 0.12;
+      oc.castShadow = true;
+      return oc;
+    }
+    head.add(buildOssicone(-1));
+    head.add(buildOssicone(1));
+
+    // two small brow tufts (dark)
+    function buildBrow(side) {
+      var br = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.06, 0.16, 8),
+        darkFurMat
+      );
+      br.position.set(side * 0.17, 0.14, 0.05);
+      br.rotation.x = -0.2;
+      return br;
+    }
+    head.add(buildBrow(-1));
+    head.add(buildBrow(1));
+
+    // two small spot patches
+    function buildSpot(x, y) {
+      var sp = new THREE.Mesh(
+        new THREE.SphereGeometry(0.10, 10, 8),
+        darkFurMat
+      );
+      sp.position.set(x, y, 0.24);
+      sp.scale.set(0.8, 0.7, 1.0);
+      return sp;
+    }
+    head.add(buildSpot(-0.14, 0.09));
+    head.add(buildSpot(0.12, -0.02));
+
+    return head;
+  }
+
+  // ------------------------------------------------------------------
+  // Mane (neck hair + head hair)
+  // ------------------------------------------------------------------
+  function buildMane() {
+    var mane = new THREE.Group(); // child of neck, at neck base
+    var strandCount = 9;
+    for (var i = 0; i < strandCount; i++) {
+      var h = 0.75 + (i / strandCount) * 0.9; // longer near the head
+      var s = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.055, 0.065, h, 6),
+        lightFurMat
+      );
+      s.position.set(-0.17 + (Math.random() - 0.5) * 0.05, h / 2,
+                     (Math.random() - 0.5) * 0.10);
+      s.rotation.x = -0.1; // slight hair curl
+      mane.add(s);
+    }
+    // head-side hair
+    for (var j = 0; j < 5; j++) {
+      var s2 = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.055, 0.5, 6),
+        lightFurMat
+      );
+      s2.position.set(
+        0.16 + (Math.random() - 0.5) * 0.1,
+        0.1 + (j / 5) * 0.5,
+        (Math.random() - 0.5) * 0.15
+      );
+      mane.add(s2);
+    }
+    return mane;
+  }
+
+  // ------------------------------------------------------------------
+  // Tail
+  // ------------------------------------------------------------------
+  function buildTail() {
+    var tail = new THREE.Group();
+    tail.position.set(-0.33, 0.16, 0);
+
+    var t = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.075, 0.06, 0.3, 8),
+      darkFurMat
+    );
+    t.rotation.x = -0.55;
+    t.rotation.z = 0.35;
+    t.castShadow = true;
+    tail.add(t);
+
+    var tip = new THREE.Mesh(
+      new THREE.SphereGeometry(0.06, 10, 8),
+      darkFurMat
+    );
+    tip.position.set(0, 0.24, 0.1);
+    tail.add(tip);
+    return tail;
+  }
+
+  // ------------------------------------------------------------------
+  // Assemble the giraffe
+  // ------------------------------------------------------------------
+  function assemble() {
+    // neck is 5 segments of 0.30, so the head sits neckLength above the neck base
+    var neckLength = 5 * 0.30; // 1.50
+    neck = buildNeck();
+    neck.position.y = 1.16;
+
+    // attach head + mane to the neck
+    head = buildHead();
+    head.position.y = neckLength;
+    neck.add(head);
+
+    var mane = buildMane();
+    neck.add(mane);
+
+    body = buildTorso();
+
+    // four legs
+    body.add(buildLeg(-0.34, 0));
+    legs.push(buildLeg(-0.34, 0));
+    body.add(buildLeg(0.34, 0));
+    legs.push(buildLeg(0.34, 0));
+    body.add(buildLeg(-0.34, 1));
+    legs.push(buildLeg(-0.34, 1));
+    body.add(buildLeg(0.34, 1));
+    legs.push(buildLeg(0.34, 1));
+
+    // tail
+    body.add(buildTail());
+
+    var giraffe = new THREE.Group();
+    giraffe.add(body);
+
+    // ground decorations: distant trees
+    function buildTree(x, z, sc) {
+      var g = new THREE.Group();
+      g.position.set(x, 0, z);
+      var trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.34 * sc, 0.46 * sc, 4.3 * sc, 8),
+        new THREE.MeshStandardMaterial({ color: 0x5b4631, roughness: 0.96 })
+      );
+      trunk.position.y = 2.2 * sc;
+      trunk.castShadow = true;
+      g.add(trunk);
+      var fol = new THREE.Mesh(
+        new THREE.ConeGeometry(2.5 * sc, 3.3 * sc, 10),
+        new THREE.MeshStandardMaterial({ color: 0x4f7a3a, roughness: 0.92 })
+      );
+      fol.position.y = 4.7 * sc;
+      fol.castShadow = true;
+      g.add(fol);
+      return g;
+    }
+    scene.add(buildTree(-6, 16, 0.85));
+    scene.add(buildTree(0, 16, 1.0));
+    scene.add(buildTree(6, 16, 0.8));
+
+    scene.add(giraffe);
+    return giraffe;
+  }
+
+  // ------------------------------------------------------------------
+  // Animation
+  // ------------------------------------------------------------------
+  var clock = new THREE.Clock();
+  var paused = false;
+  var soundOn = false;
+  var lastStepTime = 0;
+  var time = 0;
+  var camAngle = 0;
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    var dt = clock.getDelta();
+    if (!paused) time += dt;
+
+    if (!paused) {
+      // ---- walking cycle ----
+      var p = time * walkFreq + 0.5;
+      var two = 2 * p;
+      var i, leg, d, phase, thighAng, kneeAng, shinAng;
+
+      for (i = 0; i < 4; i++) {
+        leg = legs[i];
+        d = (i % 2 === 0) ? 1 : -1; // legs 0,2 swing forward; 1,3 swing backward
+        phase = p + i * Math.PI / 2;
+        thighAng = d * 0.55 * Math.sin(phase);      // thigh swing
+        kneeAng = 0.46 * Math.sin(phase);           // knee bend
+        shinAng = thighAng * 0.8 + kneeAng * 0.45;  // shin swing + flex
+        leg.rotation.z = thighAng * 0.32;           // lean forward with swing
+        leg.rotation.x = shinAng * 0.15;           // shin flex
+      }
+
+      // body bob / sway / breathing
+      body.rotation.y = 0.05 * Math.sin(two);
+      body.rotation.x = 0.02 * Math.sin(two + 0.6);
+      body.position.y = 0.045 * Math.sin(two);
+      body.scale.y = 1 + 0.012 * Math.sin(time * 2.6);
+      body.scale.x = 1 + 0.008 * Math.sin(time * 2.6 + 1.0);
+      body.scale.z = body.scale.x;
+
+      // neck + head sway
+      neck.rotation.z = 0.09 * Math.sin(time * 1.8);
+      neck.rotation.y = 0.06 * Math.sin(time * 0.9 + 0.5);
+      head.rotation.z = 0.13 * Math.sin(two + 0.3);
+      head.rotation.y = 0.05 * Math.sin(time * 2.2 + 1.2);
+
+      // camera: slow cinematic orbit around the giraffe
+      camAngle += dt * 0.12;
+      camera.position.set(
+        Math.sin(camAngle) * 7.2,
+        1.65 + 0.12 * Math.sin(time * 0.7),
+        Math.cos(camAngle) * 7.2
+      );
+      camera.lookAt(0, 1.35, 0);
+
+      // optional footstep sound
+      if (soundOn && time - lastStepTime >= 0.416) {
+        stepSound();
+        lastStepTime = time;
+      }
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  // ------------------------------------------------------------------
+  // Footstep sound (WebAudio, only after a user gesture)
+  // ------------------------------------------------------------------
+  var soundCtx = null;
+  function initSound() {
+    if (soundCtx) return;
+    try {
+      soundCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch (e) {
+      soundCtx = null;
+    }
+  }
+  function stepSound() {
+    if (!soundCtx || !soundOn) return;
+    var t = soundCtx.currentTime;
+    var osc = soundCtx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(240, t);
+    osc.frequency.exponentialRampToValueAtTime(130, t + 0.13);
+    var g = soundCtx.createGain();
+    g.gain.setValueAtTime(0.16, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    osc.connect(g);
+    g.connect(soundCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.2);
+  }
+
+  // ------------------------------------------------------------------
+  // UI
+  // ------------------------------------------------------------------
+  document.getElementById("pauseBtn").addEventListener("click", function () {
+    paused = !paused;
+    this.textContent = paused ? "Resume" : "Pause";
+  });
+  document.getElementById("soundBtn").addEventListener("click", function () {
+    initSound();
+    soundOn = !soundOn;
+    this.textContent = "Footstep sound: " + (soundOn ? "on" : "off");
+    if (soundOn) lastStepTime = 0;
+  });
+
+  // ------------------------------------------------------------------
+  // Resize
+  // ------------------------------------------------------------------
+  window.addEventListener("resize", function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ------------------------------------------------------------------
+  // Run
+  // ------------------------------------------------------------------
+  var giraffe = assemble();
+  animate();
+})();
+</script>
+</body>
+</html>
