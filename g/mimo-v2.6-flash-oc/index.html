@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Walking Giraffe &mdash; Three.js</title>
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#0b0e12; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; color:#e9eef3; }
+  #app { position:fixed; inset:0; }
+  canvas { display:block; }
+  #hud {
+    position:fixed; left:16px; top:14px; z-index:10; pointer-events:none;
+    text-shadow:0 1px 3px rgba(0,0,0,.65); user-select:none;
+  }
+  #hud h1 { margin:0; font-size:17px; font-weight:600; letter-spacing:.04em; }
+  #hud .sub { font-size:12px; opacity:.75; margin-top:3px; line-height:1.5; }
+  #hud .keys { font-size:11px; opacity:.6; margin-top:6px; line-height:1.6; }
+  #stats {
+    position:fixed; right:16px; top:14px; z-index:10; pointer-events:none;
+    font-size:11px; text-align:right; opacity:.7; text-shadow:0 1px 3px rgba(0,0,0,.65);
+    font-variant-numeric: tabular-nums; white-space:pre;
+  }
+  #err {
+    position:fixed; left:0; right:0; bottom:0; z-index:50; display:none;
+    background:rgba(120,0,0,.9); color:#fff; font:12px/1.5 monospace;
+    padding:8px 12px; white-space:pre-wrap; max-height:45%; overflow:auto;
+  }
+</style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="hud">
+    <h1>WALKING GIRAFFE</h1>
+    <div class="sub">procedural anatomy &middot; IK foot planting &middot; lateral-sequence walk</div>
+    <div class="keys">drag &mdash; orbit &nbsp;&middot;&nbsp; scroll &mdash; zoom &nbsp;&middot;&nbsp; space &mdash; pause<br>A &mdash; auto-orbit &nbsp;&middot;&nbsp; H &mdash; hide UI</div>
+  </div>
+  <div id="stats"></div>
+  <div id="err"></div>
+
+  <script src="three.min.js"></script>
+  <script>
+    // Headless / debug aid: surface any runtime error in the DOM.
+    window.__giraffeOK = false;
+    window.addEventListener('error', function (e) {
+      var el = document.getElementById('err');
+      if (!el) return;
+      el.style.display = 'block';
+      el.textContent += (e.message || 'error') + ' @ ' + (e.filename || '') + ':' + (e.lineno || '') + '\n';
+      document.title = 'ERROR: ' + (e.message || 'error');
+    });
+  </script>
+  <script src="giraffe.js"></script>
+</body>
+</html>

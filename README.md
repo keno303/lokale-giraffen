@@ -1,4 +1,4 @@
 # Giraffen von lokalen Sprachmodellen
 
-47 lauffähige Three.js-Giraffen aus einem Benchmark lokaler LLMs mit den Harnesses pi und OpenCode.
+84 Läufe eines Benchmarks lokaler LLMs mit den Harnesses pi und OpenCode, davon 55 mit lauffähiger Three.js-Giraffe.
 Die Dateien unter `g/` stammen unverändert von den Modellen. Die Übersicht ist `index.html`.
