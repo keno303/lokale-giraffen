@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Walking Giraffe — Three.js</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #87ceeb; font-family: system-ui, sans-serif; }
+  #ui {
+    position: absolute; top: 10px; left: 10px; color: #222;
+    background: rgba(255, 255, 255, 0.75); padding: 8px 12px; border-radius: 6px;
+    pointer-events: none; font-size: 13px; line-height: 1.4;
+    user-select: none;
+  }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<div id="ui">Procedural Walking Giraffe (Three.js)<br>Left drag: orbit &bull; Scroll: zoom</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.168.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.168.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ---------- Giraffe proportions ----------
+const BODY = { length: 2.4, height: 1.1, width: 0.9 };
+const NECK = { length: 2.5, radiusBottom: 0.42, radiusTop: 0.28 };
+const LEG = { upper: 1.35, lower: 1.4, hoof: 0.12, radius: 0.16 };
+const HEAD = { w: 0.6, h: 0.45, d: 0.65 };
+
+let scene, camera, renderer, controls, giraffe, parts, spotTexture;
+let startTime = null;
+
+init();
+animate();
+
+function init() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87ceeb);
+  scene.fog = new THREE.Fog(0x87ceeb, 22, 58);
+
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(9, 5, 11);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  document.body.appendChild(renderer.domElement);
+
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 2.6, 0);
+  controls.enableDamping = true;
+  controls.minDistance = 5;
+  controls.maxDistance = 45;
+
+  // Lights
+  const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambient);
+
+  const sun = new THREE.DirectionalLight(0xffffff, 1.3);
+  sun.position.set(8, 13, 5);
+  sun.castShadow = true;
+  sun.shadow.mapSize.width = 2048;
+  sun.shadow.mapSize.height = 2048;
+  sun.shadow.camera.near = 0.5;
+  sun.shadow.camera.far = 45;
+  sun.shadow.camera.left = -13;
+  sun.shadow.camera.right = 13;
+  sun.shadow.camera.top = 13;
+  sun.shadow.camera.bottom = -13;
+  scene.add(sun);
+
+  // Ground
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(70, 70),
+    new THREE.MeshStandardMaterial({ color: 0x7fb069, roughness: 1.0 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Materials
+  spotTexture = createSpotTexture();
+  const bodyMat = new THREE.MeshStandardMaterial({
+    map: spotTexture, roughness: 0.85, metalness: 0.1
+  });
+  const hoofMat = new THREE.MeshStandardMaterial({ color: 0x3d2a1a });
+  const ossiconeMat = new THREE.MeshStandardMaterial({ color: 0xe8d4a3 });
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+  const pupilMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+  const maneMat = new THREE.MeshStandardMaterial({ color: 0x7a521e });
+
+  // ---------- Build giraffe ----------
+  giraffe = new THREE.Group();
+  parts = {};
+
+  // Body
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(BODY.length, BODY.height, BODY.width),
+    bodyMat
+  );
+  body.castShadow = true;
+  body.receiveShadow = true;
+  giraffe.add(body);
+  parts.body = body;
+
+  // Neck (pivots at its base)
+  const neckGroup = new THREE.Group();
+  neckGroup.position.set(0, BODY.height / 2, -BODY.length / 2 + 0.15);
+  const neck = new THREE.Mesh(
+    new THREE.CylinderGeometry(NECK.radiusTop, NECK.radiusBottom, NECK.length, 12),
+    bodyMat
+  );
+  neck.position.y = NECK.length / 2;
+  neck.castShadow = true;
+  neck.receiveShadow = true;
+  neckGroup.add(neck);
+  parts.neck = neckGroup;
+
+  // Mane
+  const mane = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, NECK.length, 0.14),
+    maneMat
+  );
+  mane.position.set(0, NECK.length / 2, -NECK.radiusBottom - 0.09);
+  mane.castShadow = true;
+  neckGroup.add(mane);
+  giraffe.add(neckGroup);
+
+  // Head
+  const headGroup = new THREE.Group();
+  headGroup.position.set(0, NECK.length + 0.04, 0.12);
+
+  const head = new THREE.Mesh(new THREE.BoxGeometry(HEAD.w, HEAD.h, HEAD.d), bodyMat);
+  head.castShadow = true;
+  head.receiveShadow = true;
+  headGroup.add(head);
+
+  const snout = new THREE.Mesh(
+    new THREE.BoxGeometry(HEAD.w * 0.75, HEAD.h * 0.7, HEAD.d * 0.55),
+    bodyMat
+  );
+  snout.position.set(0, -HEAD.h * 0.22, HEAD.d / 2 + HEAD.d * 0.27);
+  snout.castShadow = true;
+  headGroup.add(snout);
+
+  headGroup.add(makeEye(-HEAD.w / 2 - 0.02, 0.05, HEAD.d / 2 + 0.01, eyeMat, pupilMat));
+  headGroup.add(makeEye(HEAD.w / 2 + 0.02, 0.05, HEAD.d / 2 + 0.01, eyeMat, pupilMat));
+
+  const ossL = makeOssicone(-HEAD.w * 0.3, ossiconeMat);
+  const ossR = makeOssicone(HEAD.w * 0.3, ossiconeMat);
+  ossL.position.set(ossL.position.x, HEAD.h / 2 + 0.02, -HEAD.d / 4);
+  ossR.position.set(ossR.position.x, HEAD.h / 2 + 0.02, -HEAD.d / 4);
+  headGroup.add(ossL, ossR);
+
+  const earL = makeEar(-HEAD.w * 0.4, bodyMat);
+  const earR = makeEar(HEAD.w * 0.4, bodyMat);
+  earL.position.set(earL.position.x, HEAD.h * 0.1, -HEAD.d / 3);
+  earR.position.set(earR.position.x, HEAD.h * 0.1, -HEAD.d / 3);
+  headGroup.add(earL, earR);
+
+  neckGroup.add(headGroup);
+  parts.head = headGroup;
+
+  // Legs (diagonal pairs walk together)
+  const hips = [
+    { name: 'FL', x: -BODY.width / 2 + 0.12, z: -BODY.length / 2 + 0.25 },
+    { name: 'FR', x:  BODY.width / 2 - 0.12, z: -BODY.length / 2 + 0.25 },
+    { name: 'BL', x: -BODY.width / 2 + 0.12, z:  BODY.length / 2 - 0.25 },
+    { name: 'BR', x:  BODY.width / 2 - 0.12, z:  BODY.length / 2 - 0.25 },
+  ];
+  for (const h of hips) {
+    const leg = buildLeg(h.x, h.z, bodyMat, hoofMat);
+    giraffe.add(leg.group);
+    parts['leg' + h.name] = leg;
+  }
+
+  // Tail
+  const tailGroup = new THREE.Group();
+  tailGroup.position.set(0, BODY.height / 2 - 0.15, BODY.length / 2 - 0.12);
+  const tail = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045, 0.02, 0.95, 8),
+    bodyMat
+  );
+  tail.position.y = -0.48;
+  tail.rotation.x = 0.35;
+  tail.castShadow = true;
+  tailGroup.add(tail);
+  const tuft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.075, 0.015, 0.24, 8),
+    hoofMat
+  );
+  tuft.position.y = -0.76;
+  tailGroup.add(tuft);
+  parts.tail = tailGroup;
+  giraffe.add(tailGroup);
+
+  scene.add(giraffe);
+
+  // Stand feet on the ground
+  const standY = LEG.upper + LEG.lower + LEG.hoof + BODY.height / 2;
+  giraffe.position.y = standY;
+
+  window.addEventListener('resize', onResize);
+}
+
+// ---------- Procedural textures & helpers ----------
+
+function createSpotTexture() {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#e8d4a3';
+  ctx.fillRect(0, 0, size, size);
+
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.35)';
+  ctx.fillStyle = '#7a521e';
+  for (let i = 0; i < 44; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const rx = 18 + Math.random() * 55;
+    const ry = rx * (0.55 + Math.random() * 0.35);
+    ctx.beginPath();
+    ctx.ellipse(x, y, rx, ry, Math.random() * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.shadowBlur = 0;
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+function makeEye(x, y, z, eyeMat, pupilMat) {
+  const grp = new THREE.Group();
+  grp.position.set(x, y, z);
+  const sclera = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 6), eyeMat);
+  const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), pupilMat);
+  pupil.position.z = 0.045;
+  grp.add(sclera, pupil);
+  return grp;
+}
+
+function makeOssicone(x, ossiconeMat) {
+  const grp = new THREE.Group();
+  grp.position.set(x, 0, 0);
+  const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.045, 0.22, 8), ossiconeMat);
+  stalk.position.y = 0.11;
+  const cap = new THREE.Mesh(
+    new THREE.SphereGeometry(0.065, 8, 6),
+    new THREE.MeshStandardMaterial({ color: 0x7a521e })
+  );
+  cap.position.y = 0.23;
+  grp.add(stalk, cap);
+  return grp;
+}
+
+function makeEar(x, bodyMat) {
+  const grp = new THREE.Group();
+  grp.position.set(x, 0, 0);
+  const ear = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.16, 0.04), bodyMat);
+  ear.position.y = 0.08;
+  ear.rotation.z = 0.3;
+  grp.add(ear);
+  return grp;
+}
+
+function buildLeg(hx, hz, bodyMat, hoofMat) {
+  const group = new THREE.Group();
+  group.position.set(hx, -BODY.height / 2, hz);
+
+  const hip = new THREE.Group();
+  group.add(hip);
+
+  const upper = new THREE.Mesh(
+    new THREE.CylinderGeometry(LEG.radius, LEG.radius * 0.85, LEG.upper, 10),
+    bodyMat
+  );
+  upper.position.y = -LEG.upper / 2;
+  upper.castShadow = true;
+  hip.add(upper);
+
+  const knee = new THREE.Group();
+  knee.position.y = -LEG.upper;
+  hip.add(knee);
+
+  const lower = new THREE.Mesh(
+    new THREE.CylinderGeometry(LEG.radius * 0.85, LEG.radius * 0.7, LEG.lower, 10),
+    bodyMat
+  );
+  lower.position.y = -LEG.lower / 2;
+  lower.castShadow = true;
+  knee.add(lower);
+
+  const hoof = new THREE.Mesh(
+    new THREE.CylinderGeometry(LEG.radius * 0.9, LEG.radius * 0.6, LEG.hoof, 8),
+    hoofMat
+  );
+  hoof.position.y = -LEG.lower - LEG.hoof / 2;
+  lower.add(hoof);
+
+  return { group, hip, knee, upper, lower, hoof };
+}
+
+// ---------- Animation ----------
+
+function animate(time) {
+  requestAnimationFrame(animate);
+  if (!startTime) startTime = time;
+  const t = (time - startTime) * 0.001;
+
+  controls.update();
+
+  const speed = 2.0;
+  const cycle = t * speed;
+  const legSwing = 0.5;
+  const kneeBend = 0.85;
+
+  const setLeg = (leg, phase) => {
+    const swing = Math.sin(cycle + phase);
+    leg.hip.rotation.x = swing * legSwing;        // swing forward / back
+    leg.knee.rotation.x = Math.max(0, swing) * kneeBend; // bend knee while swinging forward
+  };
+
+  // Diagonal gait: front-left + back-right, front-right + back-left
+  setLeg(parts.legFL, 0);
+  setLeg(parts.legBR, 0);
+  setLeg(parts.legFR, Math.PI);
+  setLeg(parts.legBL, Math.PI);
+
+  // Gentle body bob with the stride
+  const standY = LEG.upper + LEG.lower + LEG.hoof + BODY.height / 2;
+  giraffe.position.y = standY + Math.cos(cycle * 1.8) * 0.025;
+
+  // Neck sway
+  parts.neck.rotation.y = Math.sin(t * 1.1) * 0.04;
+  parts.neck.rotation.z = Math.cos(t * 1.1) * 0.015;
+
+  // Head nods with the step
+  parts.head.rotation.x = Math.sin(cycle) * 0.03;
+  parts.head.rotation.y = parts.neck.rotation.y * 0.5;
+
+  // Tail swish
+  parts.tail.rotation.z = Math.sin(t * 2.2) * 0.12;
+
+  renderer.render(scene, camera);
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+</script>
+</body>
+</html>

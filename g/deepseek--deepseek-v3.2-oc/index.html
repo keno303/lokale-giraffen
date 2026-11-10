@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Giraffe — gehend, Three.js</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="boot">Erzeuge Fell, Anatomie und Savanne…</div>
+
+<div id="hud" class="card">
+  <div id="stats"></div>
+  <canvas id="diagram" width="300" height="104"></canvas>
+  <div class="hint">Ziehen = drehen · Scroll = Zoom · <kbd>h</kbd> Panels</div>
+</div>
+
+<div id="panel" class="card">
+  <div class="row">
+    <label for="gait">Gang</label>
+    <select id="gait"></select>
+  </div>
+  <div class="row">
+    <label for="speed">Tempo</label>
+    <input id="speed" type="range" min="0" max="2.6" step="0.05" value="1.05">
+    <span id="speedV" class="val"></span>
+  </div>
+  <div class="row"><span id="gaitLab" class="sub"></span></div>
+  <div class="row btns" id="cams"></div>
+  <div class="row btns">
+    <button id="btnPause">⏸ pause</button>
+    <button id="btnSlow">🐢 slow</button>
+    <button id="btnShadow">☀ schatten</button>
+    <button id="btnTerrain">🌾 welt</button>
+    <button id="btnWire">◇ draht</button>
+    <button id="btnAuto">⟳ kamera</button>
+    <button id="btnDump">▤ hufe</button>
+    <button id="btnReset">↺</button>
+  </div>
+  <div class="row">
+    <label for="tex">Textur</label>
+    <select id="tex"></select>
+    <button id="btnHide">✕</button>
+  </div>
+  <pre id="log"></pre>
+</div>
+
+<div class="legend card">
+  <b>Giraffa camelopardalis</b> · reticulated · adult bull<br>
+  <span class="sub">procedural loft + Voronoi coat, treadmill gait, no assets</span>
+</div>
+
+<script src="three.min.js"></script>
+<script src="js/core.js"></script>
+<script src="js/loft.js"></script>
+<script src="js/coat.js"></script>
+<script src="js/anatomy.js"></script>
+<script src="js/skin.js"></script>
+<script src="js/giraffe.js"></script>
+<script src="js/gait.js"></script>
+<script src="js/terrain.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/debug.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

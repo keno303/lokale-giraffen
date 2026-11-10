@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walking Giraffe – Three.js</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #c9b48e; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  canvas { display: block; }
+  #ui {
+    position: fixed; left: 14px; top: 14px; padding: 12px 14px; border-radius: 10px;
+    background: rgba(30, 22, 12, 0.55); color: #f6ead2; font-size: 13px; line-height: 1.5;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); user-select: none; min-width: 210px;
+  }
+  #ui h1 { font-size: 15px; margin: 0 0 6px; font-weight: 600; letter-spacing: .3px; }
+  #ui label { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 3px 0; }
+  #ui input[type=range] { width: 110px; }
+  #ui button { margin: 6px 6px 0 0; padding: 4px 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,.25);
+    background: rgba(255,255,255,.12); color: inherit; cursor: pointer; font-size: 12px; }
+  #ui button:hover { background: rgba(255,255,255,.22); }
+  #hint { opacity: .7; font-size: 11px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="ui">
+  <h1>🦒 Savanna Giraffe</h1>
+  <label>Walk speed <input id="speed" type="range" min="0.4" max="1.6" step="0.05" value="1"></label>
+  <label>Time of day <input id="tod" type="range" min="0" max="1" step="0.01" value="0.32"></label>
+  <label>Follow camera <input id="follow" type="checkbox" checked></label>
+  <div>
+    <button id="pause">Pause</button><button id="camSide">Side</button><button id="camFront">Front</button><button id="camHead">Close-up</button>
+  </div>
+  <div id="hint">Drag to orbit · scroll to zoom · right-drag to pan</div>
+</div>
+<script src="lib/three.min.js"></script>
+<script src="lib/OrbitControls.js"></script>
+<script src="giraffe.js"></script>
+</body>
+</html>

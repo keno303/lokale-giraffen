@@ -1,0 +1,59 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #87a7c4; }
+#app { position: fixed; inset: 0; }
+canvas { display: block; }
+
+:root {
+  --ink: #f6edd6;
+  --dim: #c9bfa3;
+  --accent: #e9b24c;
+}
+
+#panel {
+  position: fixed; top: 22px; left: 24px; z-index: 20;
+  max-width: 320px; padding: 20px 22px 18px;
+  background: linear-gradient(160deg, rgba(28,24,16,.72), rgba(28,24,16,.42));
+  border: 1px solid rgba(233,178,76,.28);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.25);
+  color: var(--ink);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  backdrop-filter: blur(7px);
+  pointer-events: none;
+  user-select: none;
+}
+#panel h1 {
+  font-size: 15px; font-weight: 700; letter-spacing: .32em;
+  color: var(--accent); text-transform: uppercase;
+}
+#panel .sub { margin-top: 6px; font-size: 11px; color: var(--dim); letter-spacing: .04em; }
+#panel .rule { height: 1px; margin: 14px 0 12px; background: rgba(233,178,76,.25); }
+#panel .blurb { font-size: 11.5px; line-height: 1.7; color: #ded4ba; }
+#gaitstat {
+  display: inline-block; margin-top: 14px; padding: 5px 10px;
+  font: 11px/1 ui-monospace, monospace; letter-spacing: .08em;
+  color: #1d1810; background: var(--accent); border-radius: 5px; font-weight: 700;
+}
+
+#hud {
+  position: fixed; bottom: 20px; left: 24px; z-index: 20;
+  padding: 11px 15px;
+  background: rgba(20,17,12,.55);
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 9px;
+  color: var(--ink);
+  font: 12px/1.75 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+  user-select: none;
+}
+#hud b { color: var(--accent); font-weight: 700; }
+#hud .keys { font-size: 10.5px; color: var(--dim); letter-spacing: .02em; }
+
+/* diagnostics: kept in the DOM (for automated checks) but invisible to users */
+#status { display: none; }
+#err {
+  position: fixed; inset: 0; z-index: 100; display: none;
+  background: #3a0d0d; color: #ffd7d7; font: 15px/1.5 ui-monospace, monospace;
+  padding: 30px; white-space: pre-wrap; overflow: auto;
+}

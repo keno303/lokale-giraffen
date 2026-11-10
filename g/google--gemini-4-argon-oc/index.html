@@ -1,0 +1,2792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Giraffa camelopardalis — Realistic Biomechanical 3D Study</title>
+  <style>
+    :root {
+      --bg-glass: rgba(18, 14, 10, 0.72);
+      --border-glass: rgba(235, 190, 120, 0.25);
+      --accent: #e5a94c;
+      --accent-bright: #ffd07b;
+      --text-main: #f6efe4;
+      --text-muted: #b8a992;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    html, body {
+      width: 100%; height: 100%; overflow: hidden;
+      background: #120d08;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text-main);
+    }
+    #canvas-container {
+      position: fixed; inset: 0; width: 100%; height: 100%;
+    }
+    #hud {
+      position: fixed; inset: 0; pointer-events: none;
+      display: flex; flex-direction: column; justify-content: space-between;
+      padding: 20px 24px;
+      z-index: 10;
+    }
+    .top-bar {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 16px; flex-wrap: wrap;
+    }
+    .title-card {
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-glass);
+      border-radius: 14px;
+      padding: 14px 18px;
+      pointer-events: auto;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    }
+    .title-card h1 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      color: var(--accent-bright);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .title-card .subtitle {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+      font-style: italic;
+    }
+    .telemetry {
+      display: flex; gap: 14px; margin-top: 10px; padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.72rem;
+    }
+    .telemetry-item span {
+      display: block; color: var(--text-muted); font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .telemetry-item strong {
+      color: var(--text-main); font-weight: 600; font-variant-numeric: tabular-nums;
+    }
+    .gait-diagram {
+      display: flex; align-items: center; gap: 8px; margin-top: 8px;
+    }
+    .hoof-indicator {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 0.68rem; color: var(--text-muted);
+      background: rgba(255,255,255,0.05); padding: 2px 7px; border-radius: 6px;
+    }
+    .hoof-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      transition: background 0.08s, transform 0.08s;
+    }
+    .hoof-dot.stance {
+      background: var(--accent-bright);
+      box-shadow: 0 0 6px var(--accent);
+      transform: scale(1.2);
+    }
+    .controls-panel {
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-glass);
+      border-radius: 14px;
+      padding: 12px 16px;
+      pointer-events: auto;
+      display: flex; flex-direction: column; gap: 10px;
+      min-width: 270px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+    }
+    .control-row {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      font-size: 0.75rem;
+    }
+    .control-row label {
+      color: var(--text-muted); font-weight: 500;
+    }
+    .control-row input[type="range"] {
+      width: 130px; accent-color: var(--accent); cursor: pointer;
+    }
+    .bottom-bar {
+      display: flex; justify-content: space-between; align-items: flex-end;
+      gap: 16px; flex-wrap: wrap;
+    }
+    .btn-group {
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--border-glass);
+      border-radius: 12px;
+      padding: 6px;
+      display: flex; gap: 5px; flex-wrap: wrap;
+      pointer-events: auto;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+    button.ui-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+      padding: 6px 11px;
+      border-radius: 8px;
+      font-size: 0.74rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    button.ui-btn:hover {
+      background: rgba(229, 169, 76, 0.2);
+      border-color: rgba(229, 169, 76, 0.45);
+    }
+    button.ui-btn.active {
+      background: var(--accent);
+      color: #181006;
+      border-color: var(--accent-bright);
+      font-weight: 600;
+    }
+    .hint-pill {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      background: var(--bg-glass);
+      border: 1px solid var(--border-glass);
+      padding: 7px 13px;
+      border-radius: 20px;
+      pointer-events: auto;
+    }
+    #loading-overlay {
+      position: fixed; inset: 0;
+      background: radial-gradient(circle at center, #23180d 0%, #0d0804 100%);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 100;
+      transition: opacity 0.6s ease;
+    }
+    #loading-overlay.hidden {
+      opacity: 0; pointer-events: none;
+    }
+    .loader-title {
+      font-size: 1.2rem; color: var(--accent-bright); letter-spacing: 0.08em; text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .loader-sub {
+      font-size: 0.85rem; color: var(--text-muted);
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="loading-overlay">
+    <div class="loader-title">Giraffa Camelopardalis</div>
+    <div class="loader-sub">Synthesizing Voronoi Reticulated Coat, Anatomical Skeleton &amp; Savanna Ecosystem...</div>
+  </div>
+  <div id="canvas-container"></div>
+  <div id="hud">
+    <div class="top-bar">
+      <div class="title-card">
+        <h1>Giraffa camelopardalis reticulata</h1>
+        <div class="subtitle">Ipsilateral Pacing Gait &amp; Cervical Pendulum Biomechanics</div>
+        <div class="telemetry">
+          <div class="telemetry-item"><span>Stature</span><strong>5.15 m</strong></div>
+          <div class="telemetry-item"><span>Speed</span><strong id="hud-speed">5.4 km/h</strong></div>
+          <div class="telemetry-item"><span>Stride Phase</span><strong id="hud-phase">0.00</strong></div>
+          <div class="telemetry-item"><span>Neck Pitch</span><strong id="hud-neck">54.0°</strong></div>
+        </div>
+        <div class="gait-diagram" title="Filled dot = Hoof in ground stance phase">
+          <div class="hoof-indicator"><span class="hoof-dot" id="dot-lh"></span>LH</div>
+          <div class="hoof-indicator"><span class="hoof-dot" id="dot-lf"></span>LF</div>
+          <div class="hoof-indicator"><span class="hoof-dot" id="dot-rh"></span>RH</div>
+          <div class="hoof-indicator"><span class="hoof-dot" id="dot-rf"></span>RF</div>
+        </div>
+      </div>
+
+      <div class="controls-panel">
+        <div class="control-row">
+          <label for="slider-speed">Walk Speed</label>
+          <input id="slider-speed" type="range" min="0" max="2.0" step="0.05" value="1.0" />
+        </div>
+        <div class="control-row">
+          <label for="slider-sun">Sun Elevation</label>
+          <input id="slider-sun" type="range" min="4" max="65" step="1" value="26" />
+        </div>
+        <div class="control-row">
+          <label for="slider-turn">Steering Bias</label>
+          <input id="slider-turn" type="range" min="-0.6" max="0.6" step="0.02" value="0" />
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-bar">
+      <div class="btn-group" id="cam-buttons">
+        <button class="ui-btn active" data-cam="cinematic">Cinematic Track</button>
+        <button class="ui-btn" data-cam="side">Side Gait Study</button>
+        <button class="ui-btn" data-cam="lowfront">Low Hero Angle</button>
+        <button class="ui-btn" data-cam="head">Head &amp; Ossicones</button>
+        <button class="ui-btn" data-cam="hooves">Hoof &amp; Fetlock IK</button>
+        <button class="ui-btn" data-cam="free">Free Orbit</button>
+      </div>
+
+      <div class="btn-group">
+        <button class="ui-btn active" id="btn-coat" data-coat="reticulated">Reticulated Coat</button>
+        <button class="ui-btn" id="btn-Pause">Pause</button>
+        <button class="ui-btn" id="btn-browse">Trigger Browse Reach</button>
+      </div>
+
+      <div class="hint-pill">Drag to orbit • Scroll to zoom • Right-drag to pan • Keys [1-6] Camera • [Space] Pause</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ============================================================================
+// 02-TEXTURES.JS — Procedural High-Resolution Coat, Fur Normal, & Savanna Maps
+// ============================================================================
+
+function createSeededRandom(seed = 1337) {
+  let s = seed >>> 0;
+  return function () {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// 2D Value/Gradient Noise for organic domain warping
+function createNoise2D(seed = 42) {
+  const rand = createSeededRandom(seed);
+  const perm = new Uint8Array(512);
+  const gradX = new Float32Array(256);
+  const gradY = new Float32Array(256);
+  for (let i = 0; i < 256; i++) {
+    perm[i] = i;
+    const angle = rand() * Math.PI * 2;
+    gradX[i] = Math.cos(angle);
+    gradY[i] = Math.sin(angle);
+  }
+  for (let i = 255; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    const tmp = perm[i];
+    perm[i] = perm[j];
+    perm[j] = tmp;
+  }
+  for (let i = 0; i < 256; i++) perm[i + 256] = perm[i];
+
+  function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+  function lerp(a, b, t) { return a + t * (b - a); }
+
+  return function noise(x, y) {
+    const X = Math.floor(x) & 255;
+    const Y = Math.floor(y) & 255;
+    const xf = x - Math.floor(x);
+    const yf = y - Math.floor(y);
+    const u = fade(xf);
+    const v = fade(yf);
+
+    const aa = perm[perm[X] + Y];
+    const ab = perm[perm[X] + Y + 1];
+    const ba = perm[perm[X + 1] + Y];
+    const bb = perm[perm[X + 1] + Y + 1];
+
+    const dAA = gradX[aa] * xf + gradY[aa] * yf;
+    const dBA = gradX[ba] * (xf - 1) + gradY[ba] * yf;
+    const dAB = gradX[ab] * xf + gradY[ab] * (yf - 1);
+    const dBB = gradX[bb] * (xf - 1) + gradY[bb] * (yf - 1);
+
+    return lerp(lerp(dAA, dBA, u), lerp(dAB, dBB, u), v);
+  };
+}
+
+/**
+ * Generates the giraffe coat color map, bump/normal map, and roughness map.
+ * UV convention used by our anatomical giraffe mesh:
+ *   v in [0, 1] encodes anatomical region / height gradient:
+ *     - v in [0.00, 0.18]: lower legs (cream/buff unspotted socks transitioning to small spots)
+ *     - v in [0.18, 0.35]: upper legs / knees / hocks (medium dense polygons)
+ *     - v in [0.35, 0.85]: main torso, shoulders, croup, neck (large bold reticulated polygons)
+ *     - v in [0.85, 1.00]: upper neck & head cheeks/muzzle (fine spots fading to tan muzzle)
+ *   u in [0, 1] wraps around the circumference of torso/neck/limb:
+ *     - u near 0.0 or 1.0 is ventral (underbelly/throat) -> lighter cream with softer/fewer patches
+ *     - u near 0.5 is dorsal (spine/ridge) -> richest deep chestnut/sienna patches
+ */
+function generateGiraffeCoatTextures(mode = 'reticulated') {
+  const width = 1024;
+  const height = 1024;
+
+  const colorCanvas = document.createElement('canvas');
+  colorCanvas.width = width;
+  colorCanvas.height = height;
+  const colorCtx = colorCanvas.getContext('2d');
+
+  const bumpCanvas = document.createElement('canvas');
+  bumpCanvas.width = width;
+  bumpCanvas.height = height;
+  const bumpCtx = bumpCanvas.getContext('2d');
+
+  const roughCanvas = document.createElement('canvas');
+  roughCanvas.width = width;
+  roughCanvas.height = height;
+  const roughCtx = roughCanvas.getContext('2d');
+
+  const colorImg = colorCtx.createImageData(width, height);
+  const bumpImg = bumpCtx.createImageData(width, height);
+  const roughImg = roughCtx.createImageData(width, height);
+
+  const cData = colorImg.data;
+  const bData = bumpImg.data;
+  const rData = roughImg.data;
+
+  const rand = createSeededRandom(mode === 'masai' ? 9021 : 4099);
+  const noise1 = createNoise2D(101);
+  const noise2 = createNoise2D(202);
+  const furNoise = createNoise2D(303);
+
+  // Build multi-scale Voronoi seed grids so u wraps seamlessly (tileable in X)
+  function buildVoronoiGrid(cols, rows, jitter = 0.78) {
+    const ptsX = new Float32Array(cols * rows);
+    const ptsY = new Float32Array(cols * rows);
+    const cellTone = new Float32Array(cols * rows);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const idx = r * cols + c;
+        ptsX[idx] = c + 0.5 + (rand() - 0.5) * jitter;
+        ptsY[idx] = r + 0.5 + (rand() - 0.5) * jitter;
+        cellTone[idx] = rand();
+      }
+    }
+    return { cols, rows, ptsX, ptsY, cellTone };
+  }
+
+  const gridLarge = buildVoronoiGrid(14, 16, 0.80); // Torso & lower neck large polygons
+  const gridMed = buildVoronoiGrid(26, 28, 0.82);   // Upper legs & upper neck
+  const gridSmall = buildVoronoiGrid(44, 46, 0.85); // Knees, face cheeks, ankles
+
+  function evalVoronoi(grid, u, v, warpAmp) {
+    const { cols, rows, ptsX, ptsY, cellTone } = grid;
+    const wx = u * cols + warpAmp * noise1(u * cols * 1.4, v * rows * 1.4);
+    const wy = v * rows + warpAmp * noise2(u * cols * 1.4 + 31.7, v * rows * 1.4 + 19.3);
+
+    const baseC = Math.floor(wx);
+    const baseR = Math.floor(wy);
+
+    let d1 = 1e9;
+    let d2 = 1e9;
+    let bestC1X = 0, bestC1Y = 0;
+    let bestC2X = 0, bestC2Y = 0;
+    let tone = 0.5;
+
+    for (let dr = -1; dr <= 1; dr++) {
+      const rr = (baseR + dr + rows * 10) % rows;
+      const rOffset = (baseR + dr) - rr;
+      for (let dc = -1; dc <= 1; dc++) {
+        const cc = (baseC + dc + cols * 10) % cols;
+        const cOffset = (baseC + dc) - cc;
+        const idx = rr * cols + cc;
+        const px = ptsX[idx] + cOffset;
+        const py = ptsY[idx] + rOffset;
+        const dx = wx - px;
+        const dy = wy - py;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < d1) {
+          d2 = d1;
+          bestC2X = bestC1X;
+          bestC2Y = bestC1Y;
+          d1 = dist;
+          bestC1X = px;
+          bestC1Y = py;
+          tone = cellTone[idx];
+        } else if (dist < d2) {
+          d2 = dist;
+          bestC2X = px;
+          bestC2Y = py;
+        }
+      }
+    }
+
+    // Exact perpendicular distance to Voronoi cell bisector edge for crisp uniform channels
+    const mx = 0.5 * (bestC1X + bestC2X);
+    const my = 0.5 * (bestC1Y + bestC2Y);
+    let nx = bestC2X - bestC1X;
+    let ny = bestC2Y - bestC1Y;
+    const nLen = Math.hypot(nx, ny) || 1e-5;
+    nx /= nLen;
+    ny /= nLen;
+    const edgeDist = Math.abs((wx - mx) * nx + (wy - my) * ny);
+
+    return { edgeDist, centerDist: d1, tone };
+  }
+
+  function smoothstep(edge0, edge1, x) {
+    const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+    return t * t * (3 - 2 * t);
+  }
+
+  for (let y = 0; y < height; y++) {
+    // v = 1 at top of texture, v = 0 at bottom
+    const v = 1.0 - y / height;
+    for (let x = 0; x < width; x++) {
+      const u = x / width;
+      const idx = (y * width + x) * 4;
+
+      // Determine anatomical region blend weights from v
+      // Lower legs fade spots gradually below v = 0.20 (mid-cannon bone) into warm sandy-buff stockings
+      const legFade = smoothstep(0.06, 0.22, v);
+      // Ventral belly fade: near u = 0 or u = 1 on torso (0.32 < v < 0.65)
+      const ventralDist = Math.abs(u - 0.5) * 2.0; // 0 at dorsal spine, 1 at ventral midline
+      const isTorsoBand = smoothstep(0.28, 0.38, v) * (1.0 - smoothstep(0.58, 0.68, v));
+      const bellyFade = 1.0 - isTorsoBand * smoothstep(0.72, 0.96, ventralDist) * 0.82;
+
+      // Blend Voronoi scales smoothly by height v so upper legs match torso spot scale and taper toward knees/hocks
+      let vor;
+      if (v < 0.16) {
+        vor = evalVoronoi(gridSmall, u, v, mode === 'masai' ? 0.34 : 0.14);
+      } else if (v < 0.30) {
+        const t = smoothstep(0.16, 0.30, v);
+        const vs = evalVoronoi(gridSmall, u, v, mode === 'masai' ? 0.34 : 0.14);
+        const vm = evalVoronoi(gridMed, u, v, mode === 'masai' ? 0.32 : 0.13);
+        vor = {
+          edgeDist: vs.edgeDist * (1 - t) + vm.edgeDist * t,
+          centerDist: vs.centerDist * (1 - t) + vm.centerDist * t,
+          tone: vs.tone * (1 - t) + vm.tone * t
+        };
+      } else if (v < 0.78) {
+        const t = smoothstep(0.30, 0.42, v) * (1.0 - smoothstep(0.68, 0.78, v));
+        const vm = evalVoronoi(gridMed, u, v, mode === 'masai' ? 0.32 : 0.13);
+        const vl = evalVoronoi(gridLarge, u, v, mode === 'masai' ? 0.36 : 0.15);
+        vor = {
+          edgeDist: vm.edgeDist * (1 - t) + vl.edgeDist * t,
+          centerDist: vm.centerDist * (1 - t) + vl.centerDist * t,
+          tone: vm.tone * (1 - t) + vl.tone * t
+        };
+      } else {
+        const t = smoothstep(0.78, 0.88, v);
+        const vm = evalVoronoi(gridMed, u, v, mode === 'masai' ? 0.32 : 0.13);
+        const vs = evalVoronoi(gridSmall, u, v, mode === 'masai' ? 0.34 : 0.14);
+        vor = {
+          edgeDist: vm.edgeDist * (1 - t) + vs.edgeDist * t,
+          centerDist: vm.centerDist * (1 - t) + vs.centerDist * t,
+          tone: vm.tone * (1 - t) + vs.tone * t
+        };
+      }
+
+      // Compute patch mask (0 = light cream channel, 1 = rich dark chestnut patch)
+      let channelHalfWidth = mode === 'masai' ? 0.145 : 0.068;
+      // Add jagged stellate border perturbation for Masai or subtle organic hair border for Reticulated
+      const borderNoise = furNoise(u * 95, v * 95) * (mode === 'masai' ? 0.085 : 0.018);
+      const edgeVal = vor.edgeDist + borderNoise;
+
+      let patchMask = smoothstep(channelHalfWidth, channelHalfWidth + (mode === 'masai' ? 0.07 : 0.035), edgeVal);
+      patchMask *= legFade * bellyFade;
+
+      // Muzzle/nose tip fade at very top of UV (v > 0.93)
+      if (v > 0.92) {
+        patchMask *= 1.0 - smoothstep(0.92, 0.98, v);
+      }
+
+      // Directional short fur grain along body
+      const furStreak = furNoise(u * 220, v * 480) * 0.5 + furNoise(u * 460, v * 190) * 0.5;
+
+      // Base Cream/Golden network color (warmer golden-ochre on dorsal, warm sandy-tan on lower legs & muzzle)
+      const dorsalWarmth = (1.0 - ventralDist * 0.55) * smoothstep(0.15, 0.45, v);
+      const lowerLegTan = 1.0 - smoothstep(0.04, 0.22, v);
+      const muzzleTan = smoothstep(0.90, 0.98, v);
+      const creamR = 238 - dorsalWarmth * 14 - lowerLegTan * 24 - muzzleTan * 38 + furStreak * 10;
+      const creamG = 210 - dorsalWarmth * 24 - lowerLegTan * 28 - muzzleTan * 42 + furStreak * 8;
+      const creamB = 164 - dorsalWarmth * 36 - lowerLegTan * 28 - muzzleTan * 42 + furStreak * 6;
+
+      // Rich Chestnut / Burnt Sienna / Amber-Umber patch color
+      // Patches have slightly darker umber centers and warm russet-sienna rims
+      const centerDarken = smoothstep(0.38, 0.04, vor.centerDist);
+      const toneVar = (vor.tone - 0.5) * 26;
+
+      let patchR, patchG, patchB;
+      if (mode === 'masai') {
+        patchR = 112 - centerDarken * 34 + toneVar + furStreak * 11;
+        patchG = 60 - centerDarken * 20 + toneVar * 0.6 + furStreak * 7;
+        patchB = 30 - centerDarken * 12 + toneVar * 0.3 + furStreak * 5;
+      } else {
+        // Reticulated giraffe: vibrant liver-chestnut / burnt sienna polygons
+        patchR = 152 - centerDarken * 40 + toneVar + furStreak * 12;
+        patchG = 72 - centerDarken * 24 + toneVar * 0.55 + furStreak * 7;
+        patchB = 30 - centerDarken * 12 + toneVar * 0.3 + furStreak * 5;
+      }
+
+      const r = Math.max(0, Math.min(255, creamR * (1 - patchMask) + patchR * patchMask));
+      const g = Math.max(0, Math.min(255, creamG * (1 - patchMask) + patchG * patchMask));
+      const b = Math.max(0, Math.min(255, creamB * (1 - patchMask) + patchB * patchMask));
+
+      cData[idx] = r;
+      cData[idx + 1] = g;
+      cData[idx + 2] = b;
+      cData[idx + 3] = 255;
+
+      // Bump height: fur streaks + slight raised fullness on dark patches
+      const bumpVal = Math.max(0, Math.min(255, Math.round(128 + patchMask * 22 + furStreak * 45)));
+      bData[idx] = bumpVal;
+      bData[idx + 1] = bumpVal;
+      bData[idx + 2] = bumpVal;
+      bData[idx + 3] = 255;
+
+      // Roughness: velvety short coat (0.68 on patches, 0.76 in channels)
+      const roughVal = Math.max(0, Math.min(255, Math.round((0.76 - patchMask * 0.10 + furStreak * 0.06) * 255)));
+      rData[idx] = roughVal;
+      rData[idx + 1] = roughVal;
+      rData[idx + 2] = roughVal;
+      rData[idx + 3] = 255;
+    }
+  }
+
+  colorCtx.putImageData(colorImg, 0, 0);
+  bumpCtx.putImageData(bumpImg, 0, 0);
+  roughCtx.putImageData(roughImg, 0, 0);
+
+  return { colorCanvas, bumpCanvas, roughCanvas };
+}
+
+/**
+ * Generates a realistic liquid dark-amber giraffe eye texture
+ */
+function generateEyeTexture() {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const cx = size / 2;
+  const cy = size / 2;
+
+  // Sclera (warm dark-rimmed off-white)
+  ctx.fillStyle = '#d8cbb8';
+  ctx.fillRect(0, 0, size, size);
+
+  // Outer iris limbal ring
+  const irisGrad = ctx.createRadialGradient(cx, cy, size * 0.12, cx, cy, size * 0.44);
+  irisGrad.addColorStop(0.0, '#120904');
+  irisGrad.addColorStop(0.35, '#2b1508');
+  irisGrad.addColorStop(0.72, '#4a2610');
+  irisGrad.addColorStop(0.90, '#1e0e05');
+  irisGrad.addColorStop(1.0, '#d8cbb8');
+  ctx.fillStyle = irisGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, size * 0.44, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Horizontal-oval dark pupil (giraffes/ungulates have slightly elongated dark pupils)
+  ctx.fillStyle = '#070403';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, size * 0.21, size * 0.17, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Crisp corneal specular catchlights
+  ctx.fillStyle = 'rgba(255, 250, 240, 0.92)';
+  ctx.beginPath();
+  ctx.arc(cx - size * 0.11, cy - size * 0.11, size * 0.048, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(255, 235, 200, 0.55)';
+  ctx.beginPath();
+  ctx.arc(cx + size * 0.12, cy + size * 0.09, size * 0.025, 0, Math.PI * 2);
+  ctx.fill();
+
+  return canvas;
+}
+
+/**
+ * Generates savanna ground texture & Acacia foliage cluster alpha map
+ */
+function generateEnvironmentTextures() {
+  // 1. Savanna earth & dry grass mottled texture
+  const gSize = 512;
+  const groundCanvas = document.createElement('canvas');
+  groundCanvas.width = gSize;
+  groundCanvas.height = gSize;
+  const gCtx = groundCanvas.getContext('2d');
+  const gImg = gCtx.createImageData(gSize, gSize);
+  const gData = gImg.data;
+  const noiseA = createNoise2D(505);
+  const noiseB = createNoise2D(606);
+
+  for (let y = 0; y < gSize; y++) {
+    const v = y / gSize;
+    for (let x = 0; x < gSize; x++) {
+      const u = x / gSize;
+      // Tileable noise approximation using sin/cos domain mapping
+      const nx = Math.cos(u * Math.PI * 2) * 2.5;
+      const ny = Math.sin(u * Math.PI * 2) * 2.5;
+      const nz = Math.cos(v * Math.PI * 2) * 2.5;
+      const nw = Math.sin(v * Math.PI * 2) * 2.5;
+      const n1 = noiseA(nx + nz, ny + nw);
+      const n2 = noiseB(nx * 3.2 + nw, ny * 3.2 + nz);
+      const grain = noiseA(u * 64, v * 64) * 0.18;
+
+      const mix = 0.5 + 0.35 * n1 + 0.2 * n2 + grain;
+      // Warm Serengeti ochre soil blended with dry golden-olive turf
+      const r = Math.max(0, Math.min(255, Math.round(146 + mix * 42)));
+      const g = Math.max(0, Math.min(255, Math.round(112 + mix * 34)));
+      const b = Math.max(0, Math.min(255, Math.round(68 + mix * 20)));
+      const i = (y * gSize + x) * 4;
+      gData[i] = r;
+      gData[i + 1] = g;
+      gData[i + 2] = b;
+      gData[i + 3] = 255;
+    }
+  }
+  gCtx.putImageData(gImg, 0, 0);
+
+  // 2. Soft dust puff radial alpha sprite
+  const pSize = 128;
+  const dustCanvas = document.createElement('canvas');
+  dustCanvas.width = pSize;
+  dustCanvas.height = pSize;
+  const dCtx = dustCanvas.getContext('2d');
+  const dGrad = dCtx.createRadialGradient(pSize / 2, pSize / 2, 2, pSize / 2, pSize / 2, pSize / 2);
+  dGrad.addColorStop(0.0, 'rgba(228, 192, 142, 0.65)');
+  dGrad.addColorStop(0.45, 'rgba(210, 172, 120, 0.32)');
+  dGrad.addColorStop(1.0, 'rgba(190, 150, 100, 0.0)');
+  dCtx.fillStyle = dGrad;
+  dCtx.fillRect(0, 0, pSize, pSize);
+
+  return { groundCanvas, dustCanvas };
+}
+
+
+// ============================================================================
+// 03-GIRAFFE-MESH.JS — Anatomically Accurate Skinned & Articulated Giraffe
+// ============================================================================
+
+/**
+ * Builds a complete, anatomically proportioned, rigged Giraffe in Three.js.
+ * Returns the root Group along with bone/joint references for biomechanical gait.
+ */
+function createGiraffeModel(THREE, textures) {
+  const root = new THREE.Group();
+  root.name = 'GiraffeRoot';
+
+  // Convert canvas maps to THREE.CanvasTexture
+  function makeCoatTextures(texData) {
+    const colorMap = new THREE.CanvasTexture(texData.colorCanvas);
+    colorMap.wrapS = THREE.RepeatWrapping;
+    colorMap.wrapT = THREE.ClampToEdgeWrapping;
+    colorMap.colorSpace = THREE.SRGBColorSpace;
+    colorMap.anisotropy = 8;
+
+    const bumpMap = new THREE.CanvasTexture(texData.bumpCanvas);
+    bumpMap.wrapS = THREE.RepeatWrapping;
+    bumpMap.wrapT = THREE.ClampToEdgeWrapping;
+
+    const roughMap = new THREE.CanvasTexture(texData.roughCanvas);
+    roughMap.wrapS = THREE.RepeatWrapping;
+    roughMap.wrapT = THREE.ClampToEdgeWrapping;
+
+    return { colorMap, bumpMap, roughMap };
+  }
+
+  const coatMaps = makeCoatTextures(textures.coat);
+  const eyeMap = new THREE.CanvasTexture(textures.eyeCanvas);
+  eyeMap.colorSpace = THREE.SRGBColorSpace;
+
+  // Primary Giraffe Coat Material (velvety short fur response)
+  const coatMaterial = new THREE.MeshStandardMaterial({
+    map: coatMaps.colorMap,
+    bumpMap: coatMaps.bumpMap,
+    bumpScale: 0.012,
+    roughnessMap: coatMaps.roughMap,
+    roughness: 0.85,
+    metalness: 0.02
+  });
+
+  // Secondary Anatomical Materials
+  const darkHairMaterial = new THREE.MeshStandardMaterial({
+    color: 0x1e130c,
+    bumpMap: coatMaps.bumpMap,
+    bumpScale: 0.018,
+    roughness: 0.88,
+    metalness: 0.02
+  });
+
+  const maneMaterial = new THREE.MeshStandardMaterial({
+    color: 0x3b1f10,
+    bumpMap: coatMaps.bumpMap,
+    bumpScale: 0.02,
+    roughness: 0.86,
+    metalness: 0.02
+  });
+
+  const muzzleSkinMaterial = new THREE.MeshStandardMaterial({
+    color: 0x5c4738,
+    roughness: 0.62,
+    metalness: 0.04
+  });
+
+  const nostrilMaterial = new THREE.MeshStandardMaterial({
+    color: 0x1c130f,
+    roughness: 0.45,
+    metalness: 0.05
+  });
+
+  const hoofMaterial = new THREE.MeshStandardMaterial({
+    color: 0x231e1b,
+    roughness: 0.42,
+    metalness: 0.08
+  });
+
+  const innerEarMaterial = new THREE.MeshStandardMaterial({
+    color: 0xd8c3a5,
+    roughness: 0.82,
+    metalness: 0.0
+  });
+
+  const eyeMaterial = new THREE.MeshPhysicalMaterial({
+    map: eyeMap,
+    roughness: 0.06,
+    metalness: 0.0,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.04,
+    reflectivity: 0.95
+  });
+
+  const tongueMaterial = new THREE.MeshStandardMaterial({
+    color: 0x362840, // Authentic dark slate-purple giraffe prehensile tongue
+    roughness: 0.35,
+    metalness: 0.05
+  });
+
+  // Pelvis / Center-of-Mass Group (animated vertically, laterally, and in pitch/roll)
+  const pelvisGroup = new THREE.Group();
+  pelvisGroup.name = 'PelvisGroup';
+  root.add(pelvisGroup);
+
+  // ==========================================================================
+  // 1. CONTINUOUS SKINNED MESH FOR TORSO + WITHERS + 7-BONE CERVICAL NECK
+  // ==========================================================================
+  // We construct a skeletal chain starting at the Pelvis/Torso root:
+  //   Bone 0: SpinePelvis (at y=2.35, z=-0.65)
+  //   Bone 1: SpineMid    (at y=2.55, z=-0.05)
+  //   Bone 2: SpineChest  (at y=2.68, z=+0.50) — thoracic withers & brisket
+  //   Bone 3..8: Neck0..Neck5 (6 cervical segments rising from y=2.76, z=+0.62 to y=4.68, z=+1.52)
+  //   Bone 9: HeadMount   (at y=4.82, z=+1.60)
+  const spineBones = [];
+
+  const boneDefs = [
+    { name: 'SpinePelvis', pos: [0, 2.35, -0.65] },
+    { name: 'SpineMid',    pos: [0, 2.50, -0.08] },
+    { name: 'SpineChest',  pos: [0, 2.66,  0.48] },
+    { name: 'Neck0',       pos: [0, 2.82,  0.65] },
+    { name: 'Neck1',       pos: [0, 3.16,  0.83] },
+    { name: 'Neck2',       pos: [0, 3.52,  1.01] },
+    { name: 'Neck3',       pos: [0, 3.88,  1.18] },
+    { name: 'Neck4',       pos: [0, 4.24,  1.35] },
+    { name: 'Neck5',       pos: [0, 4.58,  1.50] },
+    { name: 'HeadBase',    pos: [0, 4.82,  1.61] }
+  ];
+
+  for (let i = 0; i < boneDefs.length; i++) {
+    const b = new THREE.Bone();
+    b.name = boneDefs[i].name;
+    if (i === 0) {
+      b.position.set(...boneDefs[i].pos);
+      pelvisGroup.add(b);
+    } else {
+      b.position.set(
+        boneDefs[i].pos[0] - boneDefs[i - 1].pos[0],
+        boneDefs[i].pos[1] - boneDefs[i - 1].pos[1],
+        boneDefs[i].pos[2] - boneDefs[i - 1].pos[2]
+      );
+      spineBones[i - 1].add(b);
+    }
+    spineBones.push(b);
+  }
+
+  // Define anatomical cross-section rings from tail-end of croup through torso,
+  // over the prominent thoracic withers & deep brisket, and smoothly up the tapering neck!
+  // Each slice specifies:
+  //   center: [0, y, z] in world space (at bind pose)
+  //   rx: half-width (lateral X)
+  //   ryTop: dorsal height above center
+  //   ryBot: ventral depth below center
+  //   dorsalPeak: sharpness of thoracic spine/withers crest
+  //   ventralBelly: roundness vs keel of sternum/belly
+  //   tilt: pitch angle (radians) of the cross-section plane normal in (Y,Z)
+  //   uvV: coat texture V coordinate (0.36 to 0.88)
+  //   boneWeights: array of [boneIdx, weight] (up to 4)
+  const bodySlices = [
+    // Croup / Buttocks cap (smoothly rounded rear haunch contour)
+    { y: 2.24, z: -0.98, rx: 0.04, ryTop: 0.05, ryBot: 0.05, peak: 0.0, keel: 0.0, tilt: 0.02,  uScale: 0.65, uvV: 0.36, bw: [[0, 1.0]] },
+    { y: 2.28, z: -0.91, rx: 0.23, ryTop: 0.28, ryBot: 0.28, peak: 0.04, keel: 0.0, tilt: 0.02, uScale: 0.80, uvV: 0.38, bw: [[0, 1.0]] },
+    // Pelvic Haunch / Sacrum (broad, muscular haunch enclosing upper femur down to y ~ 1.88m)
+    { y: 2.34, z: -0.70, rx: 0.35, ryTop: 0.35, ryBot: 0.48, peak: 0.06, keel: 0.02, tilt: 0.0, uScale: 0.92, uvV: 0.41, bw: [[0, 0.92], [1, 0.08]] },
+    // Rear Flank / Loin (tucked waist, bottom at y ~ 1.88m)
+    { y: 2.40, z: -0.42, rx: 0.35, ryTop: 0.38, ryBot: 0.52, peak: 0.08, keel: 0.05, tilt: 0.0, uScale: 0.96, uvV: 0.44, bw: [[0, 0.55], [1, 0.45]] },
+    // Mid Barrel / Ribcage (deep barrel, bottom at y ~ 1.82m)
+    { y: 2.47, z: -0.10, rx: 0.39, ryTop: 0.44, ryBot: 0.65, peak: 0.12, keel: 0.08, tilt: -0.02, uScale: 1.00, uvV: 0.48, bw: [[0, 0.15], [1, 0.70], [2, 0.15]] },
+    // Anterior Ribcage / Heart Girth (bottom at y ~ 1.78m)
+    { y: 2.54, z:  0.20, rx: 0.39, ryTop: 0.50, ryBot: 0.76, peak: 0.16, keel: 0.10, tilt: -0.06, uScale: 1.00, uvV: 0.52, bw: [[1, 0.40], [2, 0.60]] },
+    // Prominent Thoracic Withers Hump (top at y ~ 3.15m) & Broad Muscular Shoulder/Brisket (enclosing upper humerus)
+    { y: 2.63, z:  0.46, rx: 0.37, ryTop: 0.52, ryBot: 0.80, peak: 0.20, keel: 0.06, tilt: -0.18, uScale: 0.95, uvV: 0.56, bw: [[1, 0.10], [2, 0.75], [3, 0.15]] },
+    // Shoulder / Cervico-Thoracic Junction (Brisket transitions smoothly into lower neck)
+    { y: 2.76, z:  0.63, rx: 0.26, ryTop: 0.38, ryBot: 0.46, peak: 0.16, keel: 0.12, tilt: -0.52, uScale: 0.78, uvV: 0.60, bw: [[2, 0.45], [3, 0.55]] },
+    // Lower Cervical Neck (muscular oval cross-section)
+    { y: 2.97, z:  0.74, rx: 0.21, ryTop: 0.27, ryBot: 0.24, peak: 0.14, keel: 0.08, tilt: -0.82, uScale: 0.64, uvV: 0.64, bw: [[2, 0.15], [3, 0.65], [4, 0.20]] },
+    { y: 3.21, z:  0.85, rx: 0.185, ryTop: 0.23, ryBot: 0.19, peak: 0.12, keel: 0.06, tilt: -0.96, uScale: 0.58, uvV: 0.68, bw: [[3, 0.25], [4, 0.60], [5, 0.15]] },
+    // Mid Cervical Neck
+    { y: 3.53, z:  1.01, rx: 0.165, ryTop: 0.20, ryBot: 0.165, peak: 0.10, keel: 0.05, tilt: -1.02, uScale: 0.52, uvV: 0.72, bw: [[4, 0.20], [5, 0.60], [6, 0.20]] },
+    { y: 3.87, z:  1.17, rx: 0.148, ryTop: 0.18, ryBot: 0.148, peak: 0.09, keel: 0.04, tilt: -1.04, uScale: 0.48, uvV: 0.76, bw: [[5, 0.20], [6, 0.60], [7, 0.20]] },
+    // Upper Cervical Neck
+    { y: 4.21, z:  1.33, rx: 0.135, ryTop: 0.16, ryBot: 0.135, peak: 0.08, keel: 0.04, tilt: -1.06, uScale: 0.44, uvV: 0.80, bw: [[6, 0.20], [7, 0.60], [8, 0.20]] },
+    { y: 4.55, z:  1.48, rx: 0.122, ryTop: 0.145, ryBot: 0.122, peak: 0.06, keel: 0.03, tilt: -1.08, uScale: 0.40, uvV: 0.84, bw: [[7, 0.20], [8, 0.65], [9, 0.15]] },
+    // Atlas / Axis Occiput (connects cleanly inside the back of the head skull)
+    { y: 4.82, z:  1.61, rx: 0.105, ryTop: 0.125, ryBot: 0.105, peak: 0.05, keel: 0.02, tilt: -1.10, uScale: 0.38, uvV: 0.87, bw: [[8, 0.30], [9, 0.70]] },
+    { y: 4.90, z:  1.65, rx: 0.06, ryTop: 0.07, ryBot: 0.07, peak: 0.0, keel: 0.0, tilt: -1.10, uScale: 0.36, uvV: 0.88, bw: [[9, 1.0]] }
+  ];
+
+  const radialSegs = 32;
+  const numSlices = bodySlices.length;
+  const positions = [];
+  const uvs = [];
+  const skinIndices = [];
+  const skinWeights = [];
+  const indices = [];
+
+  for (let s = 0; s < numSlices; s++) {
+    const sl = bodySlices[s];
+    const cosT = Math.cos(sl.tilt);
+    const sinT = Math.sin(sl.tilt);
+
+    // Prepare 4 bone index/weight slots
+    const bIdx = [0, 0, 0, 0];
+    const bWgt = [0, 0, 0, 0];
+    let wSum = 0;
+    for (let k = 0; k < sl.bw.length && k < 4; k++) {
+      bIdx[k] = sl.bw[k][0];
+      bWgt[k] = sl.bw[k][1];
+      wSum += bWgt[k];
+    }
+    for (let k = 0; k < 4; k++) bWgt[k] /= (wSum || 1);
+
+    for (let r = 0; r <= radialSegs; r++) {
+      // u = 0 is ventral bottom, u = 0.5 is dorsal spine top, u = 1.0 wraps back to ventral bottom
+      const u = r / radialSegs;
+      const theta = u * Math.PI * 2 - Math.PI * 0.5; // -pi/2 is bottom (-Y), +pi/2 is top (+Y)
+      const cosA = Math.cos(theta);
+      const sinA = Math.sin(theta);
+
+      // Lateral width shaping: slightly narrower near dorsal withers crest, fuller at mid-rib/shoulder
+      const dorsalFactor = Math.max(0, sinA);
+      const ventralFactor = Math.max(0, -sinA);
+      const widthMod = 1.0 - sl.peak * Math.pow(dorsalFactor, 1.6) - sl.keel * Math.pow(ventralFactor, 2.0);
+      const lx = sl.rx * cosA * widthMod;
+
+      // Vertical cross-section offset before tilt
+      const radiusY = sinA >= 0 ? sl.ryTop : sl.ryBot;
+      // Add subtle shoulder / rib fullness
+      const ribFullness = 1.0 + 0.06 * Math.sin(theta * 2.0) * (1.0 - Math.abs(sinA));
+      const localUp = radiusY * sinA * ribFullness;
+
+      // Rotate localUp in the (Y, Z) sagittal plane by sl.tilt
+      const wy = sl.y + localUp * cosT;
+      const wz = sl.z + localUp * sinT;
+
+      positions.push(lx, wy, wz);
+      const uCentered = 0.5 + (u - 0.5) * (sl.uScale || 1.0);
+      uvs.push(uCentered, sl.uvV);
+      skinIndices.push(bIdx[0], bIdx[1], bIdx[2], bIdx[3]);
+      skinWeights.push(bWgt[0], bWgt[1], bWgt[2], bWgt[3]);
+    }
+  }
+
+  const ringStride = radialSegs + 1;
+  for (let s = 0; s < numSlices - 1; s++) {
+    for (let r = 0; r < radialSegs; r++) {
+      const a = s * ringStride + r;
+      const b = a + ringStride;
+      const c = a + 1;
+      const d = b + 1;
+      indices.push(a, b, c);
+      indices.push(c, b, d);
+    }
+  }
+
+  const bodyGeo = new THREE.BufferGeometry();
+  bodyGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  bodyGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  bodyGeo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skinIndices, 4));
+  bodyGeo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skinWeights, 4));
+  bodyGeo.setIndex(indices);
+  bodyGeo.computeVertexNormals();
+
+  // Fix seam normals at r=0 and r=radialSegs so lighting is 100% smooth across ventral midline
+  const normAttr = bodyGeo.getAttribute('normal');
+  for (let s = 0; s < numSlices; s++) {
+    const i0 = s * ringStride;
+    const i1 = i0 + radialSegs;
+    const nx = 0.5 * (normAttr.getX(i0) + normAttr.getX(i1));
+    const ny = 0.5 * (normAttr.getY(i0) + normAttr.getY(i1));
+    const nz = 0.5 * (normAttr.getZ(i0) + normAttr.getZ(i1));
+    const len = Math.hypot(nx, ny, nz) || 1;
+    normAttr.setXYZ(i0, nx / len, ny / len, nz / len);
+    normAttr.setXYZ(i1, nx / len, ny / len, nz / len);
+  }
+  normAttr.needsUpdate = true;
+
+  const bodyMesh = new THREE.SkinnedMesh(bodyGeo, coatMaterial);
+  bodyMesh.castShadow = true;
+  bodyMesh.receiveShadow = true;
+  pelvisGroup.add(bodyMesh);
+  root.updateMatrixWorld(true);
+  const bodySkeleton = new THREE.Skeleton(spineBones);
+  bodyMesh.bind(bodySkeleton);
+
+  // ==========================================================================
+  // 2. STANDING DORSAL MANE ALONG CERVICAL SPINE & WITHERS
+  // ==========================================================================
+  // Attach short stiff chestnut-umber mane segments along the neck bones
+  for (let bIdx = 2; bIdx <= 8; bIdx++) {
+    const bone = spineBones[bIdx];
+    const nextBone = spineBones[bIdx + 1];
+    const segLen = nextBone ? nextBone.position.length() : 0.25;
+    const numTufts = 5;
+    for (let t = 0; t < numTufts; t++) {
+      if (bIdx === 8 && t >= 3) continue; // Taper off neatly before occiput
+      const frac = (t + 0.5) / numTufts;
+      const maneHeight = bIdx === 8 ? 0.065 * (1 - t * 0.25) : 0.095;
+      const tuftGeo = new THREE.BoxGeometry(0.020, maneHeight, segLen / numTufts * 1.15);
+      // Taper top edge of mane tuft
+      const tPos = tuftGeo.attributes.position;
+      for (let vi = 0; vi < tPos.count; vi++) {
+        if (tPos.getY(vi) > 0) {
+          tPos.setX(vi, tPos.getX(vi) * 0.25);
+          tPos.setZ(vi, tPos.getZ(vi) * 0.92 - 0.01);
+        }
+      }
+      tuftGeo.computeVertexNormals();
+      const tuft = new THREE.Mesh(tuftGeo, maneMaterial);
+      tuft.castShadow = true;
+      // Offset to dorsal crest of that cervical bone
+      const dorsalRadius = 0.20 - (bIdx - 2) * 0.016;
+      const dir = nextBone
+        ? nextBone.position.clone().normalize()
+        : new THREE.Vector3(0, 0.9, 0.42).normalize();
+      // Normal in sagittal plane pointing dorsally (-Z, +Y perpendicular to neck axis)
+      const dorsalNormal = new THREE.Vector3(0, dir.z, -dir.y).normalize();
+      tuft.position.copy(dir).multiplyScalar(frac * segLen)
+        .addScaledVector(dorsalNormal, dorsalRadius + 0.022);
+      tuft.rotation.x = Math.atan2(dir.z, dir.y) - Math.PI * 0.5;
+      bone.add(tuft);
+    }
+  }
+
+  // ==========================================================================
+  // 3. SCULPTED ANATOMICAL HEAD, OSSICONES, EYES, LASHES, EARS, JAW & TONGUE
+  // ==========================================================================
+  const headBone = spineBones[9]; // HeadBase at [0, 4.82, 1.61]
+  const headPivot = new THREE.Group();
+  headPivot.name = 'HeadPivot';
+  headBone.add(headPivot);
+
+  // Build continuous lofted cranium + facial bridge + tapering prehensile muzzle
+  // In headPivot local space: +Z is forward toward nose tip, +Y is dorsal forehead
+  // Neutral head pitch will tilt headPivot downward by ~0.48 rad (~27.5 deg)
+  const headGroup = new THREE.Group();
+  headGroup.rotation.x = 0.46; // Pitch downward so muzzle points forward-downward naturally
+  headPivot.add(headGroup);
+
+  const headSlices = [
+    // Occiput (rear of skull blending into upper neck)
+    { z: -0.10, y:  0.00, rx: 0.095, ryTop: 0.105, ryBot: 0.095, uvV: 0.78 },
+    // Parietal cranium (where ossicones & ears anchor)
+    { z:  0.02, y:  0.03, rx: 0.135, ryTop: 0.135, ryBot: 0.115, uvV: 0.81 },
+    // Orbital / Frontal brow region (broad across lateral eye sockets + median 3rd ossicone bump)
+    { z:  0.16, y:  0.02, rx: 0.152, ryTop: 0.132, ryBot: 0.118, uvV: 0.84 },
+    // Anterior zygomatic / cheek narrowing
+    { z:  0.28, y: -0.01, rx: 0.112, ryTop: 0.102, ryBot: 0.095, uvV: 0.87 },
+    // Nasal bridge
+    { z:  0.42, y: -0.03, rx: 0.082, ryTop: 0.082, ryBot: 0.072, uvV: 0.90 },
+    // Upper prehensile lip / nostril flare
+    { z:  0.55, y: -0.04, rx: 0.074, ryTop: 0.072, ryBot: 0.058, uvV: 0.93 },
+    // Overhanging upper lip tip
+    { z:  0.63, y: -0.055, rx: 0.052, ryTop: 0.045, ryBot: 0.038, uvV: 0.96 },
+    { z:  0.66, y: -0.062, rx: 0.015, ryTop: 0.015, ryBot: 0.015, uvV: 0.98 }
+  ];
+
+  const hSegs = 24;
+  const hPos = [];
+  const hUvs = [];
+  const hIdx = [];
+  for (let s = 0; s < headSlices.length; s++) {
+    const hs = headSlices[s];
+    for (let r = 0; r <= hSegs; r++) {
+      const u = r / hSegs;
+      const theta = u * Math.PI * 2 - Math.PI * 0.5;
+      const cosA = Math.cos(theta);
+      const sinA = Math.sin(theta);
+
+      let lx = hs.rx * cosA;
+      let ly = hs.y + (sinA >= 0 ? hs.ryTop : hs.ryBot) * sinA;
+
+      // Sculpt prominent supraorbital brow ridges & median frontal bump at z=0.16
+      if (s === 2 && sinA > 0.15) {
+        const browBulge = Math.exp(-Math.pow(Math.abs(cosA) - 0.75, 2) / 0.08) * 0.025;
+        const medianHorn = Math.exp(-Math.pow(cosA, 2) / 0.06) * 0.028;
+        ly += browBulge + medianHorn;
+        lx *= 1.0 + browBulge * 1.4;
+      }
+      // Sculpt nostril flare at z=0.55
+      if (s === 5 && sinA > -0.1 && sinA < 0.7) {
+        lx *= 1.12;
+      }
+
+      hPos.push(lx, ly, hs.z);
+      // Scale U proportionally to head radius so facial spots are round and natural, not striped!
+      const uHead = 0.5 + (u - 0.5) * Math.max(0.18, hs.rx * 2.1);
+      hUvs.push(uHead, hs.uvV);
+    }
+  }
+  const hStride = hSegs + 1;
+  for (let s = 0; s < headSlices.length - 1; s++) {
+    for (let r = 0; r < hSegs; r++) {
+      const a = s * hStride + r;
+      const b = a + hStride;
+      const c = a + 1;
+      const d = b + 1;
+      hIdx.push(a, c, b);
+      hIdx.push(c, d, b);
+    }
+  }
+  const skullGeo = new THREE.BufferGeometry();
+  skullGeo.setAttribute('position', new THREE.Float32BufferAttribute(hPos, 3));
+  skullGeo.setAttribute('uv', new THREE.Float32BufferAttribute(hUvs, 2));
+  skullGeo.setIndex(hIdx);
+  skullGeo.computeVertexNormals();
+  const skullMesh = new THREE.Mesh(skullGeo, coatMaterial);
+  skullMesh.castShadow = true;
+  skullMesh.receiveShadow = true;
+  headGroup.add(skullMesh);
+
+  // Articulated Lower Jaw (Mandible)
+  const jawPivot = new THREE.Group();
+  jawPivot.position.set(0, -0.065, 0.16);
+  headGroup.add(jawPivot);
+
+  const jawGeo = new THREE.CylinderGeometry(0.032, 0.068, 0.44, 14);
+  jawGeo.rotateX(Math.PI * 0.5);
+  jawGeo.scale(1.0, 0.68, 1.0);
+  // Remap jaw UVs to muzzle/cheek region so it doesn't tile miniature body spots
+  const jUv = jawGeo.attributes.uv;
+  for (let i = 0; i < jUv.count; i++) {
+    jUv.setXY(i, 0.44 + jUv.getX(i) * 0.12, 0.91 + jUv.getY(i) * 0.06);
+  }
+  const jawMesh = new THREE.Mesh(jawGeo, coatMaterial);
+  jawMesh.position.set(0, -0.015, 0.21);
+  jawMesh.castShadow = true;
+  jawPivot.add(jawMesh);
+
+  const chinMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.035, 12, 10),
+    muzzleSkinMaterial
+  );
+  chinMesh.scale.set(1.05, 0.72, 1.35);
+  chinMesh.position.set(0, -0.012, 0.42);
+  jawPivot.add(chinMesh);
+
+  // Prehensile Dark Slate-Purple Tongue (extends during Browse Reach!)
+  const tonguePivot = new THREE.Group();
+  tonguePivot.position.set(0, -0.005, 0.36);
+  jawPivot.add(tonguePivot);
+
+  const tongueGeo = new THREE.CylinderGeometry(0.010, 0.022, 0.34, 14, 16);
+  tongueGeo.rotateX(Math.PI * 0.5);
+  tongueGeo.translate(0, 0, 0.17);
+  // Curve the prehensile tongue gracefully upward toward the canopy
+  const tgPos = tongueGeo.attributes.position;
+  for (let i = 0; i < tgPos.count; i++) {
+    const z = tgPos.getZ(i);
+    const t = Math.max(0, z / 0.34);
+    tgPos.setY(i, tgPos.getY(i) * (1 - 0.35 * t) + Math.pow(t, 1.85) * 0.075);
+  }
+  tongueGeo.computeVertexNormals();
+  const tongueMesh = new THREE.Mesh(tongueGeo, tongueMaterial);
+  tonguePivot.add(tongueMesh);
+  tonguePivot.scale.set(1, 1, 0.01); // Retracted by default
+
+  // Slit Nostrils & Velvet Muzzle Pad
+  const nostrils = [];
+  for (const side of [-1, 1]) {
+    const nostril = new THREE.Mesh(
+      new THREE.SphereGeometry(0.018, 10, 8),
+      nostrilMaterial
+    );
+    nostril.scale.set(0.55, 0.75, 1.75);
+    nostril.position.set(side * 0.048, -0.012, 0.565);
+    nostril.rotation.y = side * 0.32;
+    nostril.rotation.z = side * -0.25;
+    headGroup.add(nostril);
+    nostrils.push(nostril);
+  }
+
+  // Pair of Parietal Ossicones (Skin-covered bone horns with black terminal hair tufts)
+  for (const side of [-1, 1]) {
+    const ossGroup = new THREE.Group();
+    ossGroup.position.set(side * 0.062, 0.105, 0.045);
+    // Ossicones tilt backward slightly and diverge subtly
+    ossGroup.rotation.x = -0.34;
+    ossGroup.rotation.z = side * -0.12;
+
+    // Fur-covered shaft with scaled UVs so spots aren't miniature
+    const shaftGeo = new THREE.CylinderGeometry(0.023, 0.034, 0.155, 14);
+    shaftGeo.translate(0, 0.075, 0);
+    const sUv = shaftGeo.attributes.uv;
+    for (let i = 0; i < sUv.count; i++) {
+      sUv.setXY(i, 0.45 + sUv.getX(i) * 0.12, 0.88 + sUv.getY(i) * 0.08);
+    }
+    const shaftMesh = new THREE.Mesh(shaftGeo, coatMaterial);
+    shaftMesh.castShadow = true;
+    ossGroup.add(shaftMesh);
+
+    // Dark black-brown tufted crown
+    const crownGeo = new THREE.SphereGeometry(0.029, 14, 12);
+    crownGeo.scale(1.04, 1.18, 1.04);
+    const crownMesh = new THREE.Mesh(crownGeo, darkHairMaterial);
+    crownMesh.position.set(0, 0.152, 0);
+    crownMesh.castShadow = true;
+    ossGroup.add(crownMesh);
+
+    headGroup.add(ossGroup);
+  }
+
+  // Large Lateral Eyes + Eyelids + Lush Black Eyelashes
+  const eyelids = [];
+  for (const side of [-1, 1]) {
+    const eyeSocket = new THREE.Group();
+    eyeSocket.position.set(side * 0.138, 0.036, 0.175);
+    eyeSocket.rotation.y = side * (Math.PI * 0.42);
+    headGroup.add(eyeSocket);
+
+    // Glossy Eyeball
+    const eyeball = new THREE.Mesh(new THREE.SphereGeometry(0.036, 18, 16), eyeMaterial);
+    eyeball.rotation.y = -Math.PI * 0.5; // Face iris + corneal highlight outward along local +Z of eyeSocket!
+    eyeSocket.add(eyeball);
+
+    // Upper Eyelid Hood (blinks!)
+    const upperLidGeo = new THREE.SphereGeometry(0.039, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.48);
+    const upperLid = new THREE.Mesh(upperLidGeo, muzzleSkinMaterial);
+    upperLid.rotation.x = -0.58;
+    eyeSocket.add(upperLid);
+    eyelids.push(upperLid);
+
+    // Lush Black Eyelashes fanning outward from upper lid rim
+    const lashRim = new THREE.Group();
+    for (let l = -4; l <= 4; l++) {
+      const lashGeo = new THREE.ConeGeometry(0.0022, 0.028, 5);
+      lashGeo.translate(0, 0.014, 0);
+      const lash = new THREE.Mesh(lashGeo, darkHairMaterial);
+      const ang = l * 0.14;
+      lash.position.set(Math.sin(ang) * 0.036, 0.004, Math.cos(ang) * 0.036);
+      lash.rotation.x = Math.PI * 0.58;
+      lash.rotation.z = -ang * 0.65;
+      lashRim.add(lash);
+    }
+    upperLid.add(lashRim);
+
+    // Subtle Lower Eyelid Rim
+    const lowerLidGeo = new THREE.SphereGeometry(0.038, 16, 10, 0, Math.PI * 2, Math.PI * 0.64, Math.PI * 0.36);
+    const lowerLid = new THREE.Mesh(lowerLidGeo, muzzleSkinMaterial);
+    lowerLid.rotation.x = 0.18;
+    eyeSocket.add(lowerLid);
+  }
+
+  // Mobile Leaf-Shaped Cupped Ears
+  const ears = [];
+  for (const side of [-1, 1]) {
+    const earPivot = new THREE.Group();
+    earPivot.position.set(side * 0.118, 0.072, -0.005);
+    // Default alert outward & slightly backward ear posture
+    earPivot.rotation.set(-0.22, side * -0.35, side * -0.82);
+
+    // Outer coat-patterned ear pinna (cupped leaf shape)
+    const earGeo = new THREE.SphereGeometry(0.045, 14, 16);
+    const ePos = earGeo.attributes.position;
+    const eUv = earGeo.attributes.uv;
+    for (let i = 0; i < ePos.count; i++) {
+      let x = ePos.getX(i);
+      let y = ePos.getY(i); // +Y is length along ear from base to tip
+      let z = ePos.getZ(i);
+      // Shift from [-r, r] to [0, 0.24m] length
+      const t = Math.max(0, Math.min(1, (y + 0.045) / 0.09)); // 0 at base, 1 at tip
+      const leafProfile = Math.sin(Math.pow(t, 0.75) * Math.PI); // narrow base, wider mid, pointed tip
+      x *= 0.85 * leafProfile + 0.15 * (1 - t);
+      // Cup the front (+Z) of the ear
+      z *= 0.36;
+      if (z > 0) z *= -0.35; // concave inner hollow!
+      y = t * 0.23;
+      ePos.setXYZ(i, x, y, z);
+      eUv.setXY(i, 0.45 + eUv.getX(i) * 0.10, 0.90 + t * 0.07);
+    }
+    earGeo.computeVertexNormals();
+    const outerEar = new THREE.Mesh(earGeo, coatMaterial);
+    outerEar.castShadow = true;
+    earPivot.add(outerEar);
+
+    // Pale cream inner ear fluff
+    const innerEar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.008, 0.022, 0.16, 8),
+      innerEarMaterial
+    );
+    innerEar.scale.set(1.1, 1.0, 0.25);
+    innerEar.position.set(0, 0.10, 0.004);
+    earPivot.add(innerEar);
+
+    headGroup.add(earPivot);
+    ears.push({ pivot: earPivot, side });
+  }
+
+  // ==========================================================================
+  // 4. CONTINUOUS SKINNED MULTI-JOINTED LEGS (4 LIMBS WITH HOCKS, FETLOCKS, HOOVES)
+  // ==========================================================================
+  // Helper to build a realistic Cloven Hoof with median cleft
+  // Origin (0,0,0) of hoofGroup is at the coronary band (top of hoof); ground sole is at y = -0.095
+  function createClovenHoofGroup() {
+    const hoofGroup = new THREE.Group();
+
+    // Two symmetrical ungulate digits (medial & lateral claws) with a clear central cleft
+    for (const side of [-1, 1]) {
+      const clawGeo = new THREE.CylinderGeometry(0.029, 0.041, 0.095, 12);
+      const cPos = clawGeo.attributes.position;
+      for (let i = 0; i < cPos.count; i++) {
+        let x = cPos.getX(i);
+        let y = cPos.getY(i);
+        let z = cPos.getZ(i);
+        // Flatten inner medial wall to form the cloven cleft
+        if (side * x < 0) x *= 0.22;
+        // Slope dorsal wall forward (+Z) toward the toe tip at bottom (y < 0)
+        const botFactor = (0.0475 - y) / 0.095; // 0 at coronary band, 1 at ground sole
+        if (z > 0) z = z * (1.1 + 0.55 * botFactor);
+        else z = z * (0.95 - 0.1 * botFactor);
+        cPos.setXYZ(i, x, y, z);
+      }
+      clawGeo.computeVertexNormals();
+      const claw = new THREE.Mesh(clawGeo, hoofMaterial);
+      claw.position.set(side * 0.019, -0.0475, 0.012);
+      claw.castShadow = true;
+      claw.receiveShadow = true;
+      hoofGroup.add(claw);
+    }
+
+    return hoofGroup;
+  }
+
+  function createGiraffeLeg(isFront, isLeft) {
+    const side = isLeft ? 1 : -1;
+    const legName = (isLeft ? 'L' : 'R') + (isFront ? 'F' : 'H');
+
+    // Top-level limb emergence pivot at the lower chest (Elbow/Shoulder base) and flank (Stifle/Thigh base):
+    // Placed at x = +-0.115 so the upper leg (wy > 1.85m) is 100% enclosed inside the torso's ventral contour!
+    const hipOrigin = isFront
+      ? new THREE.Vector3(side * 0.115, 1.94, 0.42)
+      : new THREE.Vector3(side * 0.110, 1.90, -0.54);
+
+    // Segment 1 (upperLen): Forearm (Radius-Ulna) or Gaskin/Thigh (Tibia) down to Fore-Knee / Hock (y ~ 1.02m)
+    // Segment 2 (midLen):   Cannon Bone (Metacarpus / Metatarsus) from Fore-Knee / Hock down to Fetlock (y ~ 0.22m)
+    const upperLen = isFront ? 0.94 : 0.91;
+    const midLen = isFront ? 0.81 : 0.81;
+    const cannonLen = 0.0; // Consolidated into 2-segment free limb + pastern/hoof
+    const pasternDrop = 0.132;
+
+    // 5-Bone Hierarchy for the Limb:
+    // Bone 0: torsoAnchor (fixed to trunk so upper shoulder/haunch merges 100% seamlessly into torso!)
+    // Bone 1: scapulaPivot (rotates Forearm / Tibia)
+    // Bone 2: elbowPivot   (Fore-Knee / Carpus or Hind-Hock / Tarsus at y = -upperLen!)
+    // Bone 3: fetlockPivot (Fetlock joint at y = -(upperLen + midLen)!)
+    // Bone 4: hoofPivot    (Coronary band of Cloven Hoof)
+    const torsoAnchor = new THREE.Bone();
+    torsoAnchor.name = `${legName}_TorsoAnchor`;
+    torsoAnchor.position.copy(hipOrigin);
+    pelvisGroup.add(torsoAnchor);
+
+    const scapulaPivot = new THREE.Bone();
+    scapulaPivot.name = `${legName}_ScapulaPivot`;
+    scapulaPivot.position.set(0, 0, 0);
+    torsoAnchor.add(scapulaPivot);
+
+    const elbowPivot = new THREE.Bone();
+    elbowPivot.name = `${legName}_ElbowPivot`;
+    elbowPivot.position.set(0, -upperLen, 0);
+    scapulaPivot.add(elbowPivot);
+
+    const wristPivot = elbowPivot; // Alias for telemetry compatibility
+
+    const fetlockPivot = new THREE.Bone();
+    fetlockPivot.name = `${legName}_FetlockPivot`;
+    fetlockPivot.position.set(0, -midLen, 0);
+    elbowPivot.add(fetlockPivot);
+
+    // HoofPivot sits right at the coronary band (y = -0.125, z = +0.032); sole is 0.095m below it (total -0.22m)
+    const hoofPivot = new THREE.Bone();
+    hoofPivot.name = `${legName}_HoofPivot`;
+    hoofPivot.position.set(side * 0.020, -0.125, 0.032);
+    fetlockPivot.add(hoofPivot);
+
+    const clovenHoof = createClovenHoofGroup();
+    hoofPivot.add(clovenHoof);
+
+    // Build a single seamless SkinnedMesh from inside the torso (y = +0.28) down to the coronary band
+    const yKneeHock = -upperLen;
+    const yFetlock = -(upperLen + midLen);
+    const yEnd = yFetlock - pasternDrop;
+    const totalSpan = 0.28 - yEnd;
+
+    const segsY = 46;
+    const segsR = 20;
+    const lPos = [];
+    const lUvs = [];
+    const lSkinIdx = [];
+    const lSkinWgt = [];
+    const lIdx = [];
+
+    const uSeed = (isFront ? 0.06 : 0.44) + (isLeft ? 0.0 : 0.22);
+
+    function smoothstep(e0, e1, x) {
+      const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+      return t * t * (3 - 2 * t);
+    }
+
+    for (let iy = 0; iy <= segsY; iy++) {
+      const s = iy / segsY;
+      const y = 0.28 - s * totalSpan; // in scapulaPivot local bind coordinates
+
+      let rx, rzFront, rzBack, xShift = 0, zShift = 0, uvV, uScale;
+
+      if (y >= 0.0) {
+        // Upper shoulder / haunch collar completely inside the torso (wy = 1.90..2.18)
+        const uTop = y / 0.28;
+        const cap = iy === 0 ? 0.20 : 1.0;
+        const taperIn = 1.0 - uTop * 0.55;
+        rx = (isFront ? 0.068 : 0.072) * taperIn * cap;
+        rzFront = (isFront ? 0.092 : 0.105) * taperIn * cap;
+        rzBack = (isFront ? 0.098 : 0.112) * taperIn * cap;
+        xShift = -side * uTop * 0.06;
+        zShift = isFront ? -uTop * 0.03 : uTop * 0.03;
+        uvV = 0.40 + uTop * 0.06;
+        uScale = 0.20;
+      } else if (y >= yKneeHock) {
+        // Forearm (Radius) or Gaskin/Thigh (Tibia) descending from trunk (t=0) to Fore-Knee / Hock (t=1)
+        const t = -y / upperLen;
+        const upperMusc = Math.pow(1 - t, 1.6);
+        const calf = Math.sin(Math.pow(t, 0.55) * Math.PI) * (isFront ? 0.014 : 0.020);
+        const hockCurve = Math.exp(-Math.pow(t - 0.96, 2) / 0.016);
+        rx = (0.043 + (isFront ? 0.025 : 0.029) * upperMusc) + calf * 0.35 + hockCurve * 0.006;
+        rzFront = (0.047 + (isFront ? 0.045 : 0.058) * upperMusc) + calf + hockCurve * (isFront ? 0.014 : 0.004);
+        // Prominent posterior calcaneal hock point on hindlimb at t ~ 0.96!
+        rzBack = (0.051 + (isFront ? 0.048 : 0.064) * upperMusc) + calf + hockCurve * (isFront ? 0.006 : 0.038);
+        // Drift outward subtly from x = +-0.115 at trunk to x = +-0.135 at knee/hock for natural stance width
+        xShift = side * t * 0.020;
+        uvV = 0.40 * (1 - t) + 0.18 * t;
+        uScale = 0.20 * (1 - t * 0.28);
+      } else if (y >= yFetlock) {
+        // Cannon Bone (Metacarpus / Metatarsus) from Fore-Knee / Hock (t=0) down to Fetlock (t=1)
+        const t = (yKneeHock - y) / midLen;
+        const topBlend = Math.exp(-Math.pow(t, 2) / 0.018);
+        const fetBulge = Math.exp(-Math.pow(t - 0.96, 2) / 0.022);
+        rx = 0.040 * (1 - t * 0.10) + topBlend * 0.005 + fetBulge * 0.007;
+        rzFront = 0.044 * (1 - t * 0.10) + topBlend * (isFront ? 0.012 : 0.004) + fetBulge * 0.008;
+        rzBack = 0.048 * (1 - t * 0.08) + topBlend * (isFront ? 0.005 : 0.032) + fetBulge * 0.012;
+        xShift = side * 0.020;
+        uvV = 0.18 * (1 - t) + 0.04 * t;
+        uScale = 0.15 * (1 - t * 0.15);
+      } else {
+        // Pastern sloping forward into the cloven hoof coronary band
+        const t = Math.min(1, (yFetlock - y) / pasternDrop);
+        const botCap = iy === segsY ? 0.78 : 1.0;
+        rx = (0.041 - t * 0.006) * botCap;
+        rzFront = (0.044 - t * 0.005) * botCap;
+        rzBack = (0.049 - t * 0.012) * botCap;
+        xShift = side * 0.020;
+        zShift = t * 0.034;
+        uvV = 0.04 * (1 - t) + 0.01 * t;
+        uScale = 0.12;
+      }
+
+      // Smooth skin weights across the 5 bones:
+      // Bone 0: torsoAnchor, Bone 1: scapulaPivot, Bone 2: elbowPivot (Knee/Hock),
+      // Bone 3: fetlockPivot, Bone 4: hoofPivot
+      const w01 = smoothstep(0.18, -0.14, y);
+      const w12 = smoothstep(yKneeHock + 0.08, yKneeHock - 0.08, y);
+      const w23 = smoothstep(yFetlock + 0.06, yFetlock - 0.06, y);
+      const w34 = smoothstep(yFetlock - 0.08, yFetlock - 0.13, y);
+
+      const b0 = 1.0 - w01;
+      const b1 = w01 * (1.0 - w12);
+      const b2 = w12 * (1.0 - w23);
+      const b3 = w23 * (1.0 - w34);
+      const b4 = w34;
+
+      const wy = hipOrigin.y + y;
+      for (let ir = 0; ir <= segsR; ir++) {
+        const uRaw = ir / segsR;
+        const theta = uRaw * Math.PI * 2;
+        const sinA = Math.sin(theta);
+        const cosA = Math.cos(theta);
+        const wx = hipOrigin.x + xShift + rx * sinA;
+        const wz = hipOrigin.z + zShift + (cosA >= 0 ? rzFront : rzBack) * cosA;
+
+        lPos.push(wx, wy, wz);
+        const uSym = Math.abs(uRaw - 0.5) * 2.0;
+        lUvs.push(uSeed + uSym * uScale, uvV);
+        if (b4 > 0) {
+          lSkinIdx.push(1, 2, 3, 4);
+          lSkinWgt.push(b1, b2, b3, b4);
+        } else {
+          lSkinIdx.push(0, 1, 2, 3);
+          lSkinWgt.push(b0, b1, b2, b3);
+        }
+      }
+    }
+
+    const stride = segsR + 1;
+    for (let iy = 0; iy < segsY; iy++) {
+      for (let ir = 0; ir < segsR; ir++) {
+        const a = iy * stride + ir;
+        const b = a + stride;
+        const c = a + 1;
+        const d = b + 1;
+        lIdx.push(a, b, c);
+        lIdx.push(c, b, d);
+      }
+    }
+
+    const legGeo = new THREE.BufferGeometry();
+    legGeo.setAttribute('position', new THREE.Float32BufferAttribute(lPos, 3));
+    legGeo.setAttribute('uv', new THREE.Float32BufferAttribute(lUvs, 2));
+    legGeo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(lSkinIdx, 4));
+    legGeo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(lSkinWgt, 4));
+    legGeo.setIndex(lIdx);
+    legGeo.computeVertexNormals();
+
+    const legMesh = new THREE.SkinnedMesh(legGeo, coatMaterial);
+    legMesh.castShadow = true;
+    legMesh.receiveShadow = true;
+    pelvisGroup.add(legMesh);
+
+    root.updateMatrixWorld(true);
+    const legSkeleton = new THREE.Skeleton([torsoAnchor, scapulaPivot, elbowPivot, fetlockPivot, hoofPivot]);
+    legMesh.bind(legSkeleton);
+
+    return {
+      name: legName,
+      isFront,
+      isLeft,
+      side,
+      hipOrigin,
+      scapulaPivot,
+      elbowPivot,
+      wristPivot,
+      fetlockPivot,
+      hoofPivot,
+      upperLen,
+      midLen,
+      cannonLen
+    };
+  }
+
+  const legs = {
+    LF: createGiraffeLeg(true, true),
+    RF: createGiraffeLeg(true, false),
+    LH: createGiraffeLeg(false, true),
+    RH: createGiraffeLeg(false, false)
+  };
+
+  // ==========================================================================
+  // 5. ARTICULATED MULTI-SEGMENT TAIL WITH LONG BLACK TERMINAL TASSEL
+  // ==========================================================================
+  const tailBase = new THREE.Group();
+  tailBase.name = 'TailBase';
+  tailBase.position.set(0, 2.34, -0.90);
+  pelvisGroup.add(tailBase);
+
+  const tailSegments = [];
+  let parentTail = tailBase;
+  const tailSegCount = 4;
+  const tailSegLen = 0.24;
+
+  for (let i = 0; i < tailSegCount; i++) {
+    const segPivot = new THREE.Group();
+    if (i > 0) segPivot.position.set(0, -tailSegLen, 0);
+    parentTail.add(segPivot);
+
+    const rTop = 0.034 * (1 - i * 0.18);
+    const rBot = 0.034 * (1 - (i + 1) * 0.18);
+    const segGeo = new THREE.CylinderGeometry(rTop, rBot, tailSegLen * 1.06, 10);
+    segGeo.translate(0, -tailSegLen * 0.5, 0);
+    const segMesh = new THREE.Mesh(segGeo, coatMaterial);
+    segMesh.castShadow = true;
+    segPivot.add(segMesh);
+
+    tailSegments.push(segPivot);
+    parentTail = segPivot;
+  }
+
+  // Thick, flowing black tail switch (tassel) reaching hock level
+  const tasselPivot = new THREE.Group();
+  tasselPivot.position.set(0, -tailSegLen, 0);
+  parentTail.add(tasselPivot);
+
+  const tasselGeo = new THREE.ConeGeometry(0.056, 0.46, 14, 8);
+  const tAttr = tasselGeo.attributes.position;
+  for (let i = 0; i < tAttr.count; i++) {
+    let x = tAttr.getX(i);
+    let y = tAttr.getY(i); // +0.23 at top, -0.23 at bottom tip
+    let z = tAttr.getZ(i);
+    const u = Math.max(0, Math.min(1, (0.23 - y) / 0.46)); // 0 at top, 1 at bottom tip
+    const swell = Math.sin(Math.pow(u, 0.65) * Math.PI);
+    x *= 0.35 + 1.15 * swell;
+    z *= 0.35 + 1.15 * swell;
+    // Slight wavy curl at the tip
+    z -= Math.sin(u * Math.PI * 1.5) * 0.025;
+    tAttr.setXYZ(i, x, y - 0.21, z);
+  }
+  tasselGeo.computeVertexNormals();
+  const tasselMesh = new THREE.Mesh(tasselGeo, darkHairMaterial);
+  tasselMesh.castShadow = true;
+  tasselPivot.add(tasselMesh);
+  tailSegments.push(tasselPivot);
+
+  // Method to switch between Reticulated and Masai coat textures on the fly
+  function updateCoatTexture(newTexData) {
+    const newMaps = makeCoatTextures(newTexData);
+    coatMaterial.map = newMaps.colorMap;
+    coatMaterial.bumpMap = newMaps.bumpMap;
+    coatMaterial.roughnessMap = newMaps.roughMap;
+    coatMaterial.needsUpdate = true;
+  }
+
+  return {
+    root,
+    pelvisGroup,
+    spineBones,
+    headPivot,
+    headGroup,
+    jawPivot,
+    tonguePivot,
+    nostrils,
+    eyelids,
+    ears,
+    legs,
+    tailBase,
+    tailSegments,
+    updateCoatTexture
+  };
+}
+
+
+// ============================================================================
+// 04-GIRAFFE-GAIT.JS — Biomechanical Ipsilateral Pacing Gait & 3-Segment IK
+// ============================================================================
+
+class GiraffeBiomechanicalAnimator {
+  constructor(THREE, giraffe, getTerrainHeight, onHoofTouchdown) {
+    this.THREE = THREE;
+    this.giraffe = giraffe;
+    this.getTerrainHeight = getTerrainHeight || (() => 0);
+    this.onHoofTouchdown = onHoofTouchdown || (() => {});
+
+    // Locomotion state
+    this.stridePhase = 0.0;        // [0, 1) normalized full gait cycle
+    this.baseStrideLength = 1.92;  // meters per full stride cycle at speedMultiplier = 1.0
+    this.baseCycleDuration = 2.05; // seconds per full stride cycle at speedMultiplier = 1.0
+    this.speedMultiplier = 1.0;
+    this.turnBias = 0.0;           // radians per second yaw steering
+    this.totalTime = 0.0;
+
+    // World position and heading (+Z is local forward)
+    this.worldPos = new THREE.Vector3(0, 0, 0);
+    this.heading = 0.0;
+
+    // Authentic Giraffe Ipsilateral Pacing Gait Phase Offsets:
+    // Left Hind (0.00) -> Left Fore (0.14) -> Right Hind (0.50) -> Right Fore (0.64)
+    this.phaseOffsets = {
+      LH: 0.00,
+      LF: 0.14,
+      RH: 0.50,
+      RF: 0.64
+    };
+    this.dutyFactor = 0.62; // 62% stance phase, 38% swing phase
+
+    // Track previous stance state to fire dust puffs at exact hoof touchdown
+    this.wasInStance = { LH: true, LF: true, RH: true, RF: true };
+    this.stanceState = { LH: true, LF: true, RH: false, RF: false };
+
+    // Browse Reach animation state (triggered via UI button or periodically)
+    this.browseTimer = 0.0;
+    this.browseDuration = 5.2;
+    this.isBrowsing = false;
+
+    // Store bind-pose relative offsets of spine bones
+    this.spineRestPositions = giraffe.spineBones.map(b => b.position.clone());
+
+    // Telemetry snapshot
+    this.telemetry = {
+      speedKmh: 5.4,
+      stridePhase: 0,
+      neckPitchDeg: 54.0,
+      hoofWorldY: { LF: 0, RF: 0, LH: 0, RH: 0 }
+    };
+  }
+
+  triggerBrowseReach() {
+    this.isBrowsing = true;
+    this.browseTimer = 0.001;
+  }
+
+  /**
+   * Solves analytical 3-segment ungulate limb kinematics in sagittal (Y, Z) plane
+   * + subtle lateral abduction in X:
+   *   - Hip/Scapula at origin (0, 0, 0) of scapulaPivot
+   *   - Upper segment L1 -> Elbow (forelimb: points backward -Z) / Stifle (hindlimb: points forward +Z)
+   *   - Mid segment L2   -> Wrist (fore-knee / carpal or hind-hock / tarsal)
+   *   - Cannon segment L3 -> Fetlock joint
+   *   - Pastern/Hoof     -> Plantar sole touching exact target (targetY, targetZ)
+   */
+  solveLegIK(leg, targetLocalY, targetLocalZ, swingProgress, stanceProgress, isStance) {
+    const L1 = leg.upperLen; // Forearm (Radius) or Gaskin/Thigh (Tibia)
+    const L2 = leg.midLen;   // Cannon Bone (Metacarpus / Metatarsus)
+
+    // In Three.js (+X right, +Y up, +Z forward), Rx(theta) * (0, -L, 0)^T = (0, -L*cos(theta), -L*sin(theta))^T:
+    //   +theta swings a downward (-Y) segment BACKWARD (-Z)
+    //   -theta swings a downward (-Y) segment FORWARD (+Z)
+    let fetlockPitch = 0.0;
+    let hoofPitch = 0.0;
+
+    if (isStance) {
+      // Weight-bearing pastern spring compression in mid-stance
+      const weightLoad = Math.sin(stanceProgress * Math.PI);
+      fetlockPitch = -0.06 * weightLoad;
+      hoofPitch = -fetlockPitch; // Keep hoof sole 100% flat on ground!
+    } else {
+      // Swing phase: passive backward fetlock flexion (+X rotation -> -Z) in mid-swing
+      const dropCurve = Math.sin(swingProgress * Math.PI);
+      const lateExtend = Math.sin(Math.max(0, (swingProgress - 0.68) / 0.32) * Math.PI);
+      fetlockPitch = 0.42 * dropCurve - 0.14 * lateExtend;
+      hoofPitch = 0.14 * dropCurve;
+    }
+
+    // Total offset from fetlockPivot to ground sole is (0, -0.22, +0.035)
+    const hOffY = -0.22;
+    const hOffZ = 0.035;
+    const cosF = Math.cos(fetlockPitch);
+    const sinF = Math.sin(fetlockPitch);
+    const rotHoofOffsetY = hOffY * cosF - hOffZ * sinF;
+    const rotHoofOffsetZ = hOffY * sinF + hOffZ * cosF;
+
+    // During swing phase on the forelimb, the hoof trails slightly behind the advancing knee in mid-swing
+    const swingTrailZ = isStance ? 0 : -Math.sin(swingProgress * Math.PI) * (leg.isFront ? 0.16 : 0.06);
+
+    // Exact required Fetlock position in scapulaPivot's (Y, Z) frame:
+    const fetY = targetLocalY - rotHoofOffsetY;
+    const fetZ = (targetLocalZ + swingTrailZ) - rotHoofOffsetZ;
+
+    // Solve 2-Bone Triangle from Scapula/Hip emergence (0, 0) through Fore-Knee/Hock (L1) to Fetlock (L2)
+    let dist = Math.hypot(fetY, fetZ);
+    const minDist = Math.abs(L1 - L2) + 0.04;
+    const maxDist = (L1 + L2) - (leg.isFront ? 0.008 : 0.025);
+    dist = Math.max(minDist, Math.min(maxDist, dist));
+
+    // Angle of vector from (0,0) to (fetY, fetZ) where (0, -D) is 0 and -Z is +angle:
+    const targetDirAngle = Math.atan2(-fetZ, -fetY);
+
+    const cosAlpha1 = Math.max(-1, Math.min(1, (L1 * L1 + dist * dist - L2 * L2) / (2 * L1 * dist)));
+    const alpha1 = Math.acos(cosAlpha1);
+
+    const cosKneeInternal = Math.max(-1, Math.min(1, (L1 * L1 + L2 * L2 - dist * dist) / (2 * L1 * L2)));
+    const kneeBend = Math.PI - Math.acos(cosKneeInternal);
+
+    // ANATOMICAL BEND DIRECTION AT THE MIDDLE JOINT (y ~ 1.02m):
+    // - Forelimb: Middle joint is the CARPUS (Fore-Knee), whose apex points FORWARD (+Z, -angle):
+    //   Forearm (L1) angles FORWARD (-alpha1) to the Fore-Knee, and Cannon (L2) bends BACKWARD (+kneeBend) to Fetlock!
+    // - Hindlimb: Middle joint is the HOCK (Calcaneus), whose apex points BACKWARD (-Z, +angle):
+    //   Gaskin/Tibia (L1) angles BACKWARD (+alpha1) to the Hock, and Cannon (L2) bends FORWARD (-kneeBend) to Fetlock!
+    let theta1, theta2;
+    if (leg.isFront) {
+      theta1 = targetDirAngle - alpha1;
+      theta2 = +kneeBend;
+    } else {
+      theta1 = targetDirAngle + alpha1;
+      theta2 = -kneeBend;
+    }
+
+    const cannonWorldAngle = theta1 + theta2;
+    const theta3 = fetlockPitch - cannonWorldAngle;
+    const theta4 = hoofPitch;
+
+    // Apply solved joint rotations
+    leg.scapulaPivot.rotation.x = theta1;
+    leg.elbowPivot.rotation.x = theta2;
+    leg.fetlockPivot.rotation.x = theta3;
+    leg.hoofPivot.rotation.x = theta4;
+
+    // Subtle lateral abduction/circumduction during swing for natural 3D weight shift
+    const swingAbduct = isStance ? 0 : Math.sin(swingProgress * Math.PI) * 0.020 * leg.side;
+    leg.scapulaPivot.rotation.z = swingAbduct;
+  }
+
+  update(dt) {
+    const THREE = this.THREE;
+    this.totalTime += dt;
+
+    // Effective locomotion parameters
+    const effSpeed = this.speedMultiplier;
+    const isMoving = effSpeed > 0.01;
+    const cycleFreq = effSpeed / this.baseCycleDuration;
+    this.stridePhase = (this.stridePhase + dt * cycleFreq) % 1.0;
+
+    const strideLen = this.baseStrideLength * Math.pow(effSpeed, 0.85);
+    const linearSpeed = strideLen * cycleFreq; // meters/sec
+
+    // Advance giraffe along curved savanna path
+    // Gentle automatic meandering if user hasn't set manual steering bias so the giraffe stays in scenic region
+    const distFromOrigin = Math.hypot(this.worldPos.x, this.worldPos.z);
+    let autoTurn = 0;
+    if (distFromOrigin > 38) {
+      const angleToCenter = Math.atan2(-this.worldPos.x, -this.worldPos.z);
+      let diff = angleToCenter - this.heading;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      autoTurn = Math.max(-0.28, Math.min(0.28, diff * 0.45));
+    }
+
+    const yawRate = (this.turnBias + autoTurn) * Math.min(1.0, effSpeed);
+    this.heading += yawRate * dt;
+    this.worldPos.x += Math.sin(this.heading) * linearSpeed * dt;
+    this.worldPos.z += Math.cos(this.heading) * linearSpeed * dt;
+    const groundY = this.getTerrainHeight(this.worldPos.x, this.worldPos.z);
+    this.worldPos.y = groundY;
+
+    this.giraffe.root.position.copy(this.worldPos);
+    this.giraffe.root.rotation.y = this.heading;
+
+    // ========================================================================
+    // 1. PELVIS & CENTER-OF-MASS OSCILLATIONS (Ipsilateral Pacing Dynamics)
+    // ========================================================================
+    // In a pacing gait:
+    // - Left side legs (LH, LF) are in mid-stance around phase ~ 0.36
+    // - Right side legs (RH, RF) are in mid-stance around phase ~ 0.86
+    // So the body sways laterally at 1x stride frequency toward the supporting side,
+    // and bobs vertically at 2x stride frequency!
+    const p2pi = this.stridePhase * Math.PI * 2;
+    const moveBlend = Math.min(1.0, effSpeed);
+
+    const verticalBob = Math.sin(p2pi * 2 - 0.4) * 0.032 * moveBlend;
+    const lateralSway = -Math.cos(p2pi - 0.72) * 0.042 * moveBlend;
+    const pelvicRoll  = -Math.cos(p2pi - 0.72) * 0.032 * moveBlend - yawRate * 0.08;
+    const pelvicPitch = Math.sin(p2pi * 2 + 0.3) * 0.016 * moveBlend;
+    const pelvicYaw   = Math.sin(p2pi - 0.2) * 0.024 * moveBlend;
+
+    this.giraffe.pelvisGroup.position.set(lateralSway, verticalBob, 0);
+    this.giraffe.pelvisGroup.rotation.set(pelvicPitch, pelvicYaw, pelvicRoll);
+
+    // ========================================================================
+    // 2. FOUR-LIMB GAIT TRAJECTORIES & FOOT-LOCKED IK
+    // ========================================================================
+    const beta = this.dutyFactor;
+
+    for (const key of ['LH', 'LF', 'RH', 'RF']) {
+      const leg = this.giraffe.legs[key];
+      const legPhase = (this.stridePhase - this.phaseOffsets[key] + 1.0) % 1.0;
+
+      const isStance = !isMoving || (legPhase < beta);
+      this.stanceState[key] = isStance;
+
+      let stanceProgress = 0;
+      let swingProgress = 0;
+      let footZOffset = 0;
+      let footLiftY = 0;
+
+      // Neutral fore/aft foot stance center relative to hipOrigin:
+      // Forelimb lands slightly ahead of shoulder drop; Hindlimb lands slightly behind hip drop
+      const neutralZ = leg.isFront ? 0.05 : -0.06;
+
+      if (!isMoving) {
+        // Rest standing stance with natural staggered posture
+        const restStagger = { LH: -0.08, LF: 0.06, RH: 0.06, RF: -0.05 }[key];
+        footZOffset = neutralZ + restStagger;
+        footLiftY = 0;
+        stanceProgress = 0.5;
+      } else if (isStance) {
+        // STANCE PHASE: Foot moves linearly backward at exact ground speed (zero world slip!)
+        stanceProgress = legPhase / beta; // 0 at touchdown (+strideLen/2), 1 at liftoff (-strideLen/2)
+        footZOffset = neutralZ + (0.5 - stanceProgress) * strideLen * 0.52;
+        footLiftY = 0;
+      } else {
+        // SWING PHASE: Smooth cycloidal protraction from -strideLen/2 to +strideLen/2 with ground clearance arc
+        swingProgress = (legPhase - beta) / (1.0 - beta); // 0 at liftoff, 1 at touchdown
+        // Cycloid horizontal progression for zero-jerk liftoff and touchdown
+        const cyc = swingProgress - Math.sin(swingProgress * Math.PI * 2) / (Math.PI * 2);
+        footZOffset = neutralZ + (cyc - 0.5) * strideLen * 0.52;
+
+        // Asymmetric vertical arc: brisk lift after toe-off, floating glide before heel touchdown
+        const liftEnvelope = Math.sin(Math.pow(swingProgress, 0.78) * Math.PI);
+        const maxClearance = (leg.isFront ? 0.25 : 0.21) * Math.min(1.2, 0.4 + 0.6 * effSpeed);
+        footLiftY = maxClearance * liftEnvelope;
+      }
+
+      // Detect exact touchdown transition to spawn savanna dust puff
+      if (isStance && !this.wasInStance[key] && isMoving) {
+        const hoofWorld = new THREE.Vector3();
+        leg.hoofPivot.getWorldPosition(hoofWorld);
+        hoofWorld.y = this.getTerrainHeight(hoofWorld.x, hoofWorld.z);
+        this.onHoofTouchdown(hoofWorld, key);
+      }
+      this.wasInStance[key] = isStance;
+
+      // Compute world ground height beneath this foot's target X, Z
+      const localFootX = leg.hipOrigin.x + lateralSway;
+      const localFootZ = leg.hipOrigin.z + footZOffset;
+      const cosH = Math.cos(this.heading);
+      const sinH = Math.sin(this.heading);
+      const footWorldX = this.worldPos.x + localFootX * cosH + localFootZ * sinH;
+      const footWorldZ = this.worldPos.z - localFootX * sinH + localFootZ * cosH;
+      const terrainUnderFoot = this.getTerrainHeight(footWorldX, footWorldZ) - groundY;
+
+      // Target Y of hoof sole in scapulaPivot local coordinates:
+      // Since scapulaPivot is at y = leg.hipOrigin.y + verticalBob + rollOffset,
+      // the ground below scapulaPivot is at -(leg.hipOrigin.y + verticalBob + rollContribution) + terrainUnderFoot
+      const rollYOffset = leg.hipOrigin.x * Math.sin(pelvicRoll);
+      const pitchYOffset = -leg.hipOrigin.z * Math.sin(pelvicPitch);
+      const targetLocalY = -(leg.hipOrigin.y + verticalBob + rollYOffset + pitchYOffset) + terrainUnderFoot + footLiftY;
+
+      this.solveLegIK(leg, targetLocalY, footZOffset, swingProgress, stanceProgress, isStance);
+
+      this.telemetry.hoofWorldY[key] = Number((terrainUnderFoot + footLiftY).toFixed(3));
+    }
+
+    // ========================================================================
+    // 3. CERVICAL PENDULUM COUNTER-BALANCE & BROWSE REACH
+    // ========================================================================
+    // Giraffes oscillate their neck twice per stride (2x harmonic) to shift their
+    // center of gravity forward before each ipsilateral pair of legs swings!
+    let browseFactor = 0.0;
+    if (this.isBrowsing) {
+      this.browseTimer += dt;
+      if (this.browseTimer >= this.browseDuration) {
+        this.isBrowsing = false;
+        this.browseTimer = 0;
+      } else {
+        // Smooth bell curve reach up toward high acacia foliage
+        const u = this.browseTimer / this.browseDuration;
+        browseFactor = Math.sin(u * Math.PI) * Math.sin(u * Math.PI);
+      }
+    }
+
+    const neckBobWave = Math.sin(p2pi * 2 - 1.15) * moveBlend;
+    const neckSwayWave = Math.sin(p2pi - 0.5) * moveBlend;
+    const breathWave = Math.sin(this.totalTime * 2.1);
+
+    // SpineChest (Bone 2) subtle breathing & shoulder roll
+    const spineChest = this.giraffe.spineBones[2];
+    spineChest.rotation.x = 0.015 * neckBobWave + 0.008 * breathWave;
+    spineChest.rotation.z = -pelvicRoll * 0.45;
+
+    // Cervical Bones 3..8 (Neck0..Neck5): progressive traveling wave from base to atlas
+    let cumulativeNeckPitch = 0;
+    let cumulativeNeckYaw = 0;
+    let cumulativeNeckRoll = 0;
+
+    for (let i = 3; i <= 8; i++) {
+      const neckIdx = i - 3; // 0..5
+      const bone = this.giraffe.spineBones[i];
+      // Phase lag up the cervical chain creates a supple whip-like biological pendulum
+      const lag = neckIdx * 0.14;
+      const pitchOsc = Math.sin(p2pi * 2 - 1.15 - lag) * 0.016 * moveBlend;
+      const swayOsc  = Math.sin(p2pi - 0.5 - lag) * 0.012 * moveBlend;
+      const turnCurve = -yawRate * 0.065;
+
+      // During Browse Reach, neck extends upward and slightly backward/forward to reach high canopy
+      const browsePitch = -browseFactor * 0.055;
+
+      bone.rotation.x = pitchOsc + browsePitch + 0.003 * Math.sin(this.totalTime * 1.4 + neckIdx);
+      bone.rotation.y = swayOsc + turnCurve;
+      bone.rotation.z = -swayOsc * 0.45;
+
+      cumulativeNeckPitch += bone.rotation.x;
+      cumulativeNeckYaw += bone.rotation.y;
+      cumulativeNeckRoll += bone.rotation.z;
+    }
+
+    // Head stabilization (Vestibulo-ocular reflex keeps head level during walking,
+    // or tilts head upward with extended prehensile tongue during Browse Reach!)
+    const headLookYaw = Math.sin(this.totalTime * 0.55) * 0.12 * (1 - browseFactor);
+    const headPitchComp = -cumulativeNeckPitch * 0.68 + Math.sin(p2pi * 2 - 1.9) * 0.028 * moveBlend;
+    const browseHeadLift = -browseFactor * 0.48; // Tilt muzzle high toward canopy!
+
+    this.giraffe.headPivot.rotation.set(
+      headPitchComp + browseHeadLift,
+      headLookYaw - cumulativeNeckYaw * 0.35,
+      -cumulativeNeckRoll * 0.65
+    );
+
+    // Jaw & Prehensile Dark-Purple Tongue articulation during Browse Reach or subtle chewing
+    if (browseFactor > 0.15) {
+      const reachPeak = Math.max(0, (browseFactor - 0.15) / 0.85);
+      this.giraffe.jawPivot.rotation.x = 0.22 * reachPeak + 0.05 * Math.sin(this.totalTime * 9.0) * reachPeak;
+      this.giraffe.tonguePivot.scale.set(1, 1, 0.02 + 1.05 * reachPeak);
+      this.giraffe.tonguePivot.rotation.x = -0.18 * Math.sin(this.totalTime * 7.5) * reachPeak;
+      this.giraffe.tonguePivot.rotation.y = 0.22 * Math.cos(this.totalTime * 6.0) * reachPeak;
+    } else {
+      // Subtle occasional rumination/chewing
+      const chew = Math.max(0, Math.sin(this.totalTime * 0.8) - 0.65) * 2.8;
+      this.giraffe.jawPivot.rotation.x = 0.035 * Math.abs(Math.sin(this.totalTime * 5.5)) * chew;
+      this.giraffe.tonguePivot.scale.set(1, 1, 0.01);
+    }
+
+    // ========================================================================
+    // 4. SECONDARY LIFE ANIMATIONS: TAIL SWISH, EAR FLICKS, EYE BLINKS, NOSTRILS
+    // ========================================================================
+    // Articulated 5-segment tail pendulum with traveling wave
+    for (let t = 0; t < this.giraffe.tailSegments.length; t++) {
+      const seg = this.giraffe.tailSegments[t];
+      const phaseLag = t * 0.48;
+      // Gentle drape away from hocks + rhythmic fly-swishing wave
+      const baseDrape = t === 0 ? -0.14 - 0.06 * moveBlend : 0.04;
+      const pitchWave = Math.sin(p2pi * 2 - phaseLag) * 0.045 * moveBlend;
+      const swishBurst = Math.pow(Math.max(0, Math.sin(this.totalTime * 0.72)), 4);
+      const latSwish = Math.sin(this.totalTime * 3.2 - phaseLag) * (0.07 + 0.18 * swishBurst)
+        + Math.cos(p2pi - phaseLag) * 0.06 * moveBlend;
+
+      seg.rotation.x = baseDrape + pitchWave;
+      seg.rotation.z = latSwish;
+    }
+
+    // Independent Ear Rotations & Alert Flicks
+    for (const ear of this.giraffe.ears) {
+      const s = ear.side;
+      const flick = Math.pow(Math.max(0, Math.sin(this.totalTime * 1.9 + s * 1.7)), 14) * 0.38;
+      ear.pivot.rotation.y = s * (-0.35 + 0.14 * Math.sin(this.totalTime * 0.9 + s) + flick);
+      ear.pivot.rotation.z = s * (-0.82 + 0.06 * Math.cos(p2pi * 2));
+    }
+
+    // Natural Periodic Eye Blinks (every ~4.3 seconds)
+    const blinkCycle = (this.totalTime % 4.3);
+    const blinkAmt = blinkCycle < 0.18 ? Math.sin((blinkCycle / 0.18) * Math.PI) : 0.0;
+    for (const lid of this.giraffe.eyelids) {
+      lid.rotation.x = -0.58 + blinkAmt * 0.95;
+    }
+
+    // Nostril Breathing Dilation
+    const nostrilScale = 0.55 + 0.08 * breathWave;
+    for (const nos of this.giraffe.nostrils) {
+      nos.scale.x = nostrilScale;
+    }
+
+    // Update HUD telemetry values
+    this.telemetry.speedKmh = (linearSpeed * 3.6).toFixed(1);
+    this.telemetry.stridePhase = this.stridePhase.toFixed(2);
+    const neckPitchDeg = 54.0 + (cumulativeNeckPitch + browseHeadLift) * (180 / Math.PI) * 0.55;
+    this.telemetry.neckPitchDeg = neckPitchDeg.toFixed(1);
+  }
+}
+
+
+// ============================================================================
+// 05-SAVANNA-WORLD.JS — Serengeti / Amboseli Ecosystem, Acacias, Grass & Dust
+// ============================================================================
+
+function createSavannaEnvironment(THREE, envTextures) {
+  const worldGroup = new THREE.Group();
+  worldGroup.name = 'SavannaWorld';
+
+  // Deterministic terrain height function
+  // Smooth & nearly flat along the central walking corridor (r < 25m), rolling hills beyond
+  function getTerrainHeight(x, z) {
+    const r = Math.hypot(x, z);
+    const corridorFlat = Math.min(1.0, Math.max(0.0, (r - 12.0) / 30.0));
+    const gentleRoll = (Math.sin(x * 0.045) * Math.cos(z * 0.045) * 0.35 +
+                        Math.sin(x * 0.11 + z * 0.08) * 0.12) * (0.18 + 0.82 * corridorFlat);
+    const outerHills = Math.max(0, (r - 55.0) * 0.045) *
+                       (0.6 + 0.4 * Math.sin(Math.atan2(z, x) * 5.0 + r * 0.04));
+    return gentleRoll + outerHills;
+  }
+
+  // 1. Savanna Terrain Mesh with Vertex-Colored Game Trail & Grass Blending
+  const groundTex = new THREE.CanvasTexture(envTextures.groundCanvas);
+  groundTex.wrapS = THREE.RepeatWrapping;
+  groundTex.wrapT = THREE.RepeatWrapping;
+  groundTex.repeat.set(36, 36);
+  groundTex.colorSpace = THREE.SRGBColorSpace;
+  groundTex.anisotropy = 8;
+
+  const terrainSize = 260;
+  const terrainSegs = 140;
+  const terrainGeo = new THREE.PlaneGeometry(terrainSize, terrainSize, terrainSegs, terrainSegs);
+  terrainGeo.rotateX(-Math.PI * 0.5);
+
+  const tPos = terrainGeo.attributes.position;
+  const tColors = new Float32Array(tPos.count * 3);
+
+  for (let i = 0; i < tPos.count; i++) {
+    const x = tPos.getX(i);
+    const z = tPos.getZ(i);
+    const y = getTerrainHeight(x, z);
+    tPos.setY(i, y);
+
+    // Sandy ochre wildlife trail meandering along x ~ sin(z * 0.06) * 4.5
+    const trailCenterX = Math.sin(z * 0.055) * 3.8;
+    const distToTrail = Math.abs(x - trailCenterX);
+    const trailFactor = Math.exp(-Math.pow(distToTrail / 2.6, 2));
+
+    // Blend between warm red-ochre dusty trail and golden-olive savanna turf
+    const r = 0.82 * (1 - trailFactor) + 0.96 * trailFactor;
+    const g = 0.78 * (1 - trailFactor) + 0.80 * trailFactor;
+    const b = 0.66 * (1 - trailFactor) + 0.62 * trailFactor;
+    tColors[i * 3] = r;
+    tColors[i * 3 + 1] = g;
+    tColors[i * 3 + 2] = b;
+  }
+  terrainGeo.setAttribute('color', new THREE.BufferAttribute(tColors, 3));
+  terrainGeo.computeVertexNormals();
+
+  const terrainMat = new THREE.MeshStandardMaterial({
+    map: groundTex,
+    vertexColors: true,
+    roughness: 0.92,
+    metalness: 0.02
+  });
+
+  const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+  terrainMesh.receiveShadow = true;
+  worldGroup.add(terrainMesh);
+
+  // 2. Umbrella Thorn Acacia Trees (Vachellia tortilis)
+  const barkMat = new THREE.MeshStandardMaterial({
+    color: 0x3d2b1f,
+    roughness: 0.90,
+    metalness: 0.02
+  });
+  const canopyMat = new THREE.MeshStandardMaterial({
+    color: 0x556b2f,
+    roughness: 0.82,
+    metalness: 0.02
+  });
+  const canopyGoldMat = new THREE.MeshStandardMaterial({
+    color: 0x6e7b32,
+    roughness: 0.80,
+    metalness: 0.02
+  });
+
+  function createAcaciaTree(height = 6.2, seed = 1) {
+    const tree = new THREE.Group();
+    const rand = createSeededRandom(seed);
+
+    // Lower trunk
+    const trunkH = height * 0.42;
+    const trunkGeo = new THREE.CylinderGeometry(0.16, 0.28, trunkH, 9);
+    trunkGeo.translate(0, trunkH * 0.5, 0);
+    const trunk = new THREE.Mesh(trunkGeo, barkMat);
+    trunk.rotation.z = (rand() - 0.5) * 0.14;
+    trunk.rotation.x = (rand() - 0.5) * 0.14;
+    trunk.castShadow = true;
+    trunk.receiveShadow = true;
+    tree.add(trunk);
+
+    const topOfTrunk = new THREE.Vector3(
+      -Math.sin(trunk.rotation.z) * trunkH,
+      trunkH * 0.96,
+      Math.sin(trunk.rotation.x) * trunkH
+    );
+
+    // 4-6 diverging primary limbs reaching up to the flat umbrella crown
+    const numBranches = 5 + Math.floor(rand() * 2);
+    for (let b = 0; b < numBranches; b++) {
+      const ang = (b / numBranches) * Math.PI * 2 + (rand() - 0.5) * 0.4;
+      const spread = 0.58 + rand() * 0.25;
+      const branchLen = height * (0.58 + rand() * 0.14);
+
+      const bPivot = new THREE.Group();
+      bPivot.position.copy(topOfTrunk);
+      bPivot.rotation.y = ang;
+      bPivot.rotation.z = spread;
+
+      const bGeo = new THREE.CylinderGeometry(0.055, 0.13, branchLen, 7);
+      bGeo.translate(0, branchLen * 0.5, 0);
+      const bMesh = new THREE.Mesh(bGeo, barkMat);
+      bMesh.castShadow = true;
+      bPivot.add(bMesh);
+      tree.add(bPivot);
+
+      // Compute branch tip in tree space for flat-topped foliage pads
+      const tipRadius = Math.sin(spread) * branchLen;
+      const tipY = topOfTrunk.y + Math.cos(spread) * branchLen;
+      const tipX = topOfTrunk.x - Math.cos(ang) * tipRadius;
+      const tipZ = topOfTrunk.z + Math.sin(ang) * tipRadius;
+
+      // Layered flat umbrella foliage pads
+      for (let p = 0; p < 3; p++) {
+        const padR = (1.35 + rand() * 0.85) * (1 - p * 0.18);
+        const padGeo = new THREE.DodecahedronGeometry(padR, 1);
+        padGeo.scale(1.35, 0.22, 1.35);
+        const pad = new THREE.Mesh(padGeo, p % 2 === 0 ? canopyMat : canopyGoldMat);
+        pad.position.set(
+          tipX + (rand() - 0.5) * 0.9,
+          tipY + p * 0.22 + (rand() - 0.5) * 0.1,
+          tipZ + (rand() - 0.5) * 0.9
+        );
+        pad.castShadow = true;
+        pad.receiveShadow = true;
+        tree.add(pad);
+      }
+    }
+
+    // Central upper crown umbrella pad
+    const crownGeo = new THREE.DodecahedronGeometry(height * 0.42, 1);
+    crownGeo.scale(1.45, 0.18, 1.45);
+    const crown = new THREE.Mesh(crownGeo, canopyGoldMat);
+    crown.position.set(topOfTrunk.x, height * 0.94, topOfTrunk.z);
+    crown.castShadow = true;
+    crown.receiveShadow = true;
+    tree.add(crown);
+
+    return tree;
+  }
+
+  // Place scenic Acacia trees around the walking trail (including one near the trail for browsing context)
+  const treePlacements = [
+    { x: -6.5,  z:  8.5,  h: 6.4, s: 11 },
+    { x:  9.2,  z:  16.0, h: 6.8, s: 22 },
+    { x: -14.0, z: -12.0, h: 5.9, s: 33 },
+    { x:  16.5, z: -8.5,  h: 7.1, s: 44 },
+    { x: -24.0, z:  26.0, h: 6.6, s: 55 },
+    { x:  26.0, z:  32.0, h: 7.4, s: 66 },
+    { x: -32.0, z: -28.0, h: 6.2, s: 77 },
+    { x:  34.0, z: -26.0, h: 6.9, s: 88 },
+    { x:  4.5,  z: -24.0, h: 6.0, s: 99 },
+    { x: -18.5, z:  42.0, h: 7.2, s: 111 },
+    { x:  44.0, z:  8.0,  h: 6.5, s: 122 },
+    { x: -42.0, z:  6.0,  h: 6.7, s: 133 }
+  ];
+
+  for (const tp of treePlacements) {
+    const acacia = createAcaciaTree(tp.h, tp.s);
+    acacia.position.set(tp.x, getTerrainHeight(tp.x, tp.z) - 0.08, tp.z);
+    worldGroup.add(acacia);
+  }
+
+  // 3. Granite Kopje Boulders & Termite Mound Accents
+  const rockMat = new THREE.MeshStandardMaterial({
+    color: 0x7b7064,
+    roughness: 0.88,
+    metalness: 0.04
+  });
+
+  const rockClusters = [
+    { x:  11.5, z:  3.5, scale: [1.8, 1.1, 1.5], rot: 0.4 },
+    { x:  12.8, z:  4.4, scale: [1.1, 0.7, 0.9], rot: 1.2 },
+    { x: -11.0, z: -3.0, scale: [1.4, 0.8, 1.2], rot: 2.1 },
+    { x: -21.0, z:  14.0, scale: [2.6, 1.6, 2.1], rot: 0.8 },
+    { x:  22.0, z: -18.0, scale: [2.2, 1.3, 1.9], rot: 1.7 }
+  ];
+
+  for (const rc of rockClusters) {
+    const rGeo = new THREE.DodecahedronGeometry(1.0, 1);
+    const rMesh = new THREE.Mesh(rGeo, rockMat);
+    rMesh.scale.set(...rc.scale);
+    rMesh.rotation.y = rc.rot;
+    rMesh.position.set(rc.x, getTerrainHeight(rc.x, rc.z) + rc.scale[1] * 0.32, rc.z);
+    rMesh.castShadow = true;
+    rMesh.receiveShadow = true;
+    worldGroup.add(rMesh);
+  }
+
+  // 4. Instanced Golden Savanna Grass Tuft Field (leaves trail clear so hooves are crisp!)
+  const grassCount = 2600;
+  // Build a 6-blade arching savanna grass clump geometry so each instance is a lush natural tuft
+  const clumpPos = [];
+  const clumpNorm = [];
+  const clumpIdx = [];
+  const bladesPerClump = 6;
+  for (let b = 0; b < bladesPerClump; b++) {
+    const bAngle = (b / bladesPerClump) * Math.PI * 2 + (b % 2) * 0.25;
+    const cosB = Math.cos(bAngle);
+    const sinB = Math.sin(bAngle);
+    const bHeight = 0.34 + (b % 3) * 0.09;
+    const bArch = 0.08 + (b % 2) * 0.06;
+    const bWidth = 0.022;
+    const baseR = 0.035;
+    const vOff = clumpPos.length / 3;
+
+    // 4-segment curved ribbon blade tapering to a point
+    const segs = 4;
+    for (let s = 0; s <= segs; s++) {
+      const t = s / segs;
+      const w = bWidth * (1.0 - t * 0.92);
+      const rOut = baseR + Math.pow(t, 1.45) * bArch;
+      const y = t * bHeight * (1.0 - 0.12 * t * t);
+      const cx = cosB * rOut;
+      const cz = sinB * rOut;
+      const tx = -sinB * w;
+      const tz = cosB * w;
+
+      clumpPos.push(cx - tx, y, cz - tz);
+      clumpPos.push(cx + tx, y, cz + tz);
+      clumpNorm.push(cosB * 0.4, 0.9, sinB * 0.4);
+      clumpNorm.push(cosB * 0.4, 0.9, sinB * 0.4);
+    }
+    for (let s = 0; s < segs; s++) {
+      const i0 = vOff + s * 2;
+      clumpIdx.push(i0, i0 + 1, i0 + 2);
+      clumpIdx.push(i0 + 1, i0 + 3, i0 + 2);
+    }
+  }
+  const bladeGeo = new THREE.BufferGeometry();
+  bladeGeo.setAttribute('position', new THREE.Float32BufferAttribute(clumpPos, 3));
+  bladeGeo.setAttribute('normal', new THREE.Float32BufferAttribute(clumpNorm, 3));
+  bladeGeo.setIndex(clumpIdx);
+  bladeGeo.computeVertexNormals();
+
+  const grassMat = new THREE.MeshStandardMaterial({
+    color: 0xd4b266,
+    roughness: 0.86,
+    metalness: 0.02,
+    side: THREE.DoubleSide
+  });
+
+  const grassInstanced = new THREE.InstancedMesh(bladeGeo, grassMat, grassCount);
+  grassInstanced.castShadow = false;
+  grassInstanced.receiveShadow = true;
+
+  const gRand = createSeededRandom(777);
+  const dummy = new THREE.Object3D();
+  const cTmp = new THREE.Color();
+  const grassBaseData = [];
+
+  let placed = 0;
+  while (placed < grassCount) {
+    const r = Math.pow(gRand(), 0.62) * 52.0;
+    const ang = gRand() * Math.PI * 2;
+    const gx = Math.cos(ang) * r;
+    const gz = Math.sin(ang) * r;
+
+    // Keep the central wildlife trail mostly open so giraffe hooves & shadows read cleanly
+    const trailCenterX = Math.sin(gz * 0.055) * 3.8;
+    if (Math.abs(gx - trailCenterX) < 1.85 && gRand() < 0.88) continue;
+
+    const gy = getTerrainHeight(gx, gz);
+    const sy = 0.55 + gRand() * 0.95;
+    const sx = 0.75 + gRand() * 0.6;
+    const rotY = gRand() * Math.PI * 2;
+    const tiltX = (gRand() - 0.5) * 0.28;
+
+    dummy.position.set(gx, gy - 0.02, gz);
+    dummy.rotation.set(tiltX, rotY, 0);
+    dummy.scale.set(sx, sy, sx);
+    dummy.updateMatrix();
+    grassInstanced.setMatrixAt(placed, dummy.matrix);
+
+    // Subtle color variation from dry straw-gold to warm olive-ochre
+    cTmp.setHSL(0.10 + (gRand() - 0.5) * 0.04, 0.52 + gRand() * 0.18, 0.48 + gRand() * 0.16);
+    grassInstanced.setColorAt(placed, cTmp);
+
+    grassBaseData.push({ gx, gy: gy - 0.02, gz, sx, sy, rotY, tiltX, phase: gRand() * Math.PI * 2 });
+    placed++;
+  }
+  grassInstanced.instanceMatrix.needsUpdate = true;
+  if (grassInstanced.instanceColor) grassInstanced.instanceColor.needsUpdate = true;
+  worldGroup.add(grassInstanced);
+
+  // 5. Distant Horizon Silhouette Mountains (Kilimanjaro / Crater Highlands)
+  const mountainMat = new THREE.MeshStandardMaterial({
+    color: 0x5c4f5e,
+    roughness: 0.95,
+    metalness: 0.0
+  });
+  const kiliGeo = new THREE.CylinderGeometry(18, 52, 24, 24, 4);
+  const kiliMesh = new THREE.Mesh(kiliGeo, mountainMat);
+  kiliMesh.position.set(-65, 10, -110);
+  kiliMesh.scale.set(1.4, 1.0, 0.7);
+  worldGroup.add(kiliMesh);
+
+  // 6. Hoof-Kick Dust Puff Particle Pool
+  const dustTex = new THREE.CanvasTexture(envTextures.dustCanvas);
+  const maxDust = 48;
+  const dustSprites = [];
+  const dustGroup = new THREE.Group();
+  worldGroup.add(dustGroup);
+
+  for (let i = 0; i < maxDust; i++) {
+    const sMat = new THREE.SpriteMaterial({
+      map: dustTex,
+      transparent: true,
+      opacity: 0.0,
+      depthWrite: false
+    });
+    const sprite = new THREE.Sprite(sMat);
+    sprite.visible = false;
+    dustGroup.add(sprite);
+    dustSprites.push({
+      sprite,
+      active: false,
+      age: 0,
+      maxAge: 1.0,
+      vel: new THREE.Vector3(),
+      startScale: 0.2
+    });
+  }
+
+  let dustCursor = 0;
+  function spawnHoofDust(worldPos) {
+    for (let k = 0; k < 4; k++) {
+      const p = dustSprites[dustCursor];
+      dustCursor = (dustCursor + 1) % maxDust;
+      p.active = true;
+      p.age = 0;
+      p.maxAge = 0.75 + Math.random() * 0.55;
+      p.startScale = 0.16 + Math.random() * 0.12;
+      p.sprite.visible = true;
+      p.sprite.position.set(
+        worldPos.x + (Math.random() - 0.5) * 0.16,
+        worldPos.y + 0.06,
+        worldPos.z + (Math.random() - 0.5) * 0.16
+      );
+      p.vel.set(
+        (Math.random() - 0.5) * 0.35 + 0.12,
+        0.22 + Math.random() * 0.25,
+        (Math.random() - 0.5) * 0.35 - 0.18
+      );
+    }
+  }
+
+  // 7. Ambient Soaring Savanna Birds
+  const birdGroup = new THREE.Group();
+  worldGroup.add(birdGroup);
+  const birds = [];
+  const birdMat = new THREE.MeshBasicMaterial({ color: 0x261a10, side: THREE.DoubleSide });
+  for (let b = 0; b < 7; b++) {
+    const bRoot = new THREE.Group();
+    const wingGeo = new THREE.PlaneGeometry(0.28, 0.09);
+    wingGeo.translate(0.14, 0, 0);
+    const leftWing = new THREE.Mesh(wingGeo, birdMat);
+    leftWing.rotation.x = Math.PI * 0.5;
+    const rightWing = new THREE.Mesh(wingGeo, birdMat);
+    rightWing.rotation.x = Math.PI * 0.5;
+    rightWing.scale.x = -1;
+    bRoot.add(leftWing, rightWing);
+    birdGroup.add(bRoot);
+    birds.push({
+      root: bRoot,
+      leftWing,
+      rightWing,
+      radius: 18 + b * 4.5,
+      height: 8.5 + (b % 3) * 1.8,
+      speed: 0.18 + (b % 4) * 0.03,
+      angle: b * 0.9,
+      flapPhase: b * 1.3
+    });
+  }
+
+  let windTimer = 0;
+  function updateEnvironment(dt) {
+    windTimer += dt;
+
+    // Update active dust sprites
+    for (const p of dustSprites) {
+      if (!p.active) continue;
+      p.age += dt;
+      if (p.age >= p.maxAge) {
+        p.active = false;
+        p.sprite.visible = false;
+        continue;
+      }
+      const u = p.age / p.maxAge;
+      p.sprite.position.addScaledVector(p.vel, dt);
+      const s = p.startScale * (1.0 + u * 2.6);
+      p.sprite.scale.set(s, s, 1);
+      p.sprite.material.opacity = Math.sin(u * Math.PI) * 0.42;
+    }
+
+    // Animate soaring birds
+    for (const b of birds) {
+      b.angle += b.speed * dt;
+      b.root.position.set(
+        Math.cos(b.angle) * b.radius,
+        b.height + Math.sin(windTimer * 1.2 + b.flapPhase) * 0.4,
+        Math.sin(b.angle) * b.radius - 10
+      );
+      b.root.rotation.y = -b.angle;
+      const flap = Math.sin(windTimer * 7.5 + b.flapPhase) * 0.45;
+      b.leftWing.rotation.z = flap;
+      b.rightWing.rotation.z = -flap;
+    }
+  }
+
+  return {
+    worldGroup,
+    getTerrainHeight,
+    spawnHoofDust,
+    updateEnvironment
+  };
+}
+
+
+// ============================================================================
+// 06-MAIN-APP.JS — Scene Setup, Lighting, Camera Presets & Interactive Loop
+// ============================================================================
+
+const container = document.getElementById('canvas-container');
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xdca974);
+scene.fog = new THREE.FogExp2(0xd9a875, 0.0085);
+
+// Procedural Sky Dome Shader
+const skyGeo = new THREE.SphereGeometry(220, 32, 20);
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  depthWrite: false,
+  uniforms: {
+    uSunDir: { value: new THREE.Vector3(0.7, 0.3, -0.6).normalize() },
+    uZenithColor: { value: new THREE.Color(0x3a6491) },
+    uHorizonColor: { value: new THREE.Color(0xe8b478) },
+    uSunColor: { value: new THREE.Color(0xffe6b0) }
+  },
+  vertexShader: `
+    varying vec3 vWorldPos;
+    void main() {
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vWorldPos = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader: `
+    varying vec3 vWorldPos;
+    uniform vec3 uSunDir;
+    uniform vec3 uZenithColor;
+    uniform vec3 uHorizonColor;
+    uniform vec3 uSunColor;
+    void main() {
+      vec3 dir = normalize(vWorldPos);
+      float h = clamp(dir.y, 0.0, 1.0);
+      vec3 col = mix(uHorizonColor, uZenithColor, pow(h, 0.55));
+      float sunDot = max(dot(dir, uSunDir), 0.0);
+      col += uSunColor * pow(sunDot, 18.0) * 0.42;
+      col += uSunColor * smoothstep(0.9982, 0.9996, sunDot) * 1.4;
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+});
+const skyDome = new THREE.Mesh(skyGeo, skyMat);
+scene.add(skyDome);
+
+// Camera & OrbitControls
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 350);
+camera.position.set(6.8, 3.0, 6.2);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.minDistance = 0.9;
+controls.maxDistance = 35.0;
+controls.target.set(0, 2.55, 0.45);
+
+// Lighting Rig: Warm Golden-Hour Key Sun + Savanna Ground Bounce + Rim Light
+const hemiLight = new THREE.HemisphereLight(0xffebd2, 0xa87c4f, 1.15);
+scene.add(hemiLight);
+
+const sunLight = new THREE.DirectionalLight(0xffe4b8, 2.75);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 1.0;
+sunLight.shadow.camera.far = 45.0;
+const d = 7.5;
+sunLight.shadow.camera.left = -d;
+sunLight.shadow.camera.right = d;
+sunLight.shadow.camera.top = d;
+sunLight.shadow.camera.bottom = -d;
+sunLight.shadow.bias = -0.0004;
+sunLight.shadow.normalBias = 0.015;
+scene.add(sunLight);
+scene.add(sunLight.target);
+
+// Subtle Rim / Backlight to highlight fur silhouette, mane & eyelashes
+const rimLight = new THREE.DirectionalLight(0xffd6a8, 1.05);
+scene.add(rimLight);
+scene.add(rimLight.target);
+
+// Generate Procedural Textures, Savanna World, Giraffe & Biomechanical Animator
+const coatTexturesCache = {
+  reticulated: generateGiraffeCoatTextures('reticulated'),
+  masai: null
+};
+const eyeCanvas = generateEyeTexture();
+const envTextures = generateEnvironmentTextures();
+
+const savanna = createSavannaEnvironment(THREE, envTextures);
+scene.add(savanna.worldGroup);
+
+const giraffe = createGiraffeModel(THREE, {
+  coat: coatTexturesCache.reticulated,
+  eyeCanvas
+});
+scene.add(giraffe.root);
+
+const animator = new GiraffeBiomechanicalAnimator(
+  THREE,
+  giraffe,
+  savanna.getTerrainHeight,
+  (hoofPos) => savanna.spawnHoofDust(hoofPos)
+);
+
+// Sun elevation helper
+let sunElevationDeg = 26;
+const sunAzimuthRad = 0.62;
+function updateSunLighting(elevDeg) {
+  sunElevationDeg = elevDeg;
+  const elevRad = THREE.MathUtils.degToRad(elevDeg);
+  const sunDir = new THREE.Vector3(
+    Math.cos(elevRad) * Math.cos(sunAzimuthRad),
+    Math.sin(elevRad),
+    Math.cos(elevRad) * Math.sin(sunAzimuthRad)
+  ).normalize();
+
+  skyMat.uniforms.uSunDir.value.copy(sunDir);
+
+  const warmT = THREE.MathUtils.clamp((elevDeg - 4) / 45, 0, 1);
+  const horizonCol = new THREE.Color().lerpColors(
+    new THREE.Color(0xd9864e),
+    new THREE.Color(0xdde6ee),
+    warmT
+  );
+  const zenithCol = new THREE.Color().lerpColors(
+    new THREE.Color(0x2c4a73),
+    new THREE.Color(0x3b76b4),
+    warmT
+  );
+  const sunCol = new THREE.Color().lerpColors(
+    new THREE.Color(0xffb56b),
+    new THREE.Color(0xfff5e0),
+    warmT
+  );
+
+  skyMat.uniforms.uHorizonColor.value.copy(horizonCol);
+  skyMat.uniforms.uZenithColor.value.copy(zenithCol);
+  skyMat.uniforms.uSunColor.value.copy(sunCol);
+  scene.background.copy(horizonCol);
+  scene.fog.color.copy(horizonCol);
+
+  sunLight.color.copy(sunCol);
+  sunLight.intensity = 2.4 + warmT * 0.8;
+  hemiLight.intensity = 0.95 + warmT * 0.35;
+}
+updateSunLighting(sunElevationDeg);
+
+// Camera Tracking Modes
+let activeCamMode = 'cinematic';
+let userInteractingWithOrbit = false;
+controls.addEventListener('start', () => {
+  userInteractingWithOrbit = true;
+});
+controls.addEventListener('end', () => {
+  userInteractingWithOrbit = false;
+});
+
+const camModePresets = {
+  cinematic: { offset: new THREE.Vector3(6.6, 2.85, 5.8), lookOffset: new THREE.Vector3(0, 2.55, 0.55) },
+  side:      { offset: new THREE.Vector3(8.6, 2.60, 0.35), lookOffset: new THREE.Vector3(0, 2.55, 0.35) },
+  lowfront:  { offset: new THREE.Vector3(3.4, 1.15, 7.2), lookOffset: new THREE.Vector3(0, 2.65, 0.65) },
+  head:      { offset: new THREE.Vector3(1.45, 4.95, 2.55), lookOffset: new THREE.Vector3(0, 4.78, 1.85) },
+  hooves:    { offset: new THREE.Vector3(3.10, 0.85, 1.45), lookOffset: new THREE.Vector3(0, 0.78, 0.05) }
+};
+
+function setCameraMode(mode, instant = false) {
+  activeCamMode = mode;
+  document.querySelectorAll('#cam-buttons .ui-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.cam === mode);
+  });
+  if (mode !== 'free' && camModePresets[mode] && instant) {
+    const preset = camModePresets[mode];
+    const rootQuat = giraffe.root.quaternion;
+    const desiredPos = giraffe.root.position.clone().add(preset.offset.clone().applyQuaternion(rootQuat));
+    const desiredTarget = giraffe.root.position.clone().add(preset.lookOffset.clone().applyQuaternion(rootQuat));
+    camera.position.copy(desiredPos);
+    controls.target.copy(desiredTarget);
+    controls.update();
+  }
+}
+
+// Wire up HUD controls
+document.querySelectorAll('#cam-buttons .ui-btn').forEach(btn => {
+  btn.addEventListener('click', () => setCameraMode(btn.dataset.cam, true));
+});
+
+const sliderSpeed = document.getElementById('slider-speed');
+sliderSpeed.addEventListener('input', (e) => {
+  animator.speedMultiplier = parseFloat(e.target.value);
+});
+
+const sliderSun = document.getElementById('slider-sun');
+sliderSun.addEventListener('input', (e) => {
+  updateSunLighting(parseFloat(e.target.value));
+});
+
+const sliderTurn = document.getElementById('slider-turn');
+sliderTurn.addEventListener('input', (e) => {
+  animator.turnBias = parseFloat(e.target.value);
+});
+
+let isPaused = false;
+const btnPause = document.getElementById('btn-Pause');
+btnPause.addEventListener('click', () => {
+  isPaused = !isPaused;
+  btnPause.textContent = isPaused ? 'Resume' : 'Pause';
+  btnPause.classList.toggle('active', isPaused);
+});
+
+const btnBrowse = document.getElementById('btn-browse');
+btnBrowse.addEventListener('click', () => {
+  animator.triggerBrowseReach();
+});
+
+const btnCoat = document.getElementById('btn-coat');
+btnCoat.addEventListener('click', () => {
+  const nextCoat = btnCoat.dataset.coat === 'reticulated' ? 'masai' : 'reticulated';
+  btnCoat.dataset.coat = nextCoat;
+  btnCoat.textContent = nextCoat === 'reticulated' ? 'Reticulated Coat' : 'Masai Coat';
+  if (!coatTexturesCache[nextCoat]) {
+    coatTexturesCache[nextCoat] = generateGiraffeCoatTextures(nextCoat);
+  }
+  giraffe.updateCoatTexture(coatTexturesCache[nextCoat]);
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    btnPause.click();
+  } else if (e.key >= '1' && e.key <= '6') {
+    const modes = ['cinematic', 'side', 'lowfront', 'head', 'hooves', 'free'];
+    setCameraMode(modes[parseInt(e.key, 10) - 1], true);
+  }
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// HUD DOM references
+const hudSpeed = document.getElementById('hud-speed');
+const hudPhase = document.getElementById('hud-phase');
+const hudNeck = document.getElementById('hud-neck');
+const hoofDots = {
+  LH: document.getElementById('dot-lh'),
+  LF: document.getElementById('dot-lf'),
+  RH: document.getElementById('dot-rh'),
+  RF: document.getElementById('dot-rf')
+};
+
+// Advance initial frame so giraffe starts in a poised mid-stride posture
+const prevPos = giraffe.root.position.clone();
+animator.update(0.28);
+setCameraMode('cinematic', true);
+
+// Hide loading overlay
+setTimeout(() => {
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) overlay.classList.add('hidden');
+}, 150);
+
+// Expose deterministic inspection API for verification
+window.__GIRAFFE_DEBUG__ = {
+  scene,
+  camera,
+  renderer,
+  giraffe,
+  animator,
+  setCameraMode,
+  updateSunLighting,
+  stepTime: (seconds) => {
+    isPaused = true;
+    const steps = Math.max(1, Math.ceil(seconds / 0.016));
+    const dt = seconds / steps;
+    for (let i = 0; i < steps; i++) {
+      animator.update(dt);
+      savanna.updateEnvironment(dt);
+    }
+    setCameraMode(activeCamMode, true);
+    renderer.render(scene, camera);
+    return animator.telemetry;
+  }
+};
+
+// Main Render & Biomechanical Simulation Loop
+let lastTime = performance.now();
+
+function animate(now) {
+  requestAnimationFrame(animate);
+
+  const rawDt = (now - lastTime) * 0.001;
+  lastTime = now;
+  const dt = Math.min(rawDt, 0.05);
+
+  prevPos.copy(giraffe.root.position);
+
+  if (!isPaused) {
+    animator.update(dt);
+    savanna.updateEnvironment(dt);
+  }
+
+  // Keep directional shadow frustum & sky dome centered on the walking giraffe
+  const gPos = giraffe.root.position;
+  skyDome.position.copy(gPos);
+
+  const sunDir = skyMat.uniforms.uSunDir.value;
+  sunLight.target.position.set(gPos.x, gPos.y + 2.2, gPos.z);
+  sunLight.position.copy(sunLight.target.position).addScaledVector(sunDir, 18.0);
+
+  rimLight.target.position.set(gPos.x, gPos.y + 2.5, gPos.z);
+  rimLight.position.set(gPos.x - sunDir.x * 12, gPos.y + 5.5, gPos.z - sunDir.z * 12);
+
+  // Camera tracking update
+  const deltaMove = new THREE.Vector3().subVectors(gPos, prevPos);
+  if (activeCamMode === 'free' || userInteractingWithOrbit) {
+    camera.position.add(deltaMove);
+    controls.target.add(deltaMove);
+  } else if (camModePresets[activeCamMode]) {
+    const preset = camModePresets[activeCamMode];
+    const rootQuat = giraffe.root.quaternion;
+    const desiredPos = gPos.clone().add(preset.offset.clone().applyQuaternion(rootQuat));
+    const desiredTarget = gPos.clone().add(preset.lookOffset.clone().applyQuaternion(rootQuat));
+    const lerpAmt = 1.0 - Math.exp(-dt * 4.5);
+    camera.position.lerp(desiredPos, lerpAmt);
+    controls.target.lerp(desiredTarget, lerpAmt);
+  }
+
+  controls.update();
+
+  // Update HUD readouts
+  hudSpeed.textContent = `${animator.telemetry.speedKmh} km/h`;
+  hudPhase.textContent = animator.telemetry.stridePhase;
+  hudNeck.textContent = `${animator.telemetry.neckPitchDeg}°`;
+  for (const k of ['LH', 'LF', 'RH', 'RF']) {
+    hoofDots[k].classList.toggle('stance', !!animator.stanceState[k]);
+  }
+
+  renderer.render(scene, camera);
+}
+
+requestAnimationFrame(animate);
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Giraffa camelopardalis — Realistic Walking Giraffe in Three.js</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a1510;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #f6efe4;
+    }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    /* Sleek HUD overlay */
+    #hud {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 10;
+      width: 310px;
+      background: rgba(24, 18, 13, 0.76);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(235, 198, 142, 0.25);
+      border-radius: 14px;
+      padding: 15px 16px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    #hud.minimized .hud-body {
+      display: none;
+    }
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    #hud.minimized .hud-header {
+      margin-bottom: 0;
+    }
+    .title-block h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: #f9dfb5;
+    }
+    .title-block p {
+      font-size: 11px;
+      font-style: italic;
+      color: #cbb28c;
+      margin-top: 1px;
+    }
+    .icon-btn {
+      background: rgba(255, 235, 200, 0.1);
+      border: 1px solid rgba(255, 235, 200, 0.2);
+      color: #f6efe4;
+      border-radius: 7px;
+      padding: 4px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .icon-btn:hover {
+      background: rgba(255, 235, 200, 0.2);
+    }
+
+    .control-group {
+      margin-top: 10px;
+      padding-top: 9px;
+      border-top: 1px solid rgba(255, 235, 200, 0.1);
+    }
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #d6bc94;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .btn-row {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+    .pill-btn {
+      flex: 1 1 auto;
+      background: rgba(255, 238, 210, 0.08);
+      border: 1px solid rgba(255, 238, 210, 0.18);
+      color: #efe3cf;
+      padding: 5px 8px;
+      border-radius: 7px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+    .pill-btn:hover {
+      background: rgba(255, 238, 210, 0.18);
+    }
+    .pill-btn.active {
+      background: #d88b35;
+      border-color: #f6b665;
+      color: #1a1108;
+      font-weight: 700;
+    }
+    input[type="range"] {
+      width: 100%;
+      accent-color: #df923b;
+      cursor: pointer;
+    }
+
+    /* Live Hildebrand Lateral Pacing Gait Phase Indicator */
+    .gait-meter {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 5px;
+      margin-top: 6px;
+    }
+    .hoof-badge {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      padding: 4px 4px;
+      text-align: center;
+      font-size: 10px;
+      color: #bcae98;
+      transition: background 0.1s, color 0.1s, border-color 0.1s;
+    }
+    .hoof-badge.stance {
+      background: rgba(216, 139, 53, 0.28);
+      border-color: rgba(245, 180, 96, 0.65);
+      color: #ffe7c2;
+      font-weight: 600;
+    }
+
+    #gait-diagram {
+      width: 100%;
+      height: 44px;
+      border-radius: 6px;
+      background: rgba(18, 13, 9, 0.55);
+      border: 1px solid rgba(255, 224, 178, 0.14);
+      margin-top: 2px;
+      display: block;
+    }
+
+    #hint-bar {
+      position: fixed;
+      bottom: 14px;
+      right: 18px;
+      z-index: 10;
+      background: rgba(24, 18, 13, 0.65);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(235, 198, 142, 0.2);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 11px;
+      color: #dcc7a6;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <div id="hud">
+    <div class="hud-header">
+      <div class="title-block">
+        <h1>Giraffa camelopardalis</h1>
+        <p>Lateral Pacing Gait &amp; Cervical Biomechanics</p>
+      </div>
+      <button class="icon-btn" id="toggle-hud-btn" title="Minimize/Expand Controls">Hide</button>
+    </div>
+
+    <div class="hud-body">
+      <div class="control-group">
+        <div class="control-label">
+          <span>Walking Speed</span>
+          <span id="speed-val">1.00× (0.83 m/s)</span>
+        </div>
+        <input type="range" id="speed-slider" min="0" max="1.45" step="0.05" value="1.0" />
+        <div class="gait-meter">
+          <div class="hoof-badge stance" id="badge-LH">LH Stance</div>
+          <div class="hoof-badge stance" id="badge-LF">LF Stance</div>
+          <div class="hoof-badge stance" id="badge-RH">RH Stance</div>
+          <div class="hoof-badge stance" id="badge-RF">RF Stance</div>
+        </div>
+        <canvas id="gait-diagram" width="256" height="44" title="Hildebrand Lateral Pacing Gait Phase Diagram (Duty Factor 0.62)"></canvas>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label"><span>Subspecies Coat Pattern</span></div>
+        <div class="btn-row" id="coat-btns">
+          <button class="pill-btn active" data-coat="reticulated">Reticulated</button>
+          <button class="pill-btn" data-coat="rothschild">Rothschild</button>
+          <button class="pill-btn" data-coat="masai">Masai</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label"><span>Camera Viewpoint</span></div>
+        <div class="btn-row" id="cam-btns">
+          <button class="pill-btn active" data-cam="cinematic">3/4 Tracking</button>
+          <button class="pill-btn" data-cam="profile">Side Profile</button>
+          <button class="pill-btn" data-cam="head">Head &amp; Ossicones</button>
+          <button class="pill-btn" data-cam="hooves">Low Hoof IK</button>
+          <button class="pill-btn" data-cam="front">Front</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label"><span>Savannah Lighting</span></div>
+        <div class="btn-row" id="light-btns">
+          <button class="pill-btn active" data-light="golden">Golden Hour</button>
+          <button class="pill-btn" data-light="midday">Serengeti Sun</button>
+          <button class="pill-btn" data-light="sunset">Amber Sunset</button>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <div class="control-label"><span>Behavior &amp; Inspection</span></div>
+        <div class="btn-row">
+          <button class="pill-btn" id="browse-btn">Browse Acacia</button>
+          <button class="pill-btn" id="skel-btn">Skeleton Rig</button>
+          <button class="pill-btn" id="turntable-btn">Auto-Orbit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="hint-bar">Drag to orbit &bull; Scroll to zoom &bull; Right-drag to pan</div>
+
+  <script src="three.min.js"></script>
+  <script src="giraffe-textures.js"></script>
+  <script src="giraffe-anatomy.js"></script>
+  <script src="giraffe-gait.js"></script>
+  <script src="savannah-scene.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      const container = document.getElementById('canvas-container');
+      const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.08;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      container.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0xeed2ab, 0.0065);
+
+      const camera = new THREE.PerspectiveCamera(38, window.innerWidth / window.innerHeight, 0.1, 400);
+
+      // Lighting Suite: Warm Golden Sun with high-resolution soft shadow map + Sky/Savannah Hemisphere + Velvet Rim Backlight
+      const hemiLight = new THREE.HemisphereLight(0xdbeeff, 0xb88c52, 1.05);
+      hemiLight.position.set(0, 25, 0);
+      scene.add(hemiLight);
+
+      const sunLight = new THREE.DirectionalLight(0xfff0d4, 2.85);
+      sunLight.position.set(14, 11, 14);
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.width = 4096;
+      sunLight.shadow.mapSize.height = 4096;
+      sunLight.shadow.camera.near = 1.0;
+      sunLight.shadow.camera.far = 48.0;
+      const d = 7.5;
+      sunLight.shadow.camera.left = -d;
+      sunLight.shadow.camera.right = d;
+      sunLight.shadow.camera.top = d;
+      sunLight.shadow.camera.bottom = -d + 1.0;
+      sunLight.shadow.bias = -0.00035;
+      sunLight.shadow.normalBias = 0.018;
+      sunLight.target.position.set(0, 2.2, 0.4);
+      scene.add(sunLight);
+      scene.add(sunLight.target);
+
+      const rimLight = new THREE.DirectionalLight(0xffd28a, 1.15);
+      rimLight.position.set(-14, 8, -12);
+      scene.add(rimLight);
+
+      const lights = { sun: sunLight, hemi: hemiLight, rim: rimLight };
+
+      // Build Savannah Environment
+      const savannah = new window.SavannahScene.SavannahEnvironment(scene);
+
+      // Build Giraffe Materials, Skinned Anatomy & Biomechanical Gait Controller
+      const giraffeMaterials = window.GiraffeTextures.createGiraffeMaterials('reticulated');
+      const giraffe = window.GiraffeAnatomy.createGiraffe(giraffeMaterials);
+      scene.add(giraffe.group);
+
+      const gaitController = new window.GiraffeGait.GiraffeGaitController(giraffe, {
+        speedMultiplier: 1.0,
+        onHoofStrike: function (limbKey, hoofBone) {
+          savannah.spawnHoofStrikeEffect(limbKey, hoofBone);
+        }
+      });
+
+      // Custom Smooth Spherical Orbit + Target Camera Controller
+      const camState = {
+        theta: 0.96,          // Azimuth angle (rad): ~55 deg front-left 3/4 view
+        phi: 1.44,            // Polar angle from +Y: slightly below eye-level looking slightly up at the towering giraffe
+        radius: 8.2,          // Distance in meters
+        target: new THREE.Vector3(0, 2.48, 0.42),
+        desiredTheta: 0.96,
+        desiredPhi: 1.44,
+        desiredRadius: 8.2,
+        desiredTarget: new THREE.Vector3(0, 2.48, 0.42),
+        autoOrbit: false,
+        followHead: false
+      };
+
+      const CAM_PRESETS = {
+        cinematic: { theta: 0.96, phi: 1.44, radius: 8.2, target: [0, 2.48, 0.42], followHead: false },
+        profile:   { theta: 1.5708, phi: 1.50, radius: 8.4, target: [0, 2.48, 0.38], followHead: false },
+        head:      { theta: 0.92, phi: 1.46, radius: 1.88, target: [0, 4.62, 1.82], followHead: true },
+        hooves:    { theta: 1.18, phi: 1.52, radius: 3.6, target: [0, 0.85, 0.05], followHead: false },
+        front:     { theta: 0.22, phi: 1.45, radius: 8.2, target: [0, 2.50, 0.42], followHead: false }
+      };
+
+      function setCameraPreset(name, instant) {
+        const p = CAM_PRESETS[name];
+        if (!p) return;
+        camState.desiredTheta = p.theta;
+        camState.desiredPhi = p.phi;
+        camState.desiredRadius = p.radius;
+        camState.desiredTarget.set(p.target[0], p.target[1], p.target[2]);
+        camState.followHead = !!p.followHead;
+        if (instant) {
+          camState.theta = camState.desiredTheta;
+          camState.phi = camState.desiredPhi;
+          camState.radius = camState.desiredRadius;
+          camState.target.copy(camState.desiredTarget);
+          updateCameraTransform(0);
+        }
+      }
+
+      // Pointer / Mouse / Touch interaction for Orbit, Zoom, and Pan
+      let isDragging = false;
+      let dragButton = 0;
+      let prevX = 0;
+      let prevY = 0;
+
+      renderer.domElement.addEventListener('pointerdown', (e) => {
+        isDragging = true;
+        dragButton = e.button;
+        prevX = e.clientX;
+        prevY = e.clientY;
+        renderer.domElement.setPointerCapture(e.pointerId);
+      });
+
+      window.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - prevX;
+        const dy = e.clientY - prevY;
+        prevX = e.clientX;
+        prevY = e.clientY;
+
+        if (dragButton === 0 && !e.shiftKey) {
+          camState.desiredTheta -= dx * 0.0065;
+          camState.desiredPhi = Math.max(0.25, Math.min(1.55, camState.desiredPhi - dy * 0.0055));
+        } else {
+          // Right-click or Shift-drag pans target
+          const panScale = camState.radius * 0.0012;
+          const forward = new THREE.Vector3();
+          camera.getWorldDirection(forward);
+          const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
+          const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+          camState.desiredTarget.addScaledVector(right, -dx * panScale);
+          camState.desiredTarget.addScaledVector(up, dy * panScale);
+          camState.desiredTarget.y = Math.max(0.25, Math.min(5.2, camState.desiredTarget.y));
+        }
+      });
+
+      window.addEventListener('pointerup', () => {
+        isDragging = false;
+      });
+
+      renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+
+      renderer.domElement.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        camState.desiredRadius = Math.max(1.1, Math.min(22.0, camState.desiredRadius * (1 + e.deltaY * 0.001)));
+      }, { passive: false });
+
+      function updateCameraTransform(dt) {
+        if (camState.autoOrbit && !isDragging) {
+          camState.desiredTheta += dt * 0.25;
+        }
+        if (camState.followHead) {
+          const headWorld = new THREE.Vector3();
+          giraffe.rig.boneMap['head'].getWorldPosition(headWorld);
+          camState.desiredTarget.set(headWorld.x - 0.08, headWorld.y - 0.06, headWorld.z + 0.14);
+        }
+
+        const damp = dt > 0 ? Math.min(1, dt * 8.5) : 1.0;
+        camState.theta += (camState.desiredTheta - camState.theta) * damp;
+        camState.phi += (camState.desiredPhi - camState.phi) * damp;
+        camState.radius += (camState.desiredRadius - camState.radius) * damp;
+        camState.target.lerp(camState.desiredTarget, damp);
+
+        const sinPhi = Math.sin(camState.phi);
+        const cosPhi = Math.cos(camState.phi);
+        const cx = camState.target.x + camState.radius * sinPhi * Math.sin(camState.theta);
+        const cy = Math.max(0.18, camState.target.y + camState.radius * cosPhi);
+        const cz = camState.target.z + camState.radius * sinPhi * Math.cos(camState.theta);
+
+        camera.position.set(cx, cy, cz);
+        camera.lookAt(camState.target);
+      }
+
+      updateCameraTransform(0);
+
+      // UI Controls Wiring
+      const hud = document.getElementById('hud');
+      const toggleHudBtn = document.getElementById('toggle-hud-btn');
+      toggleHudBtn.addEventListener('click', () => {
+        hud.classList.toggle('minimized');
+        toggleHudBtn.textContent = hud.classList.contains('minimized') ? 'Show' : 'Hide';
+      });
+
+      const speedSlider = document.getElementById('speed-slider');
+      const speedVal = document.getElementById('speed-val');
+      speedSlider.addEventListener('input', () => {
+        const v = parseFloat(speedSlider.value);
+        gaitController.speedMultiplier = v;
+        const mps = (v * 0.83).toFixed(2);
+        speedVal.textContent = `${v.toFixed(2)}× (${mps} m/s)`;
+      });
+
+      document.getElementById('coat-btns').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-coat]');
+        if (!btn) return;
+        document.querySelectorAll('#coat-btns .pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        giraffeMaterials.updateSubspecies(btn.dataset.coat);
+      });
+
+      document.getElementById('cam-btns').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-cam]');
+        if (!btn) return;
+        document.querySelectorAll('#cam-btns .pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        setCameraPreset(btn.dataset.cam, false);
+      });
+
+      document.getElementById('light-btns').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-light]');
+        if (!btn) return;
+        document.querySelectorAll('#light-btns .pill-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        savannah.setTimeOfDay(btn.dataset.light, lights);
+      });
+
+      const browseBtn = document.getElementById('browse-btn');
+      browseBtn.addEventListener('click', () => {
+        gaitController.triggerBrowse();
+      });
+
+      const skelBtn = document.getElementById('skel-btn');
+      skelBtn.addEventListener('click', () => {
+        giraffe.skeletonHelper.visible = !giraffe.skeletonHelper.visible;
+        skelBtn.classList.toggle('active', giraffe.skeletonHelper.visible);
+      });
+
+      const turntableBtn = document.getElementById('turntable-btn');
+      turntableBtn.addEventListener('click', () => {
+        camState.autoOrbit = !camState.autoOrbit;
+        turntableBtn.classList.toggle('active', camState.autoOrbit);
+      });
+
+      const badges = {
+        LH: document.getElementById('badge-LH'),
+        LF: document.getElementById('badge-LF'),
+        RH: document.getElementById('badge-RH'),
+        RF: document.getElementById('badge-RF')
+      };
+
+      const gaitCanvas = document.getElementById('gait-diagram');
+      const gaitCtx = gaitCanvas.getContext('2d');
+      const gaitRows = [
+        { key: 'LH', offset: 0.00 },
+        { key: 'LF', offset: 0.14 },
+        { key: 'RH', offset: 0.50 },
+        { key: 'RF', offset: 0.64 }
+      ];
+
+      function drawGaitDiagram(phase) {
+        const w = gaitCanvas.width;
+        const h = gaitCanvas.height;
+        gaitCtx.clearRect(0, 0, w, h);
+        const labelW = 24;
+        const barW = w - labelW - 6;
+        const duty = gaitController.dutyFactor;
+
+        gaitCtx.font = '600 9px -apple-system, BlinkMacSystemFont, sans-serif';
+        gaitCtx.textBaseline = 'middle';
+
+        for (let r = 0; r < 4; r++) {
+          const row = gaitRows[r];
+          const y = 6 + r * 9.5;
+          gaitCtx.fillStyle = '#cbb392';
+          gaitCtx.fillText(row.key, 5, y + 3.5);
+
+          // Track background
+          gaitCtx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+          gaitCtx.fillRect(labelW, y, barW, 6.5);
+
+          // Stance interval [offset .. (offset + duty) % 1]
+          gaitCtx.fillStyle = 'rgba(218, 152, 74, 0.68)';
+          const start = row.offset;
+          const end = start + duty;
+          if (end <= 1.0) {
+            gaitCtx.fillRect(labelW + start * barW, y, duty * barW, 6.5);
+          } else {
+            gaitCtx.fillRect(labelW + start * barW, y, (1.0 - start) * barW, 6.5);
+            gaitCtx.fillRect(labelW, y, (end - 1.0) * barW, 6.5);
+          }
+        }
+
+        // Current phase sweep cursor
+        const cx = labelW + (phase % 1.0) * barW;
+        gaitCtx.strokeStyle = '#fff3dc';
+        gaitCtx.lineWidth = 1.5;
+        gaitCtx.beginPath();
+        gaitCtx.moveTo(cx, 3);
+        gaitCtx.lineTo(cx, h - 3);
+        gaitCtx.stroke();
+      }
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // Expose global inspection API for deterministic testing & frame stepping
+      window.__GIRAFFE_APP__ = {
+        scene,
+        camera,
+        renderer,
+        giraffe,
+        gaitController,
+        savannah,
+        camState,
+        setCameraPreset,
+        stepSimulation(dt) {
+          const info = gaitController.update(dt);
+          savannah.update(dt, info.linearSpeed, gaitController.elapsedTime, giraffe, gaitController);
+          updateCameraTransform(dt);
+          drawGaitDiagram(info.phase);
+          renderer.render(scene, camera);
+          return info;
+        }
+      };
+
+      // Main Animation Loop
+      let lastTime = performance.now();
+      function animate(now) {
+        requestAnimationFrame(animate);
+        const dt = Math.min(0.05, Math.max(0.001, (now - lastTime) * 0.001));
+        lastTime = now;
+
+        const info = gaitController.update(dt);
+        savannah.update(dt, info.linearSpeed, gaitController.elapsedTime, giraffe, gaitController);
+        updateCameraTransform(dt);
+        drawGaitDiagram(info.phase);
+
+        // Update HUD stance/swing badges
+        for (const k of ['LH', 'LF', 'RH', 'RF']) {
+          const isSt = info.stance[k];
+          badges[k].classList.toggle('stance', isSt);
+          badges[k].textContent = `${k} ${isSt ? 'Stance' : 'Swing'}`;
+        }
+
+        renderer.render(scene, camera);
+      }
+
+      // Advance initial step so skeleton & matrices are freshly updated
+      window.__GIRAFFE_APP__.stepSimulation(0.016);
+      requestAnimationFrame(animate);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walking Giraffe — Three.js</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d0f12;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:#f2ead9;}
+  #app{position:fixed;inset:0;}
+  canvas{display:block;width:100%;height:100%;}
+  .hud{position:fixed;left:16px;top:14px;pointer-events:none;
+    text-shadow:0 1px 3px rgba(0,0,0,.7);user-select:none;}
+  .hud h1{margin:0;font-size:17px;font-weight:650;letter-spacing:.3px;}
+  .hud p{margin:5px 0 0;font-size:12.5px;opacity:.82;}
+  .hud kbd{background:rgba(255,255,255,.14);border-radius:4px;padding:1px 5px;font-size:11px;}
+  #stats{position:fixed;right:16px;bottom:12px;font-size:11.5px;opacity:.7;
+    text-shadow:0 1px 3px rgba(0,0,0,.7);pointer-events:none;text-align:right;}
+  #err{position:fixed;inset:auto 0 0 0;display:none;background:#7f1d1d;color:#fff;
+    padding:10px 14px;font:12px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap;z-index:99;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="hud">
+  <h1>Walking Giraffe</h1>
+  <p>procedural rig &amp; gait &middot; <kbd>drag</kbd> orbit &middot; <kbd>scroll</kbd> zoom &middot; <kbd>space</kbd> pause</p>
+</div>
+<div id="stats"></div>
+<div id="err"></div>
+<script>
+  window.addEventListener('error', function (e) {
+    var el = document.getElementById('err');
+    el.style.display = 'block';
+    el.textContent = 'ERROR: ' + (e.message || e.error) + '\n' + (e.filename || '') + ':' + (e.lineno || '') +
+      (e.error && e.error.stack ? '\n' + e.error.stack : '');
+  });
+</script>
+<script src="three.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/geom.js"></script>
+<script src="js/giraffe.js"></script>
+<script src="js/anim.js"></script>
+<script src="js/world.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

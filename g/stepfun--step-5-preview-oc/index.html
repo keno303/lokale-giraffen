@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Giraffe — a walking giraffe in Three.js</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<div id="veil">
+  <div class="spinner"></div>
+  <div class="veil-text">Growing a giraffe&hellip;</div>
+</div>
+
+<header id="title">
+  <h1>Giraffa camelopardalis</h1>
+  <p>Procedural mesh &middot; analytic leg IK &middot; a true pacing gait</p>
+</header>
+
+<div id="hud"></div>
+
+<aside id="panel">
+  <button id="togglePanel" title="Collapse panel (H)">&ndash;</button>
+
+  <label class="row">
+    <span>Walking speed</span>
+    <input id="speed" type="range" min="0" max="2.2" step="0.01" value="1.0">
+    <output id="speedVal">1.00 m/s</output>
+  </label>
+
+  <div class="buttons">
+    <button id="pause">Pause</button>
+    <button id="orbit" class="on">Auto-orbit: on</button>
+    <button id="reset">Reset</button>
+  </div>
+
+  <p class="hint">
+    <b>Drag</b> to orbit &middot; <b>Wheel</b> / <b>pinch</b> to zoom &middot;
+    <b>Shift-drag</b> to pan &middot; move the pointer and the giraffe watches you.<br>
+    Keys: <b>Space</b> pause &middot; <b>O</b> orbit &middot; <b>R</b> reset &middot; <b>H</b> hide panel
+  </p>
+</aside>
+
+<div id="status"></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/geometry.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/giraffe.js"></script>
+<script src="js/environment.js"></script>
+<script src="js/controls.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

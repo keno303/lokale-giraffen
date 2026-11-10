@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Walking Giraffe - Three.js</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <strong>Walking Giraffe Demo</strong><br>
+        <em>Realistic Three.js Animation</em><br><br>
+        <strong>Controls:</strong><br>
+        🖋️ Mouse: Click and drag to rotate<br>
+        🔍 Scroll: Zoom in/out<br>
+        ⌨️ WASD/Arrows: Move camera<br>
+        ⌨️ Q/E: Move camera up/down<br>
+        🦒 Watch the realistic pacing gait<br>
+        <br>
+        <small>Features:<br>
+        • Anatomically accurate giraffe model<br>
+        • Realistic pacing gait animation<br>
+        • Multiple giraffes walking<br>
+        • Dynamic environment with acacia trees<br>
+        • Flying birds and moving clouds<br>
+        • Detailed spot patterns</small>
+    </div>
+    <div id="stats" style="position: absolute; top: 10px; right: 10px; color: white; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px;">
+        FPS: <span id="fps">60</span>
+    </div>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="giraffe.js"></script>
+</body>
+</html>

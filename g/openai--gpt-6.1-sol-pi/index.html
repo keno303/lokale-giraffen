@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#e8dfce">
+<title>Giraffa — A study in motion</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="experience" aria-label="Interactive three-dimensional giraffe in the savanna">
+  <div id="scene"></div>
+  <div class="vignette"></div>
+  <header>
+    <a class="wordmark" href="./index.html" aria-label="Giraffa home"><span class="mark">g.</span> GIRAFFA<span class="wordmark-line"></span><span class="collection">FIELD STUDIES / 001</span></a>
+    <button class="about-button" id="aboutButton" aria-label="About this study">About the study <span>↗</span></button>
+  </header>
+  <section class="intro">
+    <div class="eyebrow"><span></span> THE SAVANNA COLLECTION</div>
+    <h1>Grace in<br>every step.</h1>
+    <p>A quiet encounter with the world’s<br>tallest land animal.</p>
+    <div class="species"><i>Giraffa camelopardalis</i><span>RETICULATED GIRAFFE</span></div>
+  </section>
+  <div class="coordinates"><span class="live-dot"></span> EAST AFRICA <span class="divider">/</span> 0° 36′ N &nbsp; 37° 32′ E</div>
+  <aside class="facts" aria-label="Giraffe facts">
+    <div><span class="fact-number">5.5<span>m</span></span><span class="fact-label">STANDING HEIGHT</span></div>
+    <span class="fact-rule"></span>
+    <div><span class="fact-number">1.6<span>m/s</span></span><span class="fact-label">WALKING SPEED</span></div>
+  </aside>
+  <nav class="view-controls" aria-label="Camera views">
+    <span>OBSERVE</span>
+    <button class="active" data-view="portrait">Portrait</button>
+    <button data-view="profile">Profile</button>
+    <button data-view="detail">Detail</button>
+  </nav>
+  <footer>
+    <div class="gesture"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 10V5a2 2 0 0 1 4 0v6-3a2 2 0 0 1 4 0v3-1a2 2 0 0 1 4 0v6c0 4-2 6-6 6h-2c-2 0-3-1-4-3l-4-6a2 2 0 0 1 3-2l3 3"/></svg><div>Drag to explore<span>SCROLL TO MOVE CLOSER</span></div></div>
+    <div class="playback">
+      <button id="playButton" class="play-button" aria-label="Pause walking"><svg id="pauseIcon" viewBox="0 0 20 20"><path d="M6 5v10M14 5v10"/></svg><svg id="playIcon" hidden viewBox="0 0 20 20"><path d="m7 4 9 6-9 6Z"/></svg></button>
+      <div class="motion-label">Walking<span id="motionState">NATURAL PACE</span></div>
+      <div class="speed"><label for="speedSlider">Pace</label><input id="speedSlider" type="range" min="0.3" max="1.6" step="0.05" value="1" aria-label="Walking pace"><output id="speedValue">1.0×</output></div>
+      <button id="soundButton" class="sound-button" aria-pressed="false" aria-label="Enable savanna ambience" title="Savanna ambience"><svg viewBox="0 0 24 24"><path d="m11 5-5 4H3v6h3l5 4Z"/><path class="sound-waves" d="M15 8c3 2 3 6 0 8m3-11c5 4 5 10 0 14"/><path class="sound-off" d="m16 9 5 6m0-6-5 6"/></svg></button>
+    </div>
+    <div class="scene-label"><span class="sun-symbol">☼</span><div>Golden hour<span>AN INTERACTIVE NATURE STUDY</span></div></div>
+  </footer>
+  <div id="loading"><span class="loading-mark">g.</span><span>Stepping into the savanna</span><div></div></div>
+  <div id="error" hidden><h2>A little more light is needed.</h2><p>This scene needs a browser with WebGL enabled. Try a current version of Chrome, Firefox, or Safari.</p></div>
+  <dialog id="aboutDialog">
+    <button id="closeAbout" aria-label="Close about">×</button>
+    <div class="eyebrow">FIELD STUDY / 001</div>
+    <h2>A study in motion.</h2>
+    <p>Long limbs. A measured rhythm. A remarkably gentle presence. This interactive portrait celebrates the reticulated giraffe and its East African home.</p>
+    <p>The giraffe is procedurally built in Three.js: an irregular, reticulated coat, articulated limbs with inverse kinematics, a four-beat lateral walking gait, and subtle secondary motion in its neck, ears, and tail.</p>
+    <dl><dt>Explore</dt><dd>Drag to orbit. Scroll or pinch to zoom. Choose a camera view to look closer.</dd><dt>Take your time</dt><dd>Pause the walk, change its pace, or turn on a softly generated savanna soundscape.</dd><dt>Made to travel</dt><dd>Everything is local. No downloads, server, or internet connection needed.</dd></dl>
+    <div class="dialog-note">A digital interpretation, not a scientific anatomical simulation.</div>
+  </dialog>
+</main>
+<script src="lib/three.min.js"></script>
+<script src="scene.js"></script>
+</body>
+</html>

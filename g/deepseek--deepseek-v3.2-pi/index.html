@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Giraffa · procedural walking giraffe</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>
+  :root { --fg:#f2ece0; --dim:#b8ae9c; --acc:#e0a24a; --panel:rgba(22,20,18,.72); }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#101012; color:var(--fg);
+    font: 13px/1.45 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  #stage, canvas { display:block; width:100%; height:100%; }
+  .hud { position:fixed; z-index:5; }
+  #title { left:16px; top:14px; pointer-events:none; }
+  #title h1 { margin:0; font-size:19px; font-weight:650; letter-spacing:.14em; text-transform:uppercase; }
+  #title h1 span { color:var(--acc); }
+  #title p { margin:2px 0 0; color:var(--dim); font-size:11.5px; max-width:340px; }
+  #stats { right:16px; top:14px; text-align:right; color:var(--dim); font-size:11px; font-variant-numeric: tabular-nums; }
+  #stats b { color:var(--fg); font-weight:600; }
+  #panel { left:16px; bottom:14px; background:var(--panel); backdrop-filter: blur(9px);
+    border:1px solid rgba(255,255,255,.09); border-radius:12px; padding:12px 14px 10px;
+    width:290px; box-shadow:0 12px 32px rgba(0,0,0,.45); }
+  #panel h2 { margin:0 0 8px; font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+  .row { display:flex; align-items:center; gap:8px; margin:5px 0; }
+  .row label { flex:0 0 84px; color:var(--dim); font-size:11.5px; }
+  .row input[type=range] { flex:1; accent-color:var(--acc); height:18px; }
+  .row .val { flex:0 0 34px; text-align:right; font-variant-numeric:tabular-nums; font-size:11px; }
+  .btns { display:flex; flex-wrap:wrap; gap:6px; margin-top:9px; }
+  button { font:inherit; font-size:11.5px; color:var(--fg); background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.14); border-radius:7px; padding:5px 9px; cursor:pointer; }
+  button:hover { background:rgba(224,162,74,.25); border-color:rgba(224,162,74,.55); }
+  button.on { background:rgba(224,162,74,.35); border-color:var(--acc); }
+  .sep { height:1px; background:rgba(255,255,255,.09); margin:11px 0 9px; }
+  select { font:inherit; font-size:11.5px; background:rgba(255,255,255,.07); color:var(--fg);
+    border:1px solid rgba(255,255,255,.14); border-radius:6px; padding:3px 5px; }
+  #hint { right:16px; bottom:14px; color:var(--dim); font-size:10.5px; text-align:right; pointer-events:none; opacity:.85; }
+  #hint kbd { color:var(--fg); background:rgba(255,255,255,.09); border-radius:3px; padding:1px 4px; }
+  #loader { position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; gap:14px; background:#14120f; transition:opacity .5s; }
+  #loader .ring { width:46px; height:46px; border-radius:50%; border:3px solid rgba(224,162,74,.25);
+    border-top-color:var(--acc); animation:spin 1.1s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #status { color:var(--dim); font-size:12px; letter-spacing:.06em; }
+  #collapse { position:absolute; right:8px; top:6px; padding:2px 6px; font-size:10px; }
+  details summary { cursor:pointer; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<div id="loader">
+  <div class="ring"></div>
+  <div id="status">warming up the savanna…</div>
+</div>
+
+<div class="hud" id="title">
+  <h1>Giraffa <span>camelopardalis</span></h1>
+  <p>Entirely procedural: lofted anatomy, seamless Voronoi coat, 3-bone analytic IK and a
+     lateral-sequence pacing walk — no mesh files, no external assets.</p>
+</div>
+
+<div class="hud" id="stats">
+  <div><b id="fps">—</b> · <span id="distTravelled">0.00 km</span></div>
+  <div><span id="tod">morning</span> · <span id="gaitLabel">pace (4-beat)</span></div>
+</div>
+
+<div class="hud" id="panel">
+  <button id="collapse">–</button>
+  <h2>Gait &amp; scene</h2>
+  <div id="panelBody">
+    <div class="row"><label>speed</label><input id="s-speed" type="range" min="0" max="3.0" step="0.01" value="1.35"><span class="val"></span></div>
+    <div class="row"><label>cadence</label><input id="s-rate" type="range" min="0.5" max="1.8" step="0.01" value="1"><span class="val"></span></div>
+    <div class="row"><label>stride</label><input id="s-stride" type="range" min="0.2" max="1.6" step="0.01" value="1"><span class="val"></span></div>
+    <div class="row"><label>neck reach</label><input id="s-neck" type="range" min="-0.85" max="0.5" step="0.01" value="0"><span class="val"></span></div>
+    <div class="row"><label>sun</label><input id="s-sun" type="range" min="0" max="1" step="0.01" value="0.32"><span class="val"></span></div>
+    <div class="row"><label>exposure</label><input id="s-expo" type="range" min="0.5" max="1.6" step="0.01" value="1.05"><span class="val"></span></div>
+    <div class="sep"></div>
+    <div class="row"><label>camera</label><input id="s-dist" type="range" min="3.5" max="40" step="0.1" value="14"><span class="val"></span></div>
+    <div class="btns">
+      <button id="p-side">side</button>
+      <button id="p-quarter">3/4</button>
+      <button id="p-head">head</button>
+      <button id="p-low">ground</button>
+      <button id="p-front">head-on</button>
+      <button id="p-high">aerial</button>
+    </div>
+    <div class="sep"></div>
+    <div class="btns">
+      <button id="b-play">⏸ pause (space)</button>
+      <button id="b-turn">turn (t)</button>
+      <button id="b-follow" class="on">follow (f)</button>
+      <button id="b-orbit">auto-orbit (o)</button>
+      <button id="b-mane">mane</button>
+      <button id="b-shot">save png</button>
+    </div>
+    <div class="row" style="margin-top:9px">
+      <label>shadows</label>
+      <select id="s-quality">
+        <option value="1024">1024 · fast</option>
+        <option value="2048" selected>2048 · balanced</option>
+        <option value="4096">4096 · sharp</option>
+        <option value="0">off</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="hud" id="hint">
+  <div>drag = orbit · shift/right-drag or wheel = zoom · <kbd>space</kbd> walk/stop</div>
+  <div><kbd>t</kbd> turn · <kbd>f</kbd> follow · <kbd>o</kbd> auto-orbit · <kbd>↑↓</kbd> speed</div>
+</div>
+
+<script src="vendor/three.global.js"></script>
+<script src="js/util.js"></script>
+<script src="js/loft.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/giraffe.js"></script>
+<script src="js/world.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

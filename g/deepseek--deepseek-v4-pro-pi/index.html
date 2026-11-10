@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Walking Giraffe - Three.js</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
+  canvas { display: block; }
+  #info {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    color: #fff; background: rgba(0,0,0,0.5); padding: 10px 24px;
+    border-radius: 24px; font-size: 14px; pointer-events: none;
+    letter-spacing: 0.5px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  #hint {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    color: rgba(255,255,255,0.6); font-size: 13px; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="info">🦒 Walking Giraffe &mdash; Savanna Scene</div>
+<div id="hint">Drag to orbit &bull; Scroll to zoom &bull; Right-drag to pan</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.140.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+(function() {
+  'use strict';
+  var T = THREE;
+
+  // ═══════════════════════════════════════
+  // SCENE
+  // ═══════════════════════════════════════
+  var scene = new T.Scene();
+
+  // Sky gradient via canvas
+  (function() {
+    var c = document.createElement('canvas');
+    c.width = 4; c.height = 512;
+    var ctx = c.getContext('2d');
+    var g = ctx.createLinearGradient(0, 0, 0, 512);
+    g.addColorStop(0,    '#3A6FB5');
+    g.addColorStop(0.25, '#5B9ED4');
+    g.addColorStop(0.5,  '#87CEEB');
+    g.addColorStop(0.75, '#B8DCF0');
+    g.addColorStop(0.9,  '#E0D8C8');
+    g.addColorStop(1,    '#D4C4A0');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 4, 512);
+    var tex = new T.CanvasTexture(c);
+    tex.encoding = T.sRGBEncoding;
+    scene.background = tex;
+  })();
+
+  scene.fog = new T.Fog('#D4C4A0', 30, 90);
+
+  var renderer = new T.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = T.PCFSoftShadowMap;
+  renderer.toneMapping = T.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
+  document.body.appendChild(renderer.domElement);
+
+  var camera = new T.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.5, 150);
+  camera.position.set(10, 6, 14);
+
+  var controls = new T.OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 2.3, 0);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 4;
+  controls.maxDistance = 40;
+  controls.maxPolarAngle = Math.PI * 0.72;
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.25;
+  controls.update();
+
+  // ═══════════════════════════════════════
+  // LIGHTING
+  // ═══════════════════════════════════════
+  scene.add(new T.AmbientLight('#FFEEDD', 0.85));
+  scene.add(new T.HemisphereLight('#87CEEB', '#8B7355', 0.55));
+
+  var sun = new T.DirectionalLight('#FFF8E7', 3.8);
+  sun.position.set(20, 25, 8);
+  sun.castShadow = true;
+  sun.shadow.mapSize.width  = 2048;
+  sun.shadow.mapSize.height = 2048;
+  sun.shadow.camera.near   = 0.5;
+  sun.shadow.camera.far    = 70;
+  sun.shadow.camera.left   = -18;
+  sun.shadow.camera.right  = 18;
+  sun.shadow.camera.top    = 18;
+  sun.shadow.camera.bottom = -2;
+  sun.shadow.bias = -0.00015;
+  scene.add(sun);
+
+  // ═══════════════════════════════════════
+  // GROUND
+  // ═══════════════════════════════════════
+  var groundGeom = new T.CircleGeometry(30, 72);
+  var groundMat  = new T.MeshStandardMaterial({ color: '#C4A45A', roughness: 0.85, metalness: 0 });
+  var ground = new T.Mesh(groundGeom, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.06;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Dirt path
+  var pathGeom = new T.TorusGeometry(8, 0.75, 16, 120);
+  var pathMat  = new T.MeshStandardMaterial({ color: '#B8956A', roughness: 0.92, metalness: 0 });
+  var pathMesh = new T.Mesh(pathGeom, pathMat);
+  pathMesh.rotation.x = -Math.PI / 2;
+  pathMesh.position.y = -0.05;
+  pathMesh.receiveShadow = true;
+  scene.add(pathMesh);
+
+  // ═══════════════════════════════════════
+  // ACACIA TREES
+  // ═══════════════════════════════════════
+  function createAcacia(x, z, s) {
+    s = s || 1;
+    var tree = new T.Group();
+
+    // Trunk – slightly tapered
+    var tGeom = new T.CylinderGeometry(0.07*s, 0.15*s, 3.8*s, 10, 8);
+    var tMat  = new T.MeshStandardMaterial({ color: '#8B7355', roughness: 0.75, metalness: 0 });
+    var trunk = new T.Mesh(tGeom, tMat);
+    trunk.position.y = 1.9*s;
+    trunk.castShadow = true; trunk.receiveShadow = true;
+    tree.add(trunk);
+
+    // Branches radiating from top
+    var bMat = new T.MeshStandardMaterial({ color: '#7A6248', roughness: 0.7, metalness: 0 });
+    var branchCount = 5 + Math.floor(Math.random() * 3);
+    for (var i = 0; i < branchCount; i++) {
+      var angle = (i / branchCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      var len   = 0.7*s + Math.random() * 0.6*s;
+      var bGeom = new T.CylinderGeometry(0.018*s, 0.04*s, len, 6, 3);
+      var branch = new T.Mesh(bGeom, bMat);
+      branch.position.y = 3.1*s;
+      branch.rotation.z = Math.PI * 0.5 - 0.35;
+      branch.rotation.y = angle;
+      // Shift out from center
+      branch.position.x = Math.cos(angle) * 0.15*s;
+      branch.position.z = Math.sin(angle) * 0.15*s;
+      branch.castShadow = true;
+      tree.add(branch);
+    }
+
+    // Canopy – layered flat ellipsoids
+    var cMat  = new T.MeshStandardMaterial({ color: '#6B8E3A', roughness: 0.55, metalness: 0 });
+    var cGeom = new T.SphereGeometry(1.3*s, 18, 10);
+    var layers = [
+      { y: 3.3*s, sx: 1.05, sy: 0.16, sz: 1.05 },
+      { y: 3.55*s, sx: 0.85, sy: 0.14, sz: 0.88 },
+      { y: 3.75*s, sx: 0.6,  sy: 0.12, sz: 0.65 },
+    ];
+    for (var j = 0; j < layers.length; j++) {
+      var l = layers[j];
+      var canopy = new T.Mesh(cGeom, cMat);
+      canopy.position.y = l.y;
+      canopy.scale.set(l.sx, l.sy, l.sz);
+      canopy.castShadow = true; canopy.receiveShadow = true;
+      tree.add(canopy);
+    }
+
+    tree.position.set(x, 0, z);
+    tree.rotation.y = Math.random() * Math.PI * 2;
+    return tree;
+  }
+
+  // Place trees around, off the path
+  var treePositions = [
+    { x: -7, z: 7, s: 1.0 },
+    { x: 5, z: -9, s: 1.2 },
+    { x: -9, z: -5, s: 0.85 },
+    { x: 8, z: 4, s: 0.9 },
+    { x: -4, z: -11, s: 1.1 },
+  ];
+  for (var ti = 0; ti < treePositions.length; ti++) {
+    var tp = treePositions[ti];
+    scene.add(createAcacia(tp.x, tp.z, tp.s));
+  }
+
+  // ═══════════════════════════════════════
+  // GRASS TUFTS
+  // ═══════════════════════════════════════
+  var grassGroup = new T.Group();
+  var bladeGeom = new T.ConeGeometry(0.025, 0.5, 4, 1);
+  var grassColors = ['#7C9D3C', '#6B8A32', '#8DAE44', '#79993A'];
+  var grassMats = grassColors.map(function(c) {
+    return new T.MeshStandardMaterial({ color: c, roughness: 0.7, metalness: 0 });
+  });
+
+  for (var gi = 0; gi < 250; gi++) {
+    var a = Math.random() * Math.PI * 2;
+    var r = 1.2 + Math.random() * 27;
+    var gx = Math.cos(a) * r;
+    var gz = Math.sin(a) * r;
+    // Skip path area
+    var dp = Math.abs(Math.sqrt(gx*gx + gz*gz) - 8);
+    if (dp < 1.3) continue;
+    // Skip near trees
+    var tooClose = false;
+    for (var tj = 0; tj < treePositions.length; tj++) {
+      var tx = treePositions[tj].x, tz = treePositions[tj].z;
+      if (Math.sqrt((gx-tx)*(gx-tx) + (gz-tz)*(gz-tz)) < 2.0) { tooClose = true; break; }
+    }
+    if (tooClose) continue;
+
+    var tuft = new T.Group();
+    var nBlades = 2 + Math.floor(Math.random() * 4);
+    for (var b = 0; b < nBlades; b++) {
+      var blade = new T.Mesh(bladeGeom, grassMats[Math.floor(Math.random() * grassMats.length)]);
+      blade.position.y = 0.25;
+      blade.rotation.z = (Math.random() - 0.5) * 0.45;
+      blade.rotation.x = (Math.random() - 0.5) * 0.45;
+      blade.scale.setScalar(0.45 + Math.random() * 0.9);
+      blade.castShadow = true; blade.receiveShadow = true;
+      tuft.add(blade);
+    }
+    tuft.position.set(gx, 0, gz);
+    tuft.rotation.y = Math.random() * Math.PI * 2;
+    grassGroup.add(tuft);
+  }
+  scene.add(grassGroup);
+
+  // ═══════════════════════════════════════
+  // TEXTURE – GIRAFFE SPOTS
+  // ═══════════════════════════════════════
+  function createSpotTex(w, h, base, spot, density) {
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, w, h);
+
+    var cols = Math.floor(density * 1.3);
+    var rows = Math.floor(density * 0.65);
+    var cw = w / cols, ch = h / rows;
+    ctx.fillStyle = spot;
+
+    for (var row = 0; row < rows; row++) {
+      for (var col = 0; col < cols; col++) {
+        var cx = (col + 0.5) * cw + (Math.random() - 0.5) * cw * 0.7;
+        var cy = (row + 0.5) * ch + (Math.random() - 0.5) * ch * 0.7;
+        var blobs = 2 + Math.floor(Math.random() * 3);
+        for (var bi = 0; bi < blobs; bi++) {
+          var bx = cx + (Math.random() - 0.5) * cw * 0.42;
+          var by = cy + (Math.random() - 0.5) * ch * 0.42;
+          var rx = cw * 0.18 + Math.random() * cw * 0.34;
+          var ry = ch * 0.14 + Math.random() * ch * 0.28;
+          ctx.beginPath();
+          ctx.ellipse(bx, by, rx, ry, Math.random() * Math.PI, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+
+    // Noise
+    var id = ctx.getImageData(0, 0, w, h);
+    for (var i = 0; i < id.data.length; i += 4) {
+      var n = (Math.random() - 0.5) * 14;
+      id.data[i]     = Math.min(255, Math.max(0, id.data[i]     + n));
+      id.data[i + 1] = Math.min(255, Math.max(0, id.data[i + 1] + n));
+      id.data[i + 2] = Math.min(255, Math.max(0, id.data[i + 2] + n));
+    }
+    ctx.putImageData(id, 0, 0);
+
+    var tex = new T.CanvasTexture(canvas);
+    tex.wrapS = T.RepeatWrapping;
+    tex.wrapT = T.RepeatWrapping;
+    tex.encoding = T.sRGBEncoding;
+    tex.magFilter = T.LinearFilter;
+    tex.minFilter = T.LinearMipmapLinearFilter;
+    tex.generateMipmaps = true;
+    return tex;
+  }
+
+  var bodyTex = createSpotTex(512, 256, '#D4A44A', '#6B3A1F', 20);
+  var neckTex = createSpotTex(256, 512, '#D4A44A', '#5C2E14', 14);
+
+  // ═══════════════════════════════════════
+  // MATERIALS
+  // ═══════════════════════════════════════
+  var matBody     = new T.MeshStandardMaterial({ map: bodyTex, roughness: 0.55, metalness: 0.02 });
+  var matNeck     = new T.MeshStandardMaterial({ map: neckTex, roughness: 0.5,  metalness: 0.02 });
+  var matUpperLeg = new T.MeshStandardMaterial({ color: '#C49A5C', roughness: 0.5,  metalness: 0.02 });
+  var matLowerLeg = new T.MeshStandardMaterial({ color: '#B8894A', roughness: 0.45, metalness: 0.02 });
+  var matHoof     = new T.MeshStandardMaterial({ color: '#3D2B1F', roughness: 0.3,  metalness: 0.05 });
+  var matSnout    = new T.MeshStandardMaterial({ color: '#C49A5C', roughness: 0.5,  metalness: 0.02 });
+  var matOssicone = new T.MeshStandardMaterial({ color: '#5C3D2E', roughness: 0.4,  metalness: 0.03 });
+  var matEar      = new T.MeshStandardMaterial({ color: '#B8894A', roughness: 0.55, metalness: 0.02 });
+  var matTail     = new T.MeshStandardMaterial({ color: '#8B6914', roughness: 0.5,  metalness: 0.02 });
+  var matTuft     = new T.MeshStandardMaterial({ color: '#3D2B1F', roughness: 0.55, metalness: 0.02 });
+  var matEye      = new T.MeshStandardMaterial({ color: '#1A0A00', roughness: 0.15, metalness: 0.1 });
+  var matMane     = new T.MeshStandardMaterial({ color: '#5C3D2E', roughness: 0.5,  metalness: 0.02 });
+
+  // ═══════════════════════════════════════
+  // BUILD GIRAFFE
+  // ═══════════════════════════════════════
+  var giraffe = new T.Group();
+  scene.add(giraffe);
+
+  var bodyGroup = new T.Group();
+  giraffe.add(bodyGroup);
+
+  // Torso
+  var torsoGeom = new T.SphereGeometry(0.7, 32, 24);
+  var torso = new T.Mesh(torsoGeom, matBody);
+  torso.scale.set(1.55, 0.85, 0.95);
+  torso.position.y = 2.15;
+  torso.castShadow = true; torso.receiveShadow = true;
+  bodyGroup.add(torso);
+
+  // Shoulder hump
+  var humpGeom = new T.SphereGeometry(0.45, 24, 18);
+  var hump = new T.Mesh(humpGeom, matBody);
+  hump.scale.set(0.9, 0.7, 0.7);
+  hump.position.set(0.58, 2.55, 0);
+  hump.castShadow = true;
+  bodyGroup.add(hump);
+
+  // Chest
+  var chestGeom = new T.SphereGeometry(0.5, 20, 16);
+  var chest = new T.Mesh(chestGeom, matBody);
+  chest.scale.set(0.75, 0.65, 0.72);
+  chest.position.set(0.72, 1.95, 0);
+  chest.castShadow = true;
+  bodyGroup.add(chest);
+
+  // Rump
+  var rumpGeom = new T.SphereGeometry(0.42, 20, 16);
+  var rump = new T.Mesh(rumpGeom, matBody);
+  rump.scale.set(0.82, 0.7, 0.75);
+  rump.position.set(-0.72, 2.08, 0);
+  rump.castShadow = true;
+  bodyGroup.add(rump);
+
+  // Belly
+  var bellyGeom = new T.SphereGeometry(0.5, 20, 14);
+  var belly = new T.Mesh(bellyGeom, matBody);
+  belly.scale.set(1.1, 0.5, 0.7);
+  belly.position.set(0, 1.9, 0);
+  belly.castShadow = true;
+  bodyGroup.add(belly);
+
+  // ── Neck ──
+  var neckPivot = new T.Group();
+  neckPivot.position.set(0.52, 2.75, 0);
+  neckPivot.rotation.z = -0.48;
+  bodyGroup.add(neckPivot);
+
+  var neckGeom = new T.CylinderGeometry(0.13, 0.22, 2.3, 22, 10);
+  var neckMesh = new T.Mesh(neckGeom, matNeck);
+  neckMesh.position.y = 1.15;
+  neckMesh.castShadow = true; neckMesh.receiveShadow = true;
+  neckPivot.add(neckMesh);
+
+  // Mane (ridge of hair along back of neck)
+  var maneParticles = new T.Group();
+  for (var mi = 0; mi < 16; mi++) {
+    var mGeom = new T.ConeGeometry(0.025, 0.14, 4, 2);
+    var mBit = new T.Mesh(mGeom, matMane);
+    mBit.position.y = 0.15 + mi * 0.135;
+    mBit.position.z = -0.13;
+    mBit.rotation.x = -0.5;
+    mBit.rotation.z = Math.PI;
+    mBit.castShadow = true;
+    maneParticles.add(mBit);
+  }
+  neckPivot.add(maneParticles);
+
+  // Neck flare
+  var flareGeom = new T.CylinderGeometry(0.24, 0.22, 0.25, 20, 4);
+  var flare = new T.Mesh(flareGeom, matNeck);
+  flare.position.y = 0.12;
+  neckPivot.add(flare);
+
+  // ── Head ──
+  var headPivot = new T.Group();
+  headPivot.position.y = 2.3;
+  headPivot.rotation.z = 0.38;
+  neckPivot.add(headPivot);
+
+  var headGeom = new T.BoxGeometry(0.52, 0.24, 0.3, 6, 4, 4);
+  var headMesh = new T.Mesh(headGeom, matSnout);
+  headMesh.position.set(0.29, 0, 0);
+  headMesh.castShadow = true;
+  headPivot.add(headMesh);
+
+  var snoutGeom = new T.BoxGeometry(0.22, 0.19, 0.23, 4, 3, 3);
+  var snoutMesh = new T.Mesh(snoutGeom, matSnout);
+  snoutMesh.position.set(0.57, -0.03, 0);
+  snoutMesh.castShadow = true;
+  headPivot.add(snoutMesh);
+
+  // Lower jaw
+  var jawGeom = new T.BoxGeometry(0.18, 0.08, 0.16, 3, 2, 3);
+  var jaw = new T.Mesh(jawGeom, matSnout);
+  jaw.position.set(0.5, -0.13, 0);
+  jaw.castShadow = true;
+  headPivot.add(jaw);
+
+  // Nostrils
+  var nostrilGeom = new T.SphereGeometry(0.032, 8, 6);
+  var nostrilMat  = new T.MeshStandardMaterial({ color: '#2A1508', roughness: 0.3 });
+  var nL = new T.Mesh(nostrilGeom, nostrilMat);
+  nL.position.set(0.64, -0.06, 0.065);
+  headPivot.add(nL);
+  var nR = new T.Mesh(nostrilGeom, nostrilMat);
+  nR.position.set(0.64, -0.06, -0.065);
+  headPivot.add(nR);
+
+  // Eyes
+  var eyeGeom = new T.SphereGeometry(0.048, 12, 8);
+  var eyeL = new T.Mesh(eyeGeom, matEye);
+  eyeL.position.set(0.21, 0.055, 0.15);
+  headPivot.add(eyeL);
+  var eyeR = new T.Mesh(eyeGeom, matEye);
+  eyeR.position.set(0.21, 0.055, -0.15);
+  headPivot.add(eyeR);
+  // Eye whites
+  var ewGeom = new T.SphereGeometry(0.053, 8, 6);
+  var ewMat  = new T.MeshStandardMaterial({ color: '#FFFFF0', roughness: 0.2 });
+  var ewL = new T.Mesh(ewGeom, ewMat);
+  ewL.position.set(0.207, 0.055, 0.155);
+  ewL.scale.set(1, 1.1, 0.35);
+  headPivot.add(ewL);
+  var ewR = new T.Mesh(ewGeom, ewMat);
+  ewR.position.set(0.207, 0.055, -0.155);
+  ewR.scale.set(1, 1.1, 0.35);
+  headPivot.add(ewR);
+
+  // Eyelids (subtle half-rings above eyes)
+  var lidGeom = new T.TorusGeometry(0.04, 0.012, 6, 8, Math.PI);
+  var lidMat  = new T.MeshStandardMaterial({ color: '#C49A5C', roughness: 0.5 });
+  var lidL = new T.Mesh(lidGeom, lidMat);
+  lidL.position.set(0.215, 0.08, 0.15);
+  lidL.rotation.z = Math.PI;
+  lidL.rotation.y = Math.PI * 0.5;
+  headPivot.add(lidL);
+  var lidR = new T.Mesh(lidGeom, lidMat);
+  lidR.position.set(0.215, 0.08, -0.15);
+  lidR.rotation.z = Math.PI;
+  lidR.rotation.y = -Math.PI * 0.5;
+  headPivot.add(lidR);
+
+  // Ears
+  function buildEar(side) {
+    var g = new T.Group();
+    var eGeom = new T.ConeGeometry(0.06, 0.24, 8, 3);
+    var ear = new T.Mesh(eGeom, matEar);
+    ear.scale.set(0.45, 1, 1.7);
+    ear.rotation.z = side * 1.25;
+    ear.rotation.x = -0.35;
+    ear.position.set(-0.04, 0.09, side * 0.13);
+    ear.castShadow = true;
+    g.add(ear);
+    return g;
+  }
+  headPivot.add(buildEar(1));
+  headPivot.add(buildEar(-1));
+
+  // Ossicones
+  function buildOssicone(side) {
+    var g = new T.Group();
+    var oGeom = new T.CylinderGeometry(0.022, 0.04, 0.19, 10, 4);
+    var oss = new T.Mesh(oGeom, matOssicone);
+    oss.position.y = 0.095;
+    oss.rotation.z = side * 0.18;
+    oss.castShadow = true;
+    g.add(oss);
+    var knobGeom = new T.SphereGeometry(0.038, 10, 6);
+    var knob = new T.Mesh(knobGeom, matOssicone);
+    knob.position.y = 0.19;
+    knob.position.x = side * 0.012;
+    g.add(knob);
+    g.position.set(0.08, 0.11, side * 0.075);
+    return g;
+  }
+  headPivot.add(buildOssicone(1));
+  headPivot.add(buildOssicone(-1));
+
+  // ── Tail ──
+  var tailPivot = new T.Group();
+  tailPivot.position.set(-0.88, 1.85, 0);
+  bodyGroup.add(tailPivot);
+
+  var tailGeom = new T.CylinderGeometry(0.018, 0.05, 1.3, 8, 8);
+  var tailMesh = new T.Mesh(tailGeom, matTail);
+  tailMesh.position.y = -0.65;
+  tailMesh.castShadow = true;
+  tailPivot.add(tailMesh);
+
+  var tuftGeom = new T.ConeGeometry(0.04, 0.22, 8, 4);
+  var tuftMesh = new T.Mesh(tuftGeom, matTuft);
+  tuftMesh.position.y = -1.25;
+  tailPivot.add(tuftMesh);
+
+  // ── Legs ──
+  function buildLeg(sX, sZ) {
+    var g = new T.Group();
+    var upperP = new T.Group();
+    upperP.position.set(sX * 0.58, 1.7, sZ * 0.38);
+    g.add(upperP);
+
+    var uGeom = new T.CylinderGeometry(0.09, 0.12, 0.92, 14, 5);
+    var uMesh = new T.Mesh(uGeom, matUpperLeg);
+    uMesh.position.y = -0.46;
+    uMesh.castShadow = true; uMesh.receiveShadow = true;
+    upperP.add(uMesh);
+
+    var kneeP = new T.Group();
+    kneeP.position.y = -0.92;
+    upperP.add(kneeP);
+
+    var lGeom = new T.CylinderGeometry(0.058, 0.085, 0.82, 12, 5);
+    var lMesh = new T.Mesh(lGeom, matLowerLeg);
+    lMesh.position.y = -0.41;
+    lMesh.castShadow = true; lMesh.receiveShadow = true;
+    kneeP.add(lMesh);
+
+    // Knee joint bulge
+    var kJointGeom = new T.SphereGeometry(0.085, 8, 6);
+    var kJoint = new T.Mesh(kJointGeom, matLowerLeg);
+    kJoint.position.y = 0.02;
+    kneeP.add(kJoint);
+
+    var hGeom = new T.BoxGeometry(0.08, 0.1, 0.11, 3, 3, 3);
+    var hoof = new T.Mesh(hGeom, matHoof);
+    hoof.position.y = -0.85;
+    hoof.castShadow = true;
+    kneeP.add(hoof);
+
+    g.userData = { upperP: upperP, kneeP: kneeP };
+    return g;
+  }
+
+  var legFL = buildLeg(1, 1);
+  var legFR = buildLeg(1, -1);
+  var legBL = buildLeg(-1, 1);
+  var legBR = buildLeg(-1, -1);
+  bodyGroup.add(legFL); bodyGroup.add(legFR);
+  bodyGroup.add(legBL); bodyGroup.add(legBR);
+  var allLegs = [legFL, legFR, legBL, legBR];
+  // Diagonal pair gait
+  var legPhases = [0, Math.PI, Math.PI, 0];
+
+  // ═══════════════════════════════════════
+  // BLOB SHADOW & DUST
+  // ═══════════════════════════════════════
+  var shadowGeom = new T.CircleGeometry(0.85, 20);
+  var shadowMat  = new T.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.22, depthWrite: false });
+  var shadowBlob = new T.Mesh(shadowGeom, shadowMat);
+  shadowBlob.rotation.x = -Math.PI / 2;
+  shadowBlob.position.y = 0.015;
+  shadowBlob.renderOrder = 1;
+  giraffe.add(shadowBlob);
+
+  // Dust sprite texture
+  function makeDustSprite() {
+    var c = document.createElement('canvas');
+    c.width = 32; c.height = 32;
+    var ctx = c.getContext('2d');
+    var g = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    g.addColorStop(0,   'rgba(190,155,120,0.7)');
+    g.addColorStop(0.3, 'rgba(190,155,120,0.3)');
+    g.addColorStop(0.7, 'rgba(190,155,120,0.05)');
+    g.addColorStop(1,   'rgba(190,155,120,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 32, 32);
+    var tex = new T.CanvasTexture(c);
+    return new T.SpriteMaterial({ map: tex, blending: T.NormalBlending, depthWrite: false, transparent: true, opacity: 0.7 });
+  }
+  var dustSpriteMat = makeDustSprite();
+
+  // Create dust sprites near each hoof
+  var dustSprites = [];
+  for (var di = 0; di < 12; di++) {
+    var sprite = new T.Sprite(dustSpriteMat);
+    sprite.scale.set(0.35, 0.35, 1);
+    sprite.visible = false;
+    giraffe.add(sprite);
+    dustSprites.push({ sprite: sprite, legIdx: di % 4, offset: (di / 4) | 0 });
+  }
+
+  // ═══════════════════════════════════════
+  // BIRDS
+  // ═══════════════════════════════════════
+  var birdFlock = new T.Group();
+  scene.add(birdFlock);
+
+  var birdMat = new T.MeshStandardMaterial({ color: '#3A3A3A', roughness: 0.5, metalness: 0.1 });
+  var birds = [];
+  for (var bi = 0; bi < 10; bi++) {
+    var bird = new T.Group();
+    var wingGeom = new T.ConeGeometry(0.04, 0.22, 4, 1);
+    var lw = new T.Mesh(wingGeom, birdMat);
+    lw.rotation.z = 0.55;
+    lw.position.y = 0.03;
+    bird.add(lw);
+    var rw = new T.Mesh(wingGeom, birdMat);
+    rw.rotation.z = -0.55;
+    rw.position.y = 0.03;
+    bird.add(rw);
+    // Body
+    var bodyGeom = new T.SphereGeometry(0.04, 6, 4);
+    var bd = new T.Mesh(bodyGeom, birdMat);
+    bd.scale.set(1.8, 0.6, 1);
+    bird.add(bd);
+
+    bird.position.set(
+      (Math.random() - 0.5) * 30,
+      8 + Math.random() * 12,
+      (Math.random() - 0.5) * 30
+    );
+    bird.userData = {
+      speed: 0.3 + Math.random() * 0.5,
+      radius: 8 + Math.random() * 14,
+      height: 8 + Math.random() * 10,
+      phase: Math.random() * Math.PI * 2,
+      centerX: (Math.random() - 0.5) * 8,
+      centerZ: (Math.random() - 0.5) * 8,
+    };
+    birdFlock.add(bird);
+    birds.push(bird);
+  }
+
+  // ═══════════════════════════════════════
+  // ANIMATION
+  // ═══════════════════════════════════════
+  var circleRadius = 8;
+  var walkSpeed = 1.5;
+  var strideDuration = 1.05;
+  var walkAngle = 0;
+  var clock = new T.Clock();
+  var _v3 = new T.Vector3();
+  var _v3b = new T.Vector3();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    var dt = Math.min(clock.getDelta(), 0.1);
+    var t = performance.now() * 0.001;
+
+    // ── Move giraffe along circular path ──
+    walkAngle += (walkSpeed / circleRadius) * dt;
+    var gx = Math.cos(walkAngle) * circleRadius;
+    var gz = Math.sin(walkAngle) * circleRadius;
+    giraffe.position.set(gx, 0, gz);
+    giraffe.rotation.y = -walkAngle + Math.PI / 2;
+
+    // ── Walk cycle ──
+    var sa = (t / strideDuration) * Math.PI * 2;
+    var bobAmount = 0.065;
+    var bob = Math.abs(Math.sin(sa * 2)) * bobAmount;
+    bodyGroup.position.y = bob;
+    shadowBlob.position.set(0, 0.015, 0);
+
+    for (var i = 0; i < allLegs.length; i++) {
+      var leg = allLegs[i];
+      var phase = legPhases[i];
+      var ls = sa + phase;
+      leg.userData.upperP.rotation.x = 0.58 * Math.sin(ls);
+      leg.userData.kneeP.rotation.x = 0.72 * Math.max(0, Math.sin(ls + 0.55));
+    }
+
+    // Neck sway
+    var nSway = 0.045 * Math.sin(sa + 0.7);
+    neckPivot.rotation.z = -0.48 + nSway;
+    neckPivot.rotation.x = 0.035 * Math.cos(sa + 0.3);
+
+    // Head stabilization
+    headPivot.rotation.z = 0.38 - nSway * 1.25;
+    headPivot.rotation.x = -0.035 * Math.cos(sa + 0.3);
+    headPivot.rotation.z += 0.035 * Math.sin(sa * 2 + 0.4);
+
+    // Tail
+    tailPivot.rotation.z = 0.32 * Math.sin(sa * 1.6 + 1.0);
+    tailPivot.rotation.x = 0.18 * Math.cos(sa * 1.4 + 0.5);
+
+    // ── Dust particles near hooves ──
+    // Get world positions for each knee to place dust puffs
+    for (var di = 0; di < dustSprites.length; di++) {
+      var ds = dustSprites[di];
+      var leg = allLegs[ds.legIdx];
+      var ls = sa + legPhases[ds.legIdx];
+      var inStance = Math.sin(ls) < 0.15; // hoof near/on ground
+
+      if (inStance) {
+        leg.userData.kneeP.getWorldPosition(_v3);
+        ds.sprite.position.copy(_v3);
+        ds.sprite.position.y += -0.75 + (ds.offset - 1) * 0.15;
+        ds.sprite.position.x += (Math.random() - 0.5) * 0.35;
+        ds.sprite.position.z += (Math.random() - 0.5) * 0.35;
+        ds.sprite.visible = true;
+        ds.sprite.material.opacity = 0.3 + Math.random() * 0.4;
+        ds.sprite.scale.setScalar(0.2 + Math.random() * 0.45);
+      } else {
+        ds.sprite.visible = Math.random() < 0.05; // occasional puff
+        if (ds.sprite.visible) {
+          leg.userData.kneeP.getWorldPosition(_v3);
+          ds.sprite.position.copy(_v3);
+          ds.sprite.position.y += -0.75;
+          ds.sprite.material.opacity = 0.1;
+          ds.sprite.scale.setScalar(0.12);
+        }
+      }
+    }
+
+    // ── Birds ──
+    for (var bi = 0; bi < birds.length; bi++) {
+      var b = birds[bi];
+      var ud = b.userData;
+      var ba = t * ud.speed + ud.phase;
+      b.position.x = ud.centerX + Math.cos(ba) * ud.radius;
+      b.position.z = ud.centerZ + Math.sin(ba) * ud.radius * 0.7;
+      b.position.y = ud.height + Math.sin(ba * 1.7) * 1.5;
+      b.rotation.y = -ba + Math.PI / 2;
+      // Wing flap
+      var flap = Math.sin(ba * 4) * 0.3;
+      b.children[0].rotation.z = 0.55 + flap;
+      b.children[1].rotation.z = -0.55 - flap;
+    }
+
+    // ── Camera follow ──
+    controls.target.lerp(_v3b.set(gx, 2.3 + bob, gz), 0.04);
+    controls.update();
+
+    renderer.render(scene, camera);
+  }
+
+  // ═══════════════════════════════════════
+  // RESIZE
+  // ═══════════════════════════════════════
+  window.addEventListener('resize', function() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ═══════════════════════════════════════
+  // GO
+  // ═══════════════════════════════════════
+  requestAnimationFrame(animate);
+
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,168 @@
+/* Giraffe viewer — UI chrome. Deliberately minimal: the animal is the point. */
+
+:root {
+  --ink: #f3ece0;
+  --dim: #b3a693;
+  --amber: #e8b45a;
+  --bg: rgba(18, 16, 14, 0.72);
+  --line: rgba(243, 236, 224, 0.14);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #14120f;
+  color: var(--ink);
+  font: 12px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+#view {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+#view:active { cursor: grabbing; }
+
+.card {
+  position: fixed;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  backdrop-filter: blur(7px);
+  z-index: 5;
+  user-select: none;
+}
+
+/* ---------------------------------------------------------------- boot -- */
+#boot {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  padding: 14px 20px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--amber);
+  letter-spacing: 0.04em;
+  z-index: 40;
+  white-space: pre-wrap;
+  max-width: 80vw;
+}
+body.live #boot { display: none; }
+
+/* ----------------------------------------------------------------- hud -- */
+#hud {
+  left: 14px;
+  bottom: 14px;
+  width: 318px;
+  max-width: 44vw;
+}
+#hud.hidden { display: none; }
+#stats .kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px dotted rgba(243, 236, 224, 0.09);
+  padding: 1px 0;
+}
+#stats .kv span { color: var(--dim); }
+#stats .kv b { font-weight: 600; color: var(--ink); }
+#diagram {
+  display: block;
+  width: 100%;
+  height: 104px;
+  margin-top: 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.hint { color: var(--dim); margin-top: 6px; font-size: 11px; }
+kbd {
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 0 4px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 10px;
+}
+
+/* --------------------------------------------------------------- panel -- */
+#panel {
+  right: 14px;
+  top: 14px;
+  width: 330px;
+  max-width: 46vw;
+}
+#panel.hidden { display: none; }
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  flex-wrap: wrap;
+}
+.row > label {
+  color: var(--dim);
+  min-width: 52px;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+.sub { color: var(--dim); font-size: 11px; }
+.val { color: var(--amber); min-width: 62px; text-align: right; }
+
+select, input[type="range"], button {
+  font: inherit;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 7px;
+}
+select { flex: 1; min-width: 120px; }
+option { background: #211d18; color: var(--ink); }
+input[type="range"] { flex: 1; padding: 0; height: 20px; accent-color: var(--amber); }
+button { cursor: pointer; }
+button:hover { background: rgba(255, 255, 255, 0.14); }
+button.on {
+  background: rgba(232, 180, 90, 0.22);
+  border-color: rgba(232, 180, 90, 0.55);
+  color: #ffe0a8;
+}
+.btns button { font-size: 11px; padding: 4px 6px; }
+.btns.cam button { text-transform: uppercase; letter-spacing: 0.04em; font-size: 10px; }
+
+#log {
+  display: none;
+  margin: 8px 0 0;
+  padding: 6px 8px;
+  max-height: 190px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 6px;
+  font-size: 10px;
+  white-space: pre-wrap;
+  color: #ffd7a1;
+}
+#log:not(:empty) { display: block; }
+
+/* --------------------------------------------------------------- label -- */
+.legend {
+  left: 14px;
+  top: 14px;
+  line-height: 1.5;
+}
+.legend b { color: var(--amber); font-style: italic; font-weight: 600; }
+
+@media (max-width: 900px) {
+  #panel { width: 46vw; }
+  #hud { width: 46vw; }
+  .legend { display: none; }
+}

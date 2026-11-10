@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Walking Giraffe — Three.js</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #cfe3f0; font-family: system-ui, sans-serif; }
+  #info { position: fixed; left: 12px; top: 10px; color: #1d2a1a; background: rgba(255,255,255,.55);
+          padding: 6px 10px; border-radius: 6px; font-size: 13px; line-height: 1.4; user-select: none; }
+  #info kbd { background: #fff; border: 1px solid #aaa; border-radius: 3px; padding: 0 4px; }
+</style>
+</head>
+<body>
+<div id="info">
+  <b>Giraffe walk</b><br>
+  drag: orbit · wheel: zoom · <kbd>Space</kbd> pause · <kbd>R</kbd> reset camera
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="vendor/OrbitControls.js"></script>
+<script src="js/giraffe.js"></script>
+<script>
+(function () {
+  const T = THREE;
+  const renderer = new T.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = T.PCFSoftShadowMap;
+  renderer.toneMapping = T.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  document.body.appendChild(renderer.domElement);
+
+  const scene = new T.Scene();
+  scene.background = new T.Color(0xcfe3f0);
+  scene.fog = new T.Fog(0xcfe3f0, 60, 160);
+
+  const camera = new T.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 500);
+  const camHome = new T.Vector3(9, 4.5, 20);
+  camera.position.copy(camHome);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 2.2, 0);
+  controls.enableDamping = true;
+  controls.maxPolarAngle = Math.PI * 0.49;
+  controls.update();
+
+  // Lights
+  scene.add(new T.HemisphereLight(0xdfeeff, 0x6b5a3a, 0.9));
+  const sun = new T.DirectionalLight(0xfff1d6, 2.2);
+  sun.position.set(18, 26, 12);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  const sc = sun.shadow.camera;
+  sc.left = -18; sc.right = 18; sc.top = 18; sc.bottom = -18; sc.near = 1; sc.far = 80;
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.02;
+  scene.add(sun);
+
+  // Ground: savanna-ish procedural texture
+  function groundTexture() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 512;
+    const g = c.getContext('2d');
+    const img = g.createImageData(512, 512);
+    let s = 12345;
+    const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+    for (let i = 0; i < 512 * 512; i++) {
+      const v = rnd();
+      const k = i * 4;
+      img.data[k] = 150 + v * 40;
+      img.data[k + 1] = 140 + v * 30;
+      img.data[k + 2] = 80 + v * 20;
+      img.data[k + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    for (let i = 0; i < 900; i++) {
+      g.fillStyle = rnd() < 0.5 ? 'rgba(90,110,50,0.25)' : 'rgba(170,140,70,0.25)';
+      g.fillRect(rnd() * 512, rnd() * 512, 2 + rnd() * 4, 1 + rnd() * 2);
+    }
+    const tex = new T.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = T.RepeatWrapping;
+    tex.repeat.set(40, 40);
+    tex.colorSpace = T.SRGBColorSpace;
+    tex.anisotropy = 8;
+    return tex;
+  }
+  const ground = new T.Mesh(
+    new T.PlaneGeometry(400, 400),
+    new T.MeshStandardMaterial({ map: groundTexture(), roughness: 1 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Some rocks and grass tufts for scale
+  const rockMat = new T.MeshStandardMaterial({ color: 0x8a7f72, roughness: 0.95 });
+  let seed = 99;
+  const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  for (let i = 0; i < 40; i++) {
+    const r = 0.2 + rnd() * 0.5;
+    const rock = new T.Mesh(new T.DodecahedronGeometry(r, 0), rockMat);
+    const a = rnd() * Math.PI * 2, d = 18 + rnd() * 50;
+    rock.position.set(Math.cos(a) * d, r * 0.3, Math.sin(a) * d);
+    rock.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
+    rock.scale.y = 0.6;
+    rock.castShadow = rock.receiveShadow = true;
+    scene.add(rock);
+  }
+
+  // Giraffe
+  const giraffe = makeGiraffe();
+  scene.add(giraffe.root);
+
+  // Walk path: circle, heading tangent to the path, body faces +Z in model space.
+  const R = 11;
+  const omega = GIRAFFE_WALK_SPEED / R; // rad/s around the circle
+  let t = 0;
+  let paused = false;
+  let lastT = performance.now();
+
+  // Foot lowest point is at phase values; keep giraffe above ground via IK (ankleH).
+  function placeGiraffe() {
+    const a = t * omega;
+    giraffe.root.position.set(Math.cos(a) * R, 0, Math.sin(a) * R);
+    // tangent direction of motion: derivative of (cos a, sin a) is (-sin a, cos a)
+    giraffe.root.rotation.y = Math.atan2(-Math.sin(a), Math.cos(a)); // +Z forward -> tangent
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') { paused = !paused; e.preventDefault(); }
+    if (e.code === 'KeyR') { camera.position.copy(camHome); controls.target.set(0, 2.2, 0); }
+  });
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  function frame(now) {
+    const dt = Math.min((now - lastT) / 1000, 0.05);
+    lastT = now;
+    if (!paused) {
+      t += dt;
+      giraffe.update(dt);
+    }
+    placeGiraffe();
+    // Follow: move camera and orbit target together so the user's view offset is kept
+    const goal = new T.Vector3(giraffe.root.position.x, 2.2, giraffe.root.position.z);
+    const delta = goal.clone().sub(controls.target);
+    controls.target.add(delta);
+    camera.position.add(delta);
+    controls.update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+  placeGiraffe();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

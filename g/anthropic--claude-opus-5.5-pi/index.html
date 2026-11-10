@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Walking Giraffe — Three.js</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #d9c9a6; font-family: system-ui, sans-serif; }
+  canvas { display: block; }
+  #ui { position: fixed; left: 12px; top: 12px; display: flex; gap: 6px; align-items: center; }
+  #ui button { background: rgba(30,22,14,.65); color: #f3e7d0; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+  #ui button:hover { background: rgba(30,22,14,.85); }
+  #hint { position: fixed; left: 12px; bottom: 10px; color: rgba(40,28,15,.75); font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="ui"><button id="pause">Pause</button><button id="slow">Slow-mo</button><button id="follow">Free camera</button></div>
+<div id="hint">Drag to orbit · scroll to zoom · right-drag to pan</div>
+<script src="lib/three.min.js"></script>
+<script src="lib/OrbitControls.js"></script>
+<script src="js/tube.js"></script>
+<script src="js/coat.js"></script>
+<script src="js/giraffe.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

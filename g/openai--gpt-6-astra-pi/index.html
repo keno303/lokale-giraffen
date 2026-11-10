@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e8ddc6">
+  <title>The quiet giant — A savanna field study</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="experience" aria-label="Interactive 3D giraffe in the African savanna">
+    <canvas id="scene" aria-label="Walking giraffe. Drag to orbit, scroll to zoom." tabindex="0"></canvas>
+    <div class="vignette" aria-hidden="true"></div>
+    <header class="masthead">
+      <a class="brand" href="./index.html" aria-label="Savanna field studies home"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 25V15l4-2h8l4-9h4l2 3-3 2-3 10v6m-12-8v8m8-7v7M22 4V1m3 3 2-2M5 15l-3 4"/></svg><span>SAVANNA<span class="brand-sub">FIELD STUDIES</span></span></a>
+      <div class="edition"><span class="live-dot"></span> A LIVING PORTRAIT <span class="edition-no">NO. 001</span></div>
+    </header>
+    <section class="intro">
+      <p class="eyebrow">EAST AFRICA · 02° S, 35° E</p>
+      <h1>The quiet<br><em>giant.</em></h1>
+      <p class="latin">Giraffa camelopardalis</p>
+      <p class="description">An unhurried journey<br>across the golden grasslands.</p>
+      <button id="about-toggle" class="text-button" aria-expanded="false" aria-controls="field-notes">Meet the giraffe <span>↗</span></button>
+    </section>
+    <aside id="field-notes" class="notes" hidden>
+      <button id="notes-close" aria-label="Close field notes">×</button>
+      <p class="eyebrow">FIELD NOTES / 001</p><h2>Built for the treetops.</h2>
+      <p>A giraffe’s long neck has just seven vertebrae—the same number as ours. Its two fur-covered horns are called <em>ossicones</em>.</p>
+      <p>At a walk, the legs on one side move in close succession, followed by the other side. This lateral-sequence gait gives the animal its gentle, rolling rhythm.</p>
+      <div class="note-stats"><div><strong>5.3 m</strong><span>MODEL HEIGHT</span></div><div><strong>~1.8 s</strong><span>STRIDE CYCLE</span></div></div>
+      <p class="note-small">A procedural study of form and movement. Geometry, coat, vegetation, and animation are generated locally; no external assets are loaded.</p>
+    </aside>
+    <div class="scene-caption"><span class="caption-rule"></span><div><span id="behavior-label">A GENTLE WALK</span><small id="scene-subtitle">Lateral-sequence gait · tracking camera</small></div></div>
+    <div class="light-control"><span class="eyebrow">LIGHT</span><button id="light-toggle" aria-label="Change lighting to daylight"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 1v3m0 16v3M1 12h3m16 0h3M4 4l2 2m12 12 2 2M4 20l2-2M18 6l2-2"/></svg><span id="light-label">Golden hour</span></button></div>
+    <footer class="bottom-ui">
+      <div class="control-bar">
+        <button id="play-toggle" class="play-button" aria-label="Pause walking"><svg id="pause-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4v12M14 4v12"/></svg><svg id="play-icon" viewBox="0 0 20 20" aria-hidden="true" hidden><path d="m6 3 10 7-10 7z"/></svg></button>
+        <div class="pace-control"><label for="pace">WALKING PACE <output id="pace-value">1.0×</output></label><input type="range" id="pace" min="0.25" max="1.75" step="0.05" value="1" aria-label="Walking pace"></div>
+        <span class="divider"></span>
+        <div class="views" role="group" aria-label="Camera view"><button data-view="portrait" class="selected" aria-pressed="true">Portrait</button><button data-view="profile" aria-pressed="false">Profile</button><button data-view="detail" aria-pressed="false">Detail</button></div>
+        <span class="divider"></span>
+        <button id="reset" class="icon-button" title="Reset view (R)" aria-label="Reset view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 8M4 4v6h6"/></svg></button>
+        <button id="fullscreen" class="icon-button" title="Fullscreen (F)" aria-label="Enter fullscreen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button>
+      </div>
+      <div class="footer-meta"><span>OBSERVE. SLOW DOWN. WANDER.</span><span class="interaction-hint">Drag to orbit <i>·</i> Scroll to explore <i>·</i> Space to pause</span><button id="hide-ui" title="Hide interface (H)">Hide interface <span>↘</span></button></div>
+    </footer>
+    <button id="show-ui" hidden>Show interface <span>↗</span></button>
+    <div id="loading"><span class="loading-mark">S</span><p>Entering the grasslands<span class="loading-dots">…</span></p></div>
+    <div id="error" hidden><h2>A little more graphics power is needed.</h2><p>This experience requires a browser with WebGL enabled. Please try a current version of Chrome, Firefox, or Safari.</p></div>
+  </main>
+  <script src="vendor/three.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

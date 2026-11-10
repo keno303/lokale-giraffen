@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Giraffe — a walking study in Three.js</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>
+  :root{
+    --ink:#f3e9d6; --dim:#c3b49a; --panel:rgba(24,20,16,.62); --line:rgba(243,233,214,.16);
+    --accent:#e2a63f; --accent2:#8fd0b8;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden;background:#0d0b09;
+    font:13px/1.45 "Avenir Next","Segoe UI",system-ui,-apple-system,sans-serif;color:var(--ink)}
+  canvas#view{position:fixed;inset:0;display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+  canvas#view:active{cursor:grabbing}
+
+  .plate{position:fixed;z-index:5;background:var(--panel);backdrop-filter:blur(10px) saturate(1.1);
+    border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.45)}
+
+  header{left:14px;top:12px;padding:9px 13px 10px;max-width:min(42ch,40vw)}
+  header h1{margin:0;font-size:17px;letter-spacing:.06em;font-weight:600}
+  header h1 i{font-style:normal;color:var(--accent)}
+  header p{margin:5px 0 0;color:var(--dim);font-size:11.5px}
+  header .spec{margin-top:7px;display:flex;gap:12px;flex-wrap:wrap;font-size:10.5px;color:var(--dim);
+    text-transform:uppercase;letter-spacing:.09em}
+  header .spec b{color:var(--ink);font-weight:600}
+
+  #stats{right:16px;top:14px;padding:10px 13px;min-width:194px;
+    font:11px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace}
+  #stats .kv{display:flex;justify-content:space-between;gap:14px}
+  #stats .kv span{color:var(--dim)}
+  #stats .kv b{font-weight:600}
+
+  #dock{left:50%;bottom:10px;transform:translateX(-50%);padding:7px 11px;
+    display:flex;flex-direction:column;gap:5px;align-items:center;max-width:98vw}
+  #dock .row{display:flex;align-items:center;gap:13px;flex-wrap:wrap;justify-content:center}
+  .grp{display:flex;align-items:center;gap:8px}
+  .grp+.grp{border-left:1px solid var(--line);padding-left:16px}
+  .lab{font-size:9.5px;text-transform:uppercase;letter-spacing:.13em;color:var(--dim);
+    align-self:center;white-space:nowrap}
+  button{font:inherit;color:var(--ink);background:rgba(255,255,255,.06);border:1px solid var(--line);
+    border-radius:8px;padding:5px 10px;cursor:pointer;white-space:nowrap}
+  button:hover{background:rgba(255,255,255,.12)}
+  button.on{background:var(--accent);border-color:var(--accent);color:#20180b;font-weight:600}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:104px;height:18px;background:none;cursor:pointer}
+  input[type=range]::-webkit-slider-runnable-track{height:3px;border-radius:3px;background:rgba(243,233,214,.25)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;
+    background:var(--accent);margin-top:-5px;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+  input[type=range]::-moz-range-track{height:3px;border-radius:3px;background:rgba(243,233,214,.25)}
+  input[type=range]::-moz-range-thumb{width:13px;height:13px;border:0;border-radius:50%;background:var(--accent)}
+  input[type=range]:disabled{opacity:.35}
+  output{font:10.5px ui-monospace,Menlo,monospace;color:var(--accent2);min-width:9ch}
+  label.chk{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);cursor:pointer;white-space:nowrap}
+  label.chk input{accent-color:var(--accent);width:13px;height:13px}
+
+  #help{left:16px;bottom:16px;padding:7px 11px;color:var(--dim);font-size:10.5px;max-width:31ch}
+  body.noui .plate{opacity:0;pointer-events:none;transition:opacity .35s}
+  body.noui #view{cursor:crosshair}
+  .plate{transition:opacity .3s}
+  #help kbd{color:var(--ink);background:rgba(255,255,255,.08);border:1px solid var(--line);
+    border-radius:4px;padding:0 4px;font:10px ui-monospace,monospace}
+
+  #toast{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:9;padding:6px 12px;
+    background:var(--panel);border:1px solid var(--line);border-radius:20px;color:var(--dim);
+    font-size:11px;letter-spacing:.08em;opacity:0;pointer-events:none;transition:opacity .4s}
+  body.noui #toast.show{opacity:1}
+  #boot{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:12px;background:#100d0a;color:var(--dim);letter-spacing:.14em;
+    font-size:11px;text-transform:uppercase}
+  #boot b{color:var(--accent);font-size:22px;letter-spacing:.02em;font-weight:600}
+  @media (max-width:860px){
+    header p,#help{display:none}
+    #dock{gap:10px} .grp+.grp{border-left:0;padding-left:0}
+    input[type=range]{width:84px}
+  }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="boot"><b>Giraffa camelopardis</b><span>weaving hide, growing blotches…</span></div>
+
+<header class="plate">
+  <h1>A walking <i>giraffe</i></h1>
+  <p>Procedural anatomy, lofted from cross-sections; a pacing gait solved with
+     analytic two-segment IK, so every hoof plants without slipping.</p>
+  <div class="spec">
+    <span>height <b>5.3 m</b></span><span>shoulder <b>3.0 m</b></span>
+    <span>neck <b>7 vertebrae</b></span><span>gait <b>lateral pace</b></span>
+  </div>
+</header>
+
+<div id="toast">press <b>H</b> to bring the controls back</div>
+<div id="stats" class="plate"></div>
+
+<div id="dock" class="plate">
+  <div class="row">
+    <div class="grp">
+      <span class="lab">gait</span>
+      <button data-gait="idle">Idle</button>
+      <button data-gait="walk" class="on">Walk</button>
+      <button data-gait="trot">Trot</button>
+      <button data-gait="rack">Rack</button>
+    </div>
+    <div class="grp">
+      <span class="lab">speed</span>
+      <input id="speed" type="range" min="0.15" max="8" step="0.05" value="1.25"><output id="speedv"></output>
+    </div>
+    <div class="grp">
+      <span class="lab">path</span>
+      <input id="radius" type="range" min="0" max="90" step="1" value="30"><output id="radiusv"></output>
+    </div>
+    <div class="grp">
+      <span class="lab">sun</span>
+      <input id="sunAz" type="range" min="0" max="360" step="1" value="128"><output id="sunAzv"></output>
+      <input id="sunEl" type="range" min="3" max="82" step="1" value="46"><output id="sunElv"></output>
+      <input id="exposure" type="range" min="0.4" max="1.8" step="0.02" value="1.06"><output id="exposurev"></output>
+    </div>
+  </div>
+  <div class="row">
+    <div class="grp">
+      <span class="lab">camera</span>
+      <button data-cam="follow" class="on">Follow</button>
+      <button data-cam="side">Profile</button>
+      <button data-cam="low">Low</button>
+      <button data-cam="free">Orbit</button>
+    </div>
+    <div class="grp">
+      <label class="chk"><input id="tRig" type="checkbox">rig</label>
+      <label class="chk"><input id="tWire" type="checkbox">wire</label>
+      <label class="chk"><input id="tShadow" type="checkbox" checked>shadows</label>
+      <label class="chk"><input id="tDust" type="checkbox" checked>dust</label>
+      <label class="chk"><input id="tAuto" type="checkbox" checked>auto</label>
+      <label class="chk"><input id="tHerd" type="checkbox" checked>herd</label>
+      <label class="chk"><input id="tUI" type="checkbox">hide&nbsp;ui</label>
+    </div>
+    <div class="grp">
+      <button id="pause">⏸ pause</button>
+      <button id="step">step ▸</button>
+      <button id="shot" title="save a PNG of the current frame">save png</button>
+      <input id="scrub" type="range" min="0" max="999" step="1" value="0" disabled>
+    </div>
+  </div>
+</div>
+
+<div id="help" class="plate">
+  drag to orbit · wheel / pinch to zoom · <kbd>H</kbd> hides this lot ·
+  <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> gait ·
+  <kbd>↑↓</kbd> speed · <kbd>C</kbd> camera · <kbd>R</kbd> rig · <kbd>W</kbd> wire · <kbd>space</kbd> pause
+</div>
+
+<script src="lib/three.min.js"></script>
+<script src="src/core.js"></script>
+<script src="src/textures.js"></script>
+<script src="src/geometry.js"></script>
+<script src="src/giraffe.js"></script>
+<script src="src/gait.js"></script>
+<script src="src/environment.js"></script>
+<script src="src/camera.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walking Giraffe · Three.js</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #cfd9dd; color: #fff;
+    font: 13px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  #c { display: block; width: 100vw; height: 100vh; touch-action: none; }
+  .panel {
+    position: absolute; padding: 10px 13px; border-radius: 10px;
+    background: rgba(16, 20, 24, .48); backdrop-filter: blur(6px);
+    box-shadow: 0 4px 18px rgba(0,0,0,.25);
+    text-shadow: 0 1px 2px rgba(0,0,0,.5);
+    pointer-events: none; user-select: none;
+  }
+  #title { top: 14px; left: 14px; }
+  #title h1 { margin: 0; font-size: 16px; font-weight: 650; letter-spacing: .2px; }
+  #title .sub { opacity: .8; font-size: 12px; }
+  #stats { top: 14px; right: 14px; text-align: right; font-variant-numeric: tabular-nums; }
+  #help { bottom: 14px; left: 14px; font-size: 12px; opacity: .92; }
+  kbd {
+    display: inline-block; min-width: 15px; text-align: center;
+    padding: 0 4px; margin: 0 1px; border-radius: 4px;
+    background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3);
+    font: 11px/16px ui-monospace, Menlo, monospace;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="panel" id="title">
+  <h1>Walking Giraffe</h1>
+  <div class="sub">procedural anatomy &amp; gait · Three.js</div>
+</div>
+
+<div class="panel" id="stats">
+  <div>gait: <span id="hud-gait">–</span></div>
+  <div>speed: <span id="hud-speed">–</span></div>
+  <div><span id="hud-fps">–</span></div>
+</div>
+
+<div class="panel" id="help">
+  <kbd>drag</kbd> orbit &nbsp; <kbd>scroll</kbd> zoom &nbsp;
+  <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd> views &nbsp;
+  <kbd>G</kbd> gait &nbsp; <kbd>S</kbd> speed &nbsp; <kbd>A</kbd> auto-orbit &nbsp;
+  <kbd>space</kbd> pause
+</div>
+
+<script src="lib/three.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/giraffe.js"></script>
+<script src="js/gait.js"></script>
+<script src="js/world.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giraffe — Three.js</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #dfe3d8; }
+  #app { width: 100%; height: 100%; display: block; }
+  #ui {
+    position: fixed; left: 12px; bottom: 12px; z-index: 10;
+    font: 13px/1.5 -apple-system, "Segoe UI", sans-serif;
+    color: #3c3524; background: rgba(255,253,245,.82);
+    padding: 8px 12px; border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15); user-select: none;
+  }
+  #ui b { color: #7a4d1d; }
+  #overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    font: 16px -apple-system, "Segoe UI", sans-serif; color: #4a4030;
+    background: #e8e4d4; z-index: 20;
+  }
+</style>
+</head>
+<body>
+<div id="overlay">Loading giraffe… (three.js from CDN)</div>
+<div id="ui">
+  <b>Giraffe</b> · drag = orbit · wheel = zoom · <b>G</b> = graze · <b>Space</b> = walk / stop
+</div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============================== renderer / scene ============================== */
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xdcdcc8, 55, 170);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 800);
+camera.position.set(7.5, 3.4, 11.5);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxPolarAngle = 1.53;
+controls.minDistance = 3;
+controls.maxDistance = 70;
+
+/* sky dome (gradient) */
+scene.add(new THREE.Mesh(
+  new THREE.SphereGeometry(500, 32, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    vertexShader: `varying vec3 vP; void main(){ vP = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `varying vec3 vP; void main(){
+      float h = normalize(vP).y;
+      vec3 top = vec3(0.42, 0.64, 0.90), hor = vec3(0.88, 0.86, 0.76);
+      gl_FragColor = vec4(mix(hor, top, smoothstep(0.0, 0.45, h)), 1.0); }`
+  })
+));
+
+/* lights */
+const sun = new THREE.DirectionalLight(0xfff1da, 2.6);
+sun.position.set(28, 42, 18);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = sun.shadow.camera.bottom = -26;
+sun.shadow.camera.right = sun.shadow.camera.top = 26;
+sun.shadow.camera.far = 120;
+sun.shadow.bias = -0.0006;
+scene.add(sun);
+scene.add(sun.target);
+scene.add(new THREE.HemisphereLight(0xbcd4e8, 0x9a8a5e, 1.0));
+scene.add(new THREE.AmbientLight(0xffffff, 0.12));
+
+/* ============================== procedural textures ============================== */
+
+function canvasTexture(size, draw, repeat) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  draw(c.getContext('2d'), size);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  if (repeat) t.repeat.set(repeat, repeat);
+  return t;
+}
+
+/* giraffe hide: tan base + irregular dark patches (blobs of circles) */
+const hideTexture = canvasTexture(1024, (g, s) => {
+  g.fillStyle = '#e3b26e'; g.fillRect(0, 0, s, s);
+  for (let i = 0; i < 5000; i++) {
+    g.fillStyle = `rgba(170,130,80,${Math.random() * 0.05})`;
+    g.fillRect(Math.random() * s, Math.random() * s, 2, 2);
+  }
+  const cols = ['#96663a', '#8a5a2f', '#9d6c40', '#7d5028'];
+  for (let i = 0; i < 150; i++) {
+    const x = Math.random() * s, y = Math.random() * s, r = 15 + Math.random() * 27;
+    g.fillStyle = cols[(Math.random() * cols.length) | 0];
+    g.beginPath();
+    const lobes = 6 + (Math.random() * 5 | 0);
+    for (let k = 0; k < lobes; k++) {
+      const a = (k / lobes) * Math.PI * 2 + Math.random() * 0.8;
+      const rr = r * (0.6 + Math.random() * 0.5);
+      g.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+      g.arc(x + Math.cos(a) * rr, y + Math.sin(a) * rr, r * 0.42, 0, Math.PI * 2);
+    }
+    g.fill();
+  }
+});
+
+/* dry savanna grass ground */
+const grassTexture = canvasTexture(512, (g, s) => {
+  g.fillStyle = '#b09a58'; g.fillRect(0, 0, s, s);
+  for (let i = 0; i < 26000; i++) {
+    const c = Math.random();
+    g.fillStyle = c < 0.45 ? `rgba(${120 + Math.random() * 60 | 0},${100 + Math.random() * 50 | 0},50,0.35)`
+                : c < 0.8  ? `rgba(${160 + Math.random() * 50 | 0},${140 + Math.random() * 40 | 0},70,0.3)`
+                           : `rgba(${90 + Math.random() * 40 | 0},${110 + Math.random() * 40 | 0},55,0.25)`;
+    g.fillRect(Math.random() * s, Math.random() * s, 1 + Math.random() * 3, 1 + Math.random() * 2);
+  }
+}, 30);
+
+/* ============================== ground & scenery ============================== */
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(400, 400),
+  new THREE.MeshStandardMaterial({ map: grassTexture, roughness: 1 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const barkMat  = new THREE.MeshStandardMaterial({ color: 0x6b4a2c, roughness: 1 });
+const leafMat  = new THREE.MeshStandardMaterial({ color: 0x4d6b2a, roughness: 1, flatShading: true });
+const rockMat  = new THREE.MeshStandardMaterial({ color: 0x9a8f7e, roughness: 1, flatShading: true });
+
+function acacia(x, z, scale) {
+  const t = new THREE.Group();
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.3, 2.6, 7), barkMat);
+  trunk.position.y = 1.3; trunk.rotation.z = 0.06; trunk.castShadow = true;
+  t.add(trunk);
+  for (let i = 0; i < 4; i++) {
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.09, 1.9, 5), barkMat);
+    b.position.y = 2.5;
+    b.rotation.set(Math.sin(i * 2.4) * 0.9, i * 1.6, 0.7 + i * 0.2);
+    b.castShadow = true;
+    t.add(b);
+  }
+  for (let i = 0; i < 3; i++) {
+    const c = new THREE.Mesh(new THREE.SphereGeometry(1.5, 10, 7), leafMat);
+    c.scale.set(1.5, 0.45, 1.5);
+    c.position.set((Math.random() - 0.5) * 1.8, 3.3 + i * 0.5, (Math.random() - 0.5) * 1.8);
+    c.castShadow = true;
+    t.add(c);
+  }
+  t.position.set(x, 0, z);
+  t.scale.setScalar(scale);
+  t.rotation.y = Math.random() * Math.PI * 2;
+  scene.add(t);
+}
+
+function rock(x, z, s) {
+  const r = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), rockMat);
+  r.position.set(x, s * 0.45, z);
+  r.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+  r.castShadow = r.receiveShadow = true;
+  scene.add(r);
+}
+
+/* keep the walk path (radius 10) clear; scatter scenery outside it */
+for (let i = 0; i < 9; i++) {
+  const a = i / 9 * Math.PI * 2 + 0.35, d = 15 + Math.random() * 16;
+  acacia(Math.cos(a) * d, Math.sin(a) * d, 0.8 + Math.random() * 0.9);
+}
+for (let i = 0; i < 14; i++) {
+  const a = Math.random() * Math.PI * 2, d = 12.5 + Math.random() * 24;
+  rock(Math.cos(a) * d, Math.sin(a) * d, 0.3 + Math.random() * 0.8);
+}
+
+/* ============================== the giraffe ============================== */
+
+const hideMat = new THREE.MeshStandardMaterial({ map: hideTexture, roughness: 0.85 });
+const darkMat = new THREE.MeshStandardMaterial({ color: 0x4a3018, roughness: 0.9 });
+const hoofMat = new THREE.MeshStandardMaterial({ color: 0x33281e, roughness: 0.6 });
+const eyeMat  = new THREE.MeshStandardMaterial({ color: 0x1a120a, roughness: 0.2 });
+
+function mesh(geo, mat, x = 0, y = 0, z = 0) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  m.castShadow = m.receiveShadow = true;
+  return m;
+}
+function sm(m, x, y, z) { m.scale.set(x, y, z); return m; }  // squash/stretch helper
+
+const giraffe = new THREE.Group();      // root, faces +Z
+const body = new THREE.Group();         // torso
+body.position.y = 1.9;
+giraffe.add(body);
+scene.add(giraffe);
+
+/* torso: overlapping ellipsoids for a natural silhouette */
+body.add(sm(mesh(new THREE.SphereGeometry(1, 24, 18), hideMat, 0, 0, -0.1), 0.46, 0.55, 0.85));
+body.add(sm(mesh(new THREE.SphereGeometry(1, 20, 16), hideMat, 0, 0.04, 0.72), 0.42, 0.5, 0.45));  // chest
+body.add(sm(mesh(new THREE.SphereGeometry(1, 20, 16), hideMat, 0, 0.02, -0.78), 0.42, 0.48, 0.44)); // rump
+
+/* ---- legs ---- */
+function makeLeg(x, z, phase, isFront) {
+  const hip = new THREE.Group();
+  hip.position.set(x, -0.28, z);
+  const baseHip = isFront ? 0 : 0.05;
+  hip.rotation.x = baseHip;
+
+  const upper = mesh(new THREE.CapsuleGeometry(0.12, 0.68, 6, 12), hideMat, 0, -0.42, 0);
+  hip.add(upper);
+
+  const knee = new THREE.Group();
+  knee.position.y = -0.82;
+  const lower = mesh(new THREE.CapsuleGeometry(0.07, 0.62, 6, 12), hideMat, 0, -0.37, 0);
+  knee.add(lower);
+  knee.add(mesh(new THREE.BoxGeometry(0.17, 0.15, 0.22), hoofMat, 0, -0.72, 0.03));
+  knee.rotation.x = 0.1;
+
+  hip.add(knee);
+  body.add(hip);
+  return { hip, knee, phase, baseHip };
+}
+
+const legL = [
+  makeLeg( 0.34,  0.6, 0.25, true),  // left front
+  makeLeg( 0.34, -0.66, 0.0, false), // left hind
+];
+const legR = [
+  makeLeg(-0.34,  0.6, 0.75, true),   // right front
+  makeLeg(-0.34, -0.66, 0.5, false),  // right hind
+];
+const allLegs = [...legL, ...legR];
+
+/* ---- neck & head ---- */
+const neck = new THREE.Group();
+neck.position.set(0, 0.32, 0.62);
+const NECK_LEN = 1.72;
+neck.add(mesh(new THREE.CapsuleGeometry(0.19, NECK_LEN - 0.2, 8, 16), hideMat, 0, NECK_LEN / 2, 0));
+
+/* mane tufts along the back of the neck */
+for (let i = 0; i < 13; i++) {
+  const t = mesh(new THREE.BoxGeometry(0.06, 0.1, 0.07), darkMat,
+    (i % 2 - 0.5) * 0.02, 0.28 + i * 0.115, -0.155);
+  t.rotation.x = -0.5;
+  neck.add(t);
+}
+body.add(neck);
+
+/* head, compensating pitch so it stays level-ish */
+const head = new THREE.Group();
+head.position.y = NECK_LEN;
+head.add(sm(mesh(new THREE.SphereGeometry(1, 20, 16), hideMat, 0, 0, 0.05), 0.17, 0.2, 0.26));      // skull
+head.add(sm(mesh(new THREE.SphereGeometry(1, 16, 12), hideMat, 0, -0.045, 0.3), 0.13, 0.14, 0.26)); // muzzle
+const nose = mesh(new THREE.SphereGeometry(0.05, 12, 10),
+  new THREE.MeshStandardMaterial({ color: 0x5c4126, roughness: 0.8 }), 0, -0.02, 0.54);
+head.add(nose);
+
+const jaw = new THREE.Group();
+jaw.position.set(0, -0.11, 0.18);
+jaw.add(mesh(new THREE.BoxGeometry(0.15, 0.07, 0.32), hideMat, 0, -0.03, 0.12));
+head.add(jaw);
+
+for (const s of [-1, 1]) {
+  head.add(mesh(new THREE.SphereGeometry(0.045, 12, 10), eyeMat, s * 0.155, 0.09, 0.16));   // eyes
+  head.add(mesh(new THREE.SphereGeometry(0.013, 8, 6),
+    new THREE.MeshStandardMaterial({ color: 0xffffff }), s * 0.17, 0.1, 0.19));             // glint
+
+  const horn = mesh(new THREE.CylinderGeometry(0.028, 0.034, 0.24, 8), hideMat, s * 0.075, 0.26, -0.02);
+  head.add(horn);
+  head.add(mesh(new THREE.SphereGeometry(0.048, 10, 8), darkMat, s * 0.075, 0.38, -0.02)); // ossicone knob
+
+  const ear = mesh(new THREE.SphereGeometry(0.09, 10, 8), hideMat, s * 0.22, 0.17, -0.02);
+  ear.scale.set(0.28, 1, 0.55);
+  ear.rotation.z = s * -0.5;
+  head.add(ear);
+}
+neck.add(head);
+
+/* ---- tail ---- */
+const tail = new THREE.Group();
+tail.position.set(0, 0.3, -0.92);
+tail.rotation.x = 0.55;
+tail.add(mesh(new THREE.CapsuleGeometry(0.04, 0.45, 6, 8), hideMat, 0, -0.28, 0));
+const tuft = mesh(new THREE.SphereGeometry(0.075, 10, 8), darkMat, 0, -0.62, 0);
+tuft.scale.set(1, 1.4, 1);
+tail.add(tuft);
+body.add(tail);
+
+/* ============================== animation state ============================== */
+
+const PATH_R = 10, WALK_SPEED = 0.75, STEP_RATE = 3.2;   // m/s, rad/s of gait phase
+let gait = 0, speed = 0, targetSpeed = WALK_SPEED;
+let walking = true, grazing = false, grazeAmt = 0;
+let earFlickL = 0, earFlickR = 0;
+const clock = new THREE.Clock();
+
+function setWalk(on)  { walking = on;  targetSpeed = on ? WALK_SPEED : 0; }
+function setGraze(on) { grazing = on;  if (on) setWalk(false); }
+
+addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); setGraze(false); setWalk(!walking); }
+  if (e.code === 'KeyG')  { grazing ? (setGraze(false), setWalk(true)) : setGraze(true); }
+});
+
+/* ============================== per-frame update ============================== */
+
+function updateGiraffe(dt, t) {
+  speed += (targetSpeed - speed) * Math.min(1, dt * 2.2);
+  grazeAmt += ((grazing ? 1 : 0) - grazeAmt) * Math.min(1, dt * 1.6);
+
+  /* follow a circular path; angular speed matches stride-implied speed */
+  gait += STEP_RATE * (speed / WALK_SPEED) * dt;
+  const a = t * (WALK_SPEED / PATH_R);
+  const px = Math.sin(a) * PATH_R, pz = Math.cos(a) * PATH_R;
+  giraffe.position.x = px;
+  giraffe.position.z = pz;
+  giraffe.rotation.y = Math.atan2(Math.cos(a), -Math.sin(a)); // face travel direction
+
+  /* gait (swing scales with speed so legs ease to standing when stopped) */
+  const g = grazeAmt, moving = Math.min(1, speed / WALK_SPEED);
+  for (const l of allLegs) {
+    const p = gait + l.phase * Math.PI * 2;
+    l.hip.rotation.x  = l.baseHip - 0.48 * Math.sin(p) * moving;
+    l.knee.rotation.x = 0.08 + 0.7 * Math.max(0, Math.cos(p)) * moving;
+  }
+
+  /* body bounce, sway & breathing */
+  body.position.y = 1.9 + Math.sin(gait * 2) * 0.028 * moving;
+  body.rotation.z = Math.sin(gait) * 0.022 * moving;
+  body.rotation.x = g * 0.1;
+  body.scale.y = 1 + Math.sin(t * 1.7) * 0.006 + g * 0.01;
+
+  /* neck: upright while walking, swings down when grazing */
+  const neckPitch = THREE.MathUtils.lerp(0.5, 2.45, g) + Math.sin(gait) * 0.025 * moving + g * 0.06 * Math.sin(t * 2.5);
+  neck.rotation.x = neckPitch;
+  neck.rotation.z = Math.sin(t * 0.9) * 0.02 + g * Math.sin(t * 1.3) * 0.03;
+  head.rotation.x = -neckPitch - 0.02 + 0.5 * g;   // extra nose-down while grazing
+  head.rotation.y = Math.sin(t * 0.6) * 0.12 * (1 - g) + g * Math.sin(t * 1.1) * 0.15;
+  head.rotation.z = (1 - g) * Math.sin(t * 0.8) * 0.04;
+
+  /* chewing while grazing */
+  jaw.rotation.x = g * (0.18 + 0.18 * Math.sin(t * 9) * (0.5 + 0.5 * Math.sin(t * 2.3)));
+
+  /* tail flicks */
+  tail.rotation.x = 0.55 + Math.sin(t * 2.1) * 0.08 + moving * 0.1 * Math.sin(gait);
+  tail.rotation.z = Math.sin(t * 2.6) * 0.22 * (1 - g) + g * Math.sin(t * 4) * 0.1;
+
+  /* occasional ear flicks */
+  if (Math.random() < dt * 0.5) earFlickL = 1;
+  if (Math.random() < dt * 0.4) earFlickR = 1;
+  earFlickL = Math.max(0, earFlickL - dt * 3.5);
+  earFlickR = Math.max(0, earFlickR - dt * 3.5);
+  if (earRefs.l) { earRefs.l.rotation.z = -0.5 + earFlickL * 0.5; earRefs.l.rotation.x = earFlickL * 0.6; }
+  if (earRefs.r) { earRefs.r.rotation.z =  0.5 - earFlickR * 0.5; earRefs.r.rotation.x = earFlickR * 0.6; }
+}
+
+/* collect ear refs (they are the two scaled spheres in head) */
+const earRefs = {};
+for (const c of head.children) {
+  if (c.geometry instanceof THREE.SphereGeometry && c.scale.x < 0.5 && c.scale.y > 0.9) {
+    if (c.position.x < 0) earRefs.l = c; else if (c.position.x > 0) earRefs.r = c;
+  }
+}
+
+/* camera gently follows the giraffe */
+const camTarget = new THREE.Vector3(0, 2.4, PATH_R);
+function updateCamera(dt) {
+  camTarget.lerp(new THREE.Vector3(giraffe.position.x, 2.4, giraffe.position.z), 1 - Math.pow(0.001, dt));
+  controls.target.copy(camTarget);
+  controls.update();
+}
+
+/* ============================== loop ============================== */
+
+function frame() {
+  requestAnimationFrame(frame);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+  updateGiraffe(dt, t);
+  updateCamera(dt);
+  sun.position.set(giraffe.position.x + 28, 42, giraffe.position.z + 18);
+  sun.target.position.copy(giraffe.position);
+  renderer.render(scene, camera);
+}
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+document.getElementById('overlay').remove();
+window.__giraffeReady = true;
+frame();
+</script>
+<script>
+  setTimeout(() => {
+    if (!window.__giraffeReady) {
+      const o = document.getElementById('overlay');
+      if (o) o.textContent = 'Could not load three.js from the CDN — an internet connection is needed the first time. Reopen index.html while online.';
+    }
+  }, 9000);
+</script>
+</body>
+</html>

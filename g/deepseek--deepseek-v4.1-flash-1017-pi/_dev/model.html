@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+html,body{margin:0;background:#e9e4da;overflow:hidden}
+#c{display:block}
+#info{position:fixed;left:8px;top:8px;font:11px/1.4 ui-monospace,Menlo,monospace;color:#333;white-space:pre}
+</style></head>
+<body>
+<canvas id="c"></canvas>
+<div id="info"></div>
+<script src="../vendor/three.min.js"></script>
+<script src="../js/util.js"></script>
+<script src="../js/textures.js"></script>
+<script src="../js/geometry.js"></script>
+<script src="../js/giraffe.js"></script>
+<script>
+(function(){
+  var W = 1400, H = 900;
+  var cv = document.getElementById('c');
+  cv.width = W; cv.height = H;
+  var renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+  renderer.setSize(W, H, false);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.shadowMap.enabled = false;
+
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xe9e4da);
+
+  var g = new G.Giraffe();
+  g.root.traverse(function(o){ if(o.isMesh){ o.castShadow=false; } });
+  scene.add(g.root);
+
+  // time from query
+  var params = new URLSearchParams(location.search);
+  var t = params.has('t') ? parseFloat(params.get('t')) : 0;
+  g.update(t);
+
+  var amb = new THREE.HemisphereLight(0xffffff, 0x999999, 1.05);
+  scene.add(amb);
+  var dir = new THREE.DirectionalLight(0xffffff, 1.1);
+  dir.position.set(3, 6, 5); scene.add(dir);
+  var dir2 = new THREE.DirectionalLight(0xffffff, 0.5);
+  dir2.position.set(-4, 2, -5); scene.add(dir2);
+
+  // four orthographic views
+  var views = [
+    { x: 0,   y: 0,   w: W/2, h: H/2, cam: 'side' },
+    { x: W/2, y: 0,   w: W/2, h: H/2, cam: 'front' },
+    { x: 0,   y: H/2, w: W/2, h: H/2, cam: 'top' },
+    { x: W/2, y: H/2, w: W/2, h: H/2, cam: 'head' }
+  ];
+
+  var H3 = 2.75;  // half height of the figure view
+  var CY = 2.55;
+  var camSide = new THREE.OrthographicCamera(-H3, H3, CY + H3, CY - H3, -20, 40);
+  camSide.position.set(12, CY, 0.6); camSide.lookAt(0, CY, 0.6);
+  var camFront = new THREE.OrthographicCamera(-H3, H3, CY + H3, CY - H3, -20, 40);
+  camFront.position.set(0.2, CY, 12); camFront.lookAt(0.2, CY, 0.6);
+  var camTop = new THREE.OrthographicCamera(-H3, H3, H3, -H3, -20, 40);
+  camTop.position.set(0.2, 12, 0.6); camTop.up.set(0, 0, -1); camTop.lookAt(0.2, 0, 0.6);
+
+  var hb = new THREE.Box3().setFromObject(g.headGroup);
+  var hc = hb.getCenter(new THREE.Vector3());
+  var camHead = new THREE.OrthographicCamera(-0.85, 0.85, 0.55, -0.55, -20, 40);
+  camHead.position.set(hc.x + 8, hc.y + 0.15, hc.z + 0.15); camHead.lookAt(hc.x, hc.y, hc.z);
+
+  var cams = { side: camSide, front: camFront, top: camTop, head: camHead };
+
+  renderer.setScissorTest(true);
+  views.forEach(function(v){
+    renderer.setViewport(v.x, H - v.y - v.h, v.w, v.h);
+    renderer.setScissor(v.x, H - v.y - v.h, v.w, v.h);
+    renderer.render(scene, cams[v.cam]);
+  });
+
+  var b = new THREE.Box3().setFromObject(g.root);
+  document.getElementById('info').textContent =
+    'total h ' + (b.max.y-b.min.y).toFixed(2) +
+    ' | body len ' + (b.max.z-b.min.z).toFixed(2) +
+    ' | width ' + (b.max.x-b.min.x).toFixed(2) +
+    ' | head ' + (hb.max.z-hb.min.z).toFixed(2) + 'x' + (hb.max.y-hb.min.y).toFixed(2) +
+    ' | neck base r ' + g.neck.rings[0].ry.toFixed(2) + '/' + g.neck.rings[0].rx.toFixed(2);
+  window.__READY = true;
+})();
+</script>
+</body></html>
