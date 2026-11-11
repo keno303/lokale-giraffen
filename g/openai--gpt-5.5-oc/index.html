@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Walking Giraffe - Three.js</title>
+  <style>
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #8ec6e8;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    canvas { display: block; }
+    .hud {
+      position: fixed;
+      left: 16px;
+      top: 14px;
+      max-width: 360px;
+      padding: 12px 14px;
+      color: #213018;
+      background: rgba(255, 248, 224, 0.78);
+      border: 1px solid rgba(94, 70, 35, 0.25);
+      border-radius: 14px;
+      box-shadow: 0 10px 26px rgba(44, 55, 38, 0.18);
+      backdrop-filter: blur(6px);
+      user-select: none;
+    }
+    .hud h1 {
+      margin: 0 0 6px;
+      font-size: 18px;
+      letter-spacing: 0.2px;
+    }
+    .hud p {
+      margin: 4px 0;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .hud kbd {
+      padding: 1px 5px;
+      border-radius: 5px;
+      background: rgba(255,255,255,0.65);
+      border: 1px solid rgba(0,0,0,0.12);
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <h1>Procedural Walking Giraffe</h1>
+    <p>Drag to orbit, scroll to zoom. The animal uses articulated legs, a swaying neck, tail, mane, ossicones, hoof contact, and a looping walk path.</p>
+    <p><kbd>Space</kbd> pause/resume &nbsp; <kbd>R</kbd> reset camera</p>
+  </div>
+
+  <!-- Classic UMD builds are vendored locally so this works from file:// with no server, build step, or internet connection. -->
+  <script src="vendor/three.min.js"></script>
+  <script src="vendor/OrbitControls.js"></script>
+  <script>
+  (() => {
+    'use strict';
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x8fc9ee);
+    scene.fog = new THREE.Fog(0x8fc9ee, 34, 92);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 180);
+    camera.position.set(12, 7.2, 14);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.minDistance = 5;
+    controls.maxDistance = 45;
+    controls.maxPolarAngle = Math.PI * 0.49;
+    controls.target.set(0, 3.1, 0);
+
+    const hemi = new THREE.HemisphereLight(0xeaf7ff, 0x6d5c31, 1.15);
+    scene.add(hemi);
+
+    const sun = new THREE.DirectionalLight(0xfff3d1, 2.1);
+    sun.position.set(-10, 15, 8);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = 45;
+    sun.shadow.camera.left = -18;
+    sun.shadow.camera.right = 18;
+    sun.shadow.camera.top = 18;
+    sun.shadow.camera.bottom = -18;
+    scene.add(sun);
+
+    const fill = new THREE.DirectionalLight(0x9fc4ff, 0.32);
+    fill.position.set(9, 7, -12);
+    scene.add(fill);
+
+    const mat = {
+      coat: new THREE.MeshStandardMaterial({ color: 0xd8a44c, roughness: 0.72, metalness: 0.02 }),
+      belly: new THREE.MeshStandardMaterial({ color: 0xf1d59a, roughness: 0.8 }),
+      spot: new THREE.MeshStandardMaterial({ color: 0x7d4a1e, roughness: 0.86 }),
+      darkSpot: new THREE.MeshStandardMaterial({ color: 0x553115, roughness: 0.9 }),
+      hoof: new THREE.MeshStandardMaterial({ color: 0x2d211a, roughness: 0.7 }),
+      mane: new THREE.MeshStandardMaterial({ color: 0x4a2b14, roughness: 0.9 }),
+      eye: new THREE.MeshStandardMaterial({ color: 0x090705, roughness: 0.35 }),
+      white: new THREE.MeshStandardMaterial({ color: 0xfff8dc, roughness: 0.48 }),
+      grass: new THREE.MeshStandardMaterial({ color: 0x77a13e, roughness: 0.9 }),
+      dirt: new THREE.MeshStandardMaterial({ color: 0x9a7444, roughness: 0.92 }),
+      leaf: new THREE.MeshStandardMaterial({ color: 0x547f2a, roughness: 0.86 }),
+      trunk: new THREE.MeshStandardMaterial({ color: 0x755334, roughness: 0.82 })
+    };
+
+    function roundedBoxGeometry(w, h, d, r, s) {
+      // Three.js r128 has no RoundedBoxGeometry in the core build; bevelled box approximates softer anatomy.
+      const shape = new THREE.Shape();
+      const x = -w / 2, y = -h / 2;
+      shape.moveTo(x + r, y);
+      shape.lineTo(x + w - r, y);
+      shape.quadraticCurveTo(x + w, y, x + w, y + r);
+      shape.lineTo(x + w, y + h - r);
+      shape.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      shape.lineTo(x + r, y + h);
+      shape.quadraticCurveTo(x, y + h, x, y + h - r);
+      shape.lineTo(x, y + r);
+      shape.quadraticCurveTo(x, y, x + r, y);
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: true, bevelSegments: s, bevelSize: r * 0.45, bevelThickness: r * 0.45, curveSegments: s });
+      geo.center();
+      return geo;
+    }
+
+    function makeMesh(geo, material, parent, pos, rot, scale, shadow = true) {
+      const mesh = new THREE.Mesh(geo, material);
+      if (pos) mesh.position.set(pos[0], pos[1], pos[2]);
+      if (rot) mesh.rotation.set(rot[0], rot[1], rot[2]);
+      if (scale) mesh.scale.set(scale[0], scale[1], scale[2]);
+      mesh.castShadow = shadow;
+      mesh.receiveShadow = shadow;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    const giraffe = new THREE.Group();
+    scene.add(giraffe);
+
+    const bodyGroup = new THREE.Group();
+    bodyGroup.position.y = 2.95;
+    giraffe.add(bodyGroup);
+
+    const bodyGeo = new THREE.SphereGeometry(1, 32, 20);
+    const body = makeMesh(bodyGeo, mat.coat, bodyGroup, [0, 0, 0], [0.02, 0, -0.02], [2.35, 0.78, 0.82]);
+    const chest = makeMesh(bodyGeo, mat.coat, bodyGroup, [1.85, 0.08, 0], [0, 0, -0.02], [0.9, 0.74, 0.74]);
+    const rump = makeMesh(bodyGeo, mat.coat, bodyGroup, [-1.75, 0, 0], [0, 0, 0.03], [0.88, 0.7, 0.76]);
+    const belly = makeMesh(bodyGeo, mat.belly, bodyGroup, [0.15, -0.34, 0], [0, 0, 0], [1.9, 0.22, 0.58], false);
+
+    // Neck with articulated segments so it can sway naturally while walking.
+    const neckRoot = new THREE.Group();
+    neckRoot.position.set(2.06, 0.34, 0);
+    bodyGroup.add(neckRoot);
+    const neckSegments = [];
+    const neckGeo = new THREE.CylinderGeometry(0.37, 0.48, 1.05, 20, 8);
+    for (let i = 0; i < 5; i++) {
+      const pivot = new THREE.Group();
+      pivot.position.set(i === 0 ? 0 : 0.1, i === 0 ? 0 : 0.92, 0);
+      pivot.rotation.z = -0.32;
+      (i === 0 ? neckRoot : neckSegments[i - 1].pivot).add(pivot);
+      const seg = makeMesh(neckGeo, mat.coat, pivot, [0.22, 0.47, 0], [0, 0, -0.18], [1 - i * 0.05, 1, 0.93 - i * 0.03]);
+      neckSegments.push({ pivot, seg });
+    }
+
+    const headRoot = new THREE.Group();
+    headRoot.position.set(0.35, 0.92, 0);
+    headRoot.rotation.z = -0.28;
+    neckSegments[neckSegments.length - 1].pivot.add(headRoot);
+
+    const skull = makeMesh(new THREE.SphereGeometry(1, 32, 18), mat.coat, headRoot, [0.43, 0.03, 0], [0, 0, 0.02], [0.67, 0.44, 0.38]);
+    const muzzle = makeMesh(new THREE.SphereGeometry(1, 32, 18), mat.belly, headRoot, [1.01, -0.06, 0], [0, 0, -0.03], [0.46, 0.28, 0.31]);
+    const nose = makeMesh(new THREE.SphereGeometry(1, 24, 12), mat.hoof, headRoot, [1.35, -0.08, 0], [0, 0, 0], [0.13, 0.09, 0.18]);
+
+    [-1, 1].forEach(side => {
+      const ear = makeMesh(new THREE.SphereGeometry(1, 24, 12), mat.coat, headRoot, [0.1, 0.22, side * 0.35], [0.2, side * 0.15, side * 0.32], [0.14, 0.36, 0.08]);
+      ear.name = 'ear';
+      const eyeWhite = makeMesh(new THREE.SphereGeometry(1, 16, 10), mat.white, headRoot, [0.62, 0.13, side * 0.34], [0, 0, 0], [0.072, 0.046, 0.035]);
+      const eye = makeMesh(new THREE.SphereGeometry(1, 16, 10), mat.eye, headRoot, [0.65, 0.13, side * 0.372], [0, 0, 0], [0.036, 0.026, 0.018]);
+      const horn = new THREE.Group();
+      horn.position.set(0.22, 0.41, side * 0.17);
+      horn.rotation.z = -0.07;
+      headRoot.add(horn);
+      makeMesh(new THREE.CylinderGeometry(0.045, 0.06, 0.46, 12), mat.coat, horn, [0, 0.22, 0], [0, 0, 0], [1, 1, 1]);
+      makeMesh(new THREE.SphereGeometry(1, 14, 8), mat.darkSpot, horn, [0, 0.48, 0], [0, 0, 0], [0.105, 0.09, 0.105]);
+    });
+
+    // Dark mane following the neck ridge.
+    const maneParts = [];
+    for (let i = 0; i < 6; i++) {
+      const blade = makeMesh(new THREE.ConeGeometry(0.09, 0.5, 4), mat.mane, i === 0 ? neckRoot : neckSegments[Math.min(i - 1, neckSegments.length - 1)].pivot,
+        [0.04, i === 0 ? 0.22 : 0.65, 0], [0, 0, Math.PI * 0.5], [1, 0.75, 1]);
+      maneParts.push(blade);
+    }
+
+    const tailRoot = new THREE.Group();
+    tailRoot.position.set(-2.5, 0.13, 0);
+    tailRoot.rotation.z = 0.75;
+    bodyGroup.add(tailRoot);
+    const tail = makeMesh(new THREE.CylinderGeometry(0.035, 0.055, 1.45, 10), mat.mane, tailRoot, [-0.48, -0.55, 0], [0, 0, -0.55], [1, 1, 1]);
+    const tailTuft = makeMesh(new THREE.ConeGeometry(0.18, 0.58, 12), mat.mane, tailRoot, [-0.96, -1.1, 0], [0, 0, -0.55], [1, 1, 1]);
+
+    // Spots are flattened ellipsoids placed on torso, neck and head.
+    const spotGeo = new THREE.SphereGeometry(1, 20, 10);
+    const spots = [];
+    function addSpot(parent, x, y, z, sx, sy, rz, material = mat.spot) {
+      const spot = makeMesh(spotGeo, material, parent, [x, y, z], [0, 0, rz], [sx, sy, 0.035], false);
+      spots.push(spot);
+      return spot;
+    }
+    const bodySpotData = [
+      [-1.75, 0.18, 0.72, .34, .22, .4], [-1.18, .43, .75, .27, .19, -.3], [-.6, .18, .79, .36, .24, .1], [.04, .48, .76, .31, .22, -.42], [.66, .1, .8, .39, .24, .22], [1.24, .38, .71, .28, .2, -.12], [1.83, .05, .61, .26, .2, .35],
+      [-1.45, -.08, -.72, .31, .2, -.3], [-.83, .36, -.77, .29, .2, .22], [-.18, .02, -.8, .37, .24, -.12], [.45, .39, -.76, .29, .19, .45], [1.0, -.03, -.77, .35, .23, -.35], [1.64, .31, -.62, .25, .18, .15]
+    ];
+    bodySpotData.forEach(s => addSpot(bodyGroup, ...s));
+    for (let i = 0; i < neckSegments.length; i++) {
+      addSpot(neckSegments[i].pivot, 0.23, 0.44, 0.36, 0.16 - i * 0.01, 0.12, (i % 2 ? -.4 : .25), i % 2 ? mat.darkSpot : mat.spot);
+      addSpot(neckSegments[i].pivot, 0.23, 0.58, -0.35, 0.14 - i * 0.01, 0.11, (i % 2 ? .2 : -.35));
+    }
+    addSpot(headRoot, .53, .27, .31, .12, .075, .4, mat.darkSpot);
+    addSpot(headRoot, .9, .06, -.29, .11, .07, -.2);
+
+    const legs = [];
+    function makeLeg(name, x, z, phase, isFront) {
+      const upperLen = isFront ? 1.75 : 1.65;
+      const lowerLen = isFront ? 1.62 : 1.55;
+      const hoofLen = 0.34;
+      const root = new THREE.Group();
+      root.position.set(x, -0.42, z);
+      bodyGroup.add(root);
+      const upper = new THREE.Group();
+      root.add(upper);
+      const upperMesh = makeMesh(new THREE.CylinderGeometry(0.18, 0.24, upperLen, 18), mat.coat, upper, [0, -upperLen / 2, 0], [0, 0, 0], [1, 1, 0.86]);
+      const knee = new THREE.Group();
+      knee.position.set(0, -upperLen, 0);
+      upper.add(knee);
+      makeMesh(new THREE.SphereGeometry(1, 16, 10), mat.coat, knee, [0, 0.04, 0], [0, 0, 0], [0.2, 0.16, 0.16]);
+      const lower = new THREE.Group();
+      knee.add(lower);
+      const lowerMesh = makeMesh(new THREE.CylinderGeometry(0.115, 0.155, lowerLen, 16), mat.coat, lower, [0, -lowerLen / 2, 0], [0, 0, 0], [0.92, 1, 0.78]);
+      const ankle = new THREE.Group();
+      ankle.position.set(0, -lowerLen, 0);
+      lower.add(ankle);
+      makeMesh(new THREE.SphereGeometry(1, 16, 8), mat.coat, ankle, [0, 0.03, 0], [0, 0, 0], [0.15, 0.11, 0.13]);
+      const hoof = makeMesh(roundedBoxGeometry(0.34, 0.24, 0.44, 0.045, 5), mat.hoof, ankle, [0.06, -hoofLen, 0], [0, 0, 0.06], [1, 1, 1]);
+      const mark1 = addSpot(upper, 0.01, -0.72, z > 0 ? 0.145 : -0.145, 0.13, 0.22, 0.25);
+      const mark2 = addSpot(lower, 0.005, -0.58, z > 0 ? 0.1 : -0.1, 0.085, 0.16, -0.15, mat.darkSpot);
+      legs.push({ name, root, upper, knee, lower, ankle, hoof, phase, isFront, upperLen, lowerLen, mark1, mark2 });
+    }
+    makeLeg('frontLeft', 1.52, 0.43, 0, true);
+    makeLeg('frontRight', 1.52, -0.43, Math.PI, true);
+    makeLeg('rearLeft', -1.54, 0.43, Math.PI, false);
+    makeLeg('rearRight', -1.54, -0.43, 0, false);
+
+    // Ground, track, acacia silhouettes and grass tufts.
+    const ground = makeMesh(new THREE.PlaneGeometry(220, 220, 1, 1), mat.grass, scene, [0, -0.02, 0], [-Math.PI / 2, 0, 0], [1, 1, 1], false);
+    ground.receiveShadow = true;
+    const track = makeMesh(new THREE.RingGeometry(8.6, 10.6, 96, 4), mat.dirt, scene, [0, 0.005, 0], [-Math.PI / 2, 0, 0], [1, 0.62, 1], false);
+    track.receiveShadow = true;
+
+    const pebbleGeo = new THREE.DodecahedronGeometry(0.09, 0);
+    const grassBladeGeo = new THREE.ConeGeometry(0.025, 0.55, 5);
+    const rand = (() => {
+      let seed = 7;
+      return () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+    })();
+    for (let i = 0; i < 170; i++) {
+      const angle = rand() * Math.PI * 2;
+      const radius = 7 + rand() * 38;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      if (Math.abs((x * x) / 96 + (z * z) / 36 - 1) < 0.22) continue;
+      const tuft = makeMesh(grassBladeGeo, mat.leaf, scene, [x, 0.22, z], [0.18 * (rand() - .5), rand() * Math.PI, 0.22 * (rand() - .5)], [0.7 + rand() * 1.3, 0.55 + rand() * 1.1, 0.7 + rand() * 1.3], false);
+      tuft.receiveShadow = false;
+    }
+    for (let i = 0; i < 30; i++) {
+      makeMesh(pebbleGeo, mat.dirt, scene, [(rand() - .5) * 33, 0.05, (rand() - .5) * 18], [rand(), rand(), rand()], [0.6 + rand(), 0.35 + rand() * .7, 0.5 + rand()], false);
+    }
+
+    function makeAcacia(x, z, s) {
+      const tree = new THREE.Group();
+      tree.position.set(x, 0, z);
+      tree.scale.setScalar(s);
+      scene.add(tree);
+      makeMesh(new THREE.CylinderGeometry(0.15, 0.26, 3.3, 9), mat.trunk, tree, [0, 1.65, 0], [0.08, 0, -0.04]);
+      const crown = new THREE.Group();
+      crown.position.set(0.3, 3.45, 0);
+      tree.add(crown);
+      makeMesh(new THREE.SphereGeometry(1, 18, 10), mat.leaf, crown, [-0.75, 0.1, 0], [0, 0, 0], [1.4, .42, .78]);
+      makeMesh(new THREE.SphereGeometry(1, 18, 10), mat.leaf, crown, [0.45, 0.22, 0.12], [0, 0, 0], [1.65, .48, .88]);
+      makeMesh(new THREE.SphereGeometry(1, 18, 10), mat.leaf, crown, [1.5, 0.05, -0.08], [0, 0, 0], [1.12, .35, .64]);
+    }
+    makeAcacia(-15, -10, 1.1);
+    makeAcacia(18, 8, 0.85);
+    makeAcacia(-23, 14, 0.7);
+
+    const shadowBlob = new THREE.Mesh(
+      new THREE.CircleGeometry(2.5, 48),
+      new THREE.MeshBasicMaterial({ color: 0x1d1b10, transparent: true, opacity: 0.16, depthWrite: false })
+    );
+    shadowBlob.rotation.x = -Math.PI / 2;
+    shadowBlob.position.y = 0.012;
+    scene.add(shadowBlob);
+
+    const clock = new THREE.Clock();
+    let paused = false;
+    let elapsed = 0;
+    const pathA = 9.6;
+    const pathB = 5.9;
+    const speed = 0.34;
+
+    function updateLeg(leg, t) {
+      const stride = Math.sin(t + leg.phase);
+      const lift = Math.max(0, Math.sin(t + leg.phase + Math.PI * 0.12));
+      const planted = Math.max(0, -Math.sin(t + leg.phase));
+      const sideBias = leg.root.position.z > 0 ? 1 : -1;
+
+      leg.root.position.y = -0.42 + lift * 0.09;
+      leg.root.rotation.x = sideBias * 0.025 * Math.sin(t * 0.5);
+      leg.upper.rotation.z = 0.32 * stride + (leg.isFront ? -0.03 : 0.04);
+      leg.knee.rotation.z = -0.58 * Math.max(0, stride) - 0.22 * lift + 0.08 * planted;
+      leg.lower.rotation.z = 0.22 * stride + 0.43 * lift;
+      leg.ankle.rotation.z = -0.18 * stride - 0.28 * lift;
+      leg.hoof.rotation.z = -0.12 + 0.25 * planted - 0.22 * lift;
+      leg.hoof.position.x = 0.06 + 0.035 * stride;
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.045);
+      if (!paused) elapsed += dt;
+
+      const walk = elapsed * 4.15;
+      const route = elapsed * speed;
+      const x = Math.cos(route) * pathA;
+      const z = Math.sin(route) * pathB;
+      const dx = -Math.sin(route) * pathA;
+      const dz = Math.cos(route) * pathB;
+      giraffe.position.set(x, 0, z);
+      giraffe.rotation.y = Math.atan2(dx, dz) - Math.PI / 2;
+      shadowBlob.position.x = x;
+      shadowBlob.position.z = z;
+      shadowBlob.scale.set(1.15 + 0.04 * Math.sin(walk * 2), 0.74, 1);
+      shadowBlob.rotation.z = -giraffe.rotation.y;
+
+      bodyGroup.position.y = 2.95 + Math.sin(walk * 2) * 0.055;
+      bodyGroup.rotation.z = Math.sin(walk) * 0.018;
+      bodyGroup.rotation.x = Math.sin(walk + 0.9) * 0.018;
+
+      legs.forEach(leg => updateLeg(leg, walk));
+
+      neckRoot.rotation.z = -0.17 + Math.sin(walk * 0.5 + 0.3) * 0.055;
+      neckRoot.rotation.y = Math.sin(walk * 0.5) * 0.04;
+      neckSegments.forEach((segment, i) => {
+        segment.pivot.rotation.z = -0.30 + Math.sin(walk * 0.52 + i * 0.34) * 0.028;
+        segment.pivot.rotation.y = Math.sin(walk * 0.42 + i * 0.45) * 0.018;
+      });
+      headRoot.rotation.z = -0.29 + Math.sin(walk * 0.55 + 1.4) * 0.05;
+      headRoot.rotation.y = Math.sin(walk * 0.45 + 0.7) * 0.035;
+      tailRoot.rotation.z = 0.72 + Math.sin(walk * 0.8) * 0.18;
+      tailRoot.rotation.y = Math.sin(walk * 1.15) * 0.38;
+      tailTuft.rotation.z = -0.55 + Math.sin(walk * 1.7) * 0.18;
+
+      // Keep the camera softly following the animal without fighting manual orbiting.
+      const desiredTarget = new THREE.Vector3(x, 3.1, z);
+      controls.target.lerp(desiredTarget, paused ? 0.015 : 0.035);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    window.addEventListener('keydown', (event) => {
+      if (event.code === 'Space') {
+        paused = !paused;
+        event.preventDefault();
+      }
+      if (event.key.toLowerCase() === 'r') {
+        camera.position.set(giraffe.position.x + 12, 7.2, giraffe.position.z + 14);
+        controls.target.set(giraffe.position.x, 3.1, giraffe.position.z);
+      }
+    });
+
+    animate();
+  })();
+  </script>
+</body>
+</html>

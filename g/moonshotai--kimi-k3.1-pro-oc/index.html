@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#d8b27d">
+  <title>Giraffe — A Field Study</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="experience" aria-label="Interactive three-dimensional giraffe walking through a savanna">
+    <canvas id="scene"></canvas>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <a class="brand" href="#" id="brand" aria-label="Reset the field study">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="5"></circle><path d="M16 1v6M16 25v6M1 16h6M25 16h6M5.4 5.4l4.2 4.2M22.4 22.4l4.2 4.2M26.6 5.4l-4.2 4.2M9.6 22.4l-4.2 4.2"></path></svg>
+        <span><strong>TERA</strong><small>FIELD STUDIES</small></span>
+      </a>
+      <div class="live-indicator"><span></span> LIVE OBSERVATION <i>•</i> <span id="timeOfDay">06:24 AM</span></div>
+      <button class="about-button" id="aboutButton" aria-label="Show field notes">FIELD NOTES <span>↗</span></button>
+    </header>
+
+    <section class="intro" aria-labelledby="title">
+      <div class="eyebrow"><span></span> THE EAST AFRICAN SAVANNA</div>
+      <h1 id="title">Grace in<br><em>motion.</em></h1>
+      <p>An intimate study of the world's<br>tallest land animal.</p>
+      <div class="species">
+        <span class="species-number">01</span>
+        <div><strong>Giraffa camelopardalis</strong><small>RETICULATED GIRAFFE</small></div>
+      </div>
+    </section>
+
+    <aside class="fact-rail" aria-label="Giraffe facts">
+      <div class="fact"><span>HEIGHT</span><strong>5.2 <small>m</small></strong></div>
+      <div class="rail-line"></div>
+      <div class="fact"><span>HABITAT</span><strong class="fact-word">Savanna</strong></div>
+      <div class="rail-line"></div>
+      <div class="fact"><span>GAIT</span><strong class="fact-word">Pacing</strong></div>
+    </aside>
+
+    <div class="annotation" id="annotation" aria-hidden="true">
+      <span class="annotation-dot"></span><span class="annotation-line"></span>
+      <div><small>UNIQUE BY NATURE</small><strong>No two coats are alike.</strong></div>
+    </div>
+
+    <div class="view-switcher" aria-label="Camera view">
+      <button class="view-button active" data-view="profile" aria-label="Profile camera view"><span>01</span> PROFILE</button>
+      <button class="view-button" data-view="portrait" aria-label="Portrait camera view"><span>02</span> PORTRAIT</button>
+      <button class="view-button" data-view="free" aria-label="Free orbit camera view"><span>03</span> FREE ORBIT</button>
+    </div>
+
+    <footer class="bottom-area">
+      <div class="location"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.1 7-12A7 7 0 0 0 5 9c0 5.9 7 12 7 12Z"></path><circle cx="12" cy="9" r="2.3"></circle></svg><div><strong>SAMBURU NATIONAL RESERVE</strong><span>0.6108° N &nbsp; 37.5356° E</span></div></div>
+
+      <div class="controls" aria-label="Animation controls">
+        <button id="playButton" class="play-button" aria-label="Pause animation"><svg id="pauseIcon" viewBox="0 0 20 20"><path d="M6 4h3v12H6zM11 4h3v12h-3z"></path></svg><svg id="playIcon" viewBox="0 0 20 20" hidden><path d="m6 3 11 7-11 7z"></path></svg></button>
+        <div class="control-divider"></div>
+        <div class="speed-control"><div><label for="speed">WALKING PACE</label><output id="speedValue" for="speed">1.0×</output></div><input id="speed" type="range" min="0.5" max="1.5" value="1" step="0.1" aria-label="Walking speed"></div>
+        <div class="control-divider"></div>
+        <button id="resetButton" class="reset-button" aria-label="Reset camera" title="Reset camera"><svg viewBox="0 0 24 24"><path d="M4.9 8A8 8 0 1 1 4 12M4 4v5h5"></path></svg></button>
+      </div>
+
+      <div class="hint"><svg viewBox="0 0 24 30" aria-hidden="true"><rect x="5" y="2" width="14" height="23" rx="7"></rect><path d="M12 6v5M8 28h8"></path></svg><div><strong>TAKE A CLOSER LOOK</strong><span>Drag to orbit · Scroll to zoom</span></div></div>
+    </footer>
+
+    <section class="field-notes" id="fieldNotes" aria-label="Field notes" hidden>
+      <button id="closeNotes" class="close-notes" aria-label="Close field notes">×</button>
+      <div class="eyebrow"><span></span> OBSERVATION 01</div>
+      <h2>Built for<br>the long view.</h2>
+      <p>With its long neck and distinctive, net-like coat, the reticulated giraffe is perfectly adapted to life among the acacias.</p>
+      <p>Notice how the legs on each side move together. This is a <strong>pacing gait</strong>—a balanced, unhurried way for such a tall animal to cross the landscape.</p>
+      <dl><div><dt>COAT</dt><dd>Irregular, liver-colored patches</dd></div><div><dt>DIET</dt><dd>Leaves, flowers & seedpods</dd></div><div><dt>CONSERVATION</dt><dd>Endangered</dd></div></dl>
+      <small class="notes-footnote">A real-time, procedurally modeled wildlife study.<br>No video. No pre-rendered animation.</small>
+    </section>
+
+    <div class="loading" id="loading"><div class="loading-mark">T</div><span>PREPARING THE FIELD STUDY</span><div class="loading-line"><i></i></div></div>
+    <div class="error-message" id="errorMessage" hidden><h2>WebGL is unavailable</h2><p>This field study needs a browser with WebGL enabled.</p></div>
+  </main>
+  <script src="three.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#c9c3a7">
+  <meta name="description" content="An interactive, procedurally built reticulated giraffe walking through a late-afternoon savanna. A self-contained Three.js field study.">
+  <title>Wild Atlas — A Study in Motion</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main id="scene" aria-label="Interactive 3D scene of a realistic giraffe walking across the savanna"></main>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="masthead interface">
+    <a class="brand" href="#" id="brandReset" aria-label="Wild Atlas, reset camera">
+      <svg class="brand-mark" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+        <circle cx="20" cy="20" r="18.5" stroke="currentColor" stroke-width="1"/>
+        <path d="M20 7v26M7 20h26M11 11l18 18M29 11L11 29" stroke="currentColor" stroke-width=".8"/>
+        <circle cx="20" cy="20" r="5" fill="currentColor"/>
+      </svg>
+      <span><strong>WILD ATLAS</strong><small>A STUDY IN MOTION</small></span>
+    </a>
+    <div class="location"><span class="live-dot"></span> KENYAN SAVANNA <span class="location-divider"></span> 16:42 EAT</div>
+    <button class="notes-button" id="infoToggle" aria-expanded="false" aria-controls="fieldNotes">
+      <span>FIELD NOTES</span>
+      <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 15L15 5M6 5h9v9" stroke="currentColor" stroke-width="1.2"/></svg>
+    </button>
+  </header>
+
+  <div class="chapter interface"><span>001</span><i></i><span>THE GENTLE GIANTS</span></div>
+
+  <section class="species interface" aria-label="Species information">
+    <div class="eyebrow"><span></span> GIRAFFA CAMELOPARDALIS RETICULATA</div>
+    <h1>Walking tall.</h1>
+    <p>Quiet rhythm. Extraordinary grace.</p>
+  </section>
+
+  <nav class="view-switch interface" aria-label="Camera views">
+    <span class="view-label">PERSPECTIVE</span>
+    <button class="view-button active" data-view="follow" aria-pressed="true"><span>01</span> Follow</button>
+    <button class="view-button" data-view="profile" aria-pressed="false"><span>02</span> Profile</button>
+    <button class="view-button" data-view="detail" aria-pressed="false"><span>03</span> Detail</button>
+  </nav>
+
+  <aside class="field-notes interface" id="fieldNotes" aria-hidden="true">
+    <div class="notes-top"><span>FIELD NOTES / 001</span><button id="notesClose" aria-label="Close field notes">×</button></div>
+    <h2>Reticulated<br>giraffe</h2>
+    <p class="notes-intro">A living mosaic, moving through the acacia woodlands of northern Kenya.</p>
+    <dl class="facts">
+      <div><dt>HEIGHT</dt><dd>4.6–5.5 <small>m</small></dd></div>
+      <div><dt>MASS</dt><dd>800–1,200 <small>kg</small></dd></div>
+      <div><dt>HABITAT</dt><dd>Open savanna</dd></div>
+    </dl>
+    <div class="gait-note">
+      <span class="note-label">THE WALK</span>
+      <p>Unlike most mammals, a giraffe moves both legs on one side of its body almost together—a distinctive lateral gait.</p>
+      <div class="gait-diagram" aria-label="Left hind, left front, right hind, right front footfall sequence">
+        <span>LH</span><i></i><span>LF</span><i></i><span>RH</span><i></i><span>RF</span>
+      </div>
+    </div>
+    <div class="notes-footer">PROCEDURAL ANATOMY · REAL-TIME KINEMATICS</div>
+  </aside>
+
+  <div class="control-wrap interface">
+    <div class="controls" role="group" aria-label="Animation controls">
+      <button class="play-button" id="playButton" aria-label="Pause walking" title="Pause / resume (Space)">
+        <svg class="pause-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 4h3v12H6zM12 4h3v12h-3z" fill="currentColor"/></svg>
+        <svg class="play-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M6 3.5L16 10L6 16.5z" fill="currentColor"/></svg>
+      </button>
+      <div class="movement-copy"><span>MOVEMENT</span><strong id="movementLabel">Natural walk</strong></div>
+      <div class="control-divider"></div>
+      <div class="speed-control">
+        <label for="speed">PACE <output id="speedValue" for="speed">1.0×</output></label>
+        <input id="speed" type="range" min="0.5" max="1.5" value="1" step="0.1" aria-label="Walking speed">
+      </div>
+      <div class="control-divider"></div>
+      <button class="reset-button" id="resetButton" title="Reset camera (R)">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4.8 9a7.5 7.5 0 1 1 .7 7.5M4 4v5h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>RESET VIEW</span>
+      </button>
+    </div>
+    <div class="under-controls"><span><i></i> LIVE SIMULATION</span><span>DRAG TO ORBIT <b>·</b> SCROLL TO EXPLORE</span></div>
+  </div>
+
+  <div class="soundless interface" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <div class="loading" id="loading" aria-live="polite">
+    <div class="loading-mark">WA</div>
+    <span>WILD ATLAS</span>
+    <p>Preparing the savanna</p>
+    <div class="loading-line"><i></i></div>
+  </div>
+
+  <noscript><div class="no-script">This field study needs JavaScript and WebGL to render the giraffe.</div></noscript>
+  <script src="./vendor/three.min.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

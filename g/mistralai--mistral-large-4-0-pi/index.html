@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Walking Giraffe — Three.js</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #141008;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+  #hud { position: fixed; left: 14px; top: 12px; color: #f5ead2; pointer-events: none;
+    text-shadow: 0 1px 3px rgba(0,0,0,.65); user-select: none; }
+  #hud h1 { font-size: 15px; margin: 0 0 4px; font-weight: 600; letter-spacing: .4px; }
+  #hud p  { font-size: 11px; margin: 0; opacity: .82; }
+  #vig { position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(20,12,4,.38) 100%); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="vig"></div>
+<div id="hud">
+  <h1>&#x1F992; Walking Giraffe &mdash; Three.js</h1>
+  <p>drag = orbit &middot; scroll = zoom &middot; space = pause &middot; just open this file, no server needed</p>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,2295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Realistic Walking Giraffe in Three.js • Serengeti Plains</title>
+  <style>
+    :root {
+      --primary: #c97d37;
+      --primary-hover: #dc8d45;
+      --bg-panel: rgba(20, 15, 11, 0.85);
+      --bg-panel-hover: rgba(30, 23, 17, 0.94);
+      --text: #f5eedf;
+      --text-muted: #b8a892;
+      --border: rgba(201, 125, 55, 0.35);
+      --accent: #e59b4c;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #1a140f;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--text);
+    }
+
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* UI Overlay */
+    .ui-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px;
+    }
+
+    /* Header */
+    .header-bar {
+      pointer-events: auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+
+    .title-group {
+      background: var(--bg-panel);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+
+    .title-group h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #ffd699;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .title-group p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .glass-btn {
+      pointer-events: auto;
+      background: var(--bg-panel);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    }
+
+    .glass-btn:hover {
+      background: var(--bg-panel-hover);
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      color: #fff;
+    }
+
+    .glass-btn.active {
+      background: rgba(201, 125, 55, 0.45);
+      border-color: var(--accent);
+      color: #ffd699;
+    }
+
+    /* Controls Panel */
+    .controls-panel {
+      pointer-events: auto;
+      align-self: flex-end;
+      background: var(--bg-panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px 22px;
+      width: 370px;
+      max-width: calc(100vw - 40px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: all 0.3s ease;
+    }
+
+    .panel-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .mini-btn {
+      flex: 1;
+      min-width: 65px;
+      padding: 7px 10px;
+      font-size: 11.5px;
+      border-radius: 8px;
+      border: 1px solid rgba(201, 125, 55, 0.25);
+      background: rgba(38, 30, 22, 0.7);
+      color: var(--text);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .mini-btn:hover {
+      border-color: var(--primary);
+      background: rgba(60, 48, 36, 0.85);
+    }
+
+    .mini-btn.active {
+      background: var(--primary);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .slider-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      min-width: 85px;
+    }
+
+    .slider-value {
+      font-size: 12px;
+      font-weight: 600;
+      color: #ffd699;
+      min-width: 45px;
+      text-align: right;
+    }
+
+    input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 5px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.18);
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: var(--primary);
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(201, 125, 55, 0.85);
+      transition: transform 0.1s;
+    }
+
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    /* Modal / Field Guide */
+    .info-modal {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 530px;
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+      background: rgba(18, 14, 11, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 28px;
+      z-index: 100;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+    }
+
+    .info-modal.active {
+      display: block;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      border-bottom: 1px solid rgba(201, 125, 55, 0.25);
+      padding-bottom: 12px;
+    }
+
+    .modal-header h2 {
+      font-size: 18px;
+      color: #ffd699;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 24px;
+      cursor: pointer;
+      line-height: 1;
+    }
+
+    .close-btn:hover {
+      color: #fff;
+    }
+
+    .fact-item {
+      margin-bottom: 14px;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: #e5dac9;
+    }
+
+    .fact-item strong {
+      color: #ffd699;
+    }
+
+    /* Loading Overlay */
+    #loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #140e0a;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      transition: opacity 0.6s ease, visibility 0.6s ease;
+      pointer-events: none;
+    }
+
+    #loading-overlay.fade-out {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .spinner {
+      width: 55px;
+      height: 55px;
+      border: 4px solid rgba(201, 125, 55, 0.2);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s cubic-bezier(0.6, 0.2, 0.4, 0.8) infinite;
+      margin-bottom: 20px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-size: 15px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #ffd699;
+      font-weight: 600;
+    }
+
+    .loading-subtext {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    /* Tips HUD */
+    .tips-hud {
+      pointer-events: auto;
+      background: rgba(18, 14, 11, 0.75);
+      border: 1px solid rgba(201, 125, 55, 0.22);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      gap: 14px;
+    }
+
+    .tips-hud span kbd {
+      background: rgba(255,255,255,0.14);
+      padding: 2px 5px;
+      border-radius: 4px;
+      color: #ffd699;
+      font-size: 10px;
+      font-family: inherit;
+    }
+  </style>
+
+  <!-- Load Three.js and OrbitControls with offline local + CDN fallback -->
+  <script src="libs/three.min.js"></script>
+  <script>
+    if (typeof THREE === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');
+    }
+  </script>
+  <script src="libs/OrbitControls.js"></script>
+  <script>
+    if (typeof THREE.OrbitControls === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"><\/script>');
+    }
+  </script>
+</head>
+<body>
+
+  <!-- Loading Screen -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-text">Synthesizing Serengeti...</div>
+    <div class="loading-subtext" id="loading-sub">Generating reticulated procedural hide &amp; anatomy...</div>
+  </div>
+
+  <!-- WebGL Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- UI HUD -->
+  <div class="ui-layer">
+    <!-- Header -->
+    <div class="header-bar">
+      <div class="title-group">
+        <h1>🦒 Serengeti Reticulated Giraffe</h1>
+        <p>Giraffa camelopardalis reticulata • Real-time Pacing Locomotion Engine</p>
+      </div>
+
+      <div class="top-actions">
+        <button class="glass-btn" id="btn-sound" title="Toggle savannah ambient audio">
+          <span id="sound-icon">🔈</span> Sound
+        </button>
+        <button class="glass-btn" id="btn-info" title="Anatomy & Locomotion details">
+          <span>ℹ️</span> Field Guide
+        </button>
+      </div>
+    </div>
+
+    <!-- Bottom HUD Bar -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; width: 100%;">
+      <div class="tips-hud">
+        <span><kbd>L-Click + Drag</kbd> Orbit</span>
+        <span><kbd>R-Click + Drag</kbd> Pan</span>
+        <span><kbd>Scroll</kbd> Zoom</span>
+        <span><kbd>Space</kbd> Browse Leaves</span>
+      </div>
+
+      <!-- Controls Panel -->
+      <div class="controls-panel">
+        <!-- Locomotion Mode -->
+        <div>
+          <div class="panel-section-title">
+            <span>Locomotion Mode</span>
+            <span id="speed-display" style="color: #ffd699; font-weight: 600;">1.0× Normal</span>
+          </div>
+          <div class="btn-row">
+            <button class="mini-btn active" id="btn-mode-world">Walk Across Plains</button>
+            <button class="mini-btn" id="btn-mode-treadmill">Walk in Place</button>
+            <button class="mini-btn" id="btn-action-browse" style="border-color: var(--primary); color: #ffd699;">🌿 Browse Tree</button>
+          </div>
+        </div>
+
+        <!-- Walk Speed -->
+        <div class="slider-row">
+          <span class="slider-label">Walk Pace</span>
+          <input type="range" id="slider-speed" min="0.4" max="1.8" step="0.05" value="1.0">
+          <span class="slider-value" id="val-speed">1.0×</span>
+        </div>
+
+        <!-- Camera Presets -->
+        <div>
+          <div class="panel-section-title">Camera Perspective</div>
+          <div class="btn-row">
+            <button class="mini-btn active" data-cam="follow">Tracking 3/4</button>
+            <button class="mini-btn" data-cam="ground">Majestic Low</button>
+            <button class="mini-btn" data-cam="head">Head &amp; Eyes</button>
+            <button class="mini-btn" data-cam="pan">Cinematic Pan</button>
+            <button class="mini-btn" data-cam="free">Free Orbit</button>
+          </div>
+        </div>
+
+        <!-- Lighting / Time of Day -->
+        <div>
+          <div class="panel-section-title">Savannah Atmosphere</div>
+          <div class="btn-row">
+            <button class="mini-btn" data-time="dawn">Dawn</button>
+            <button class="mini-btn active" data-time="sunset">Golden Hour</button>
+            <button class="mini-btn" data-time="noon">Midday</button>
+            <button class="mini-btn" data-time="night">Starry Night</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Field Guide Modal -->
+  <div class="info-modal" id="info-modal">
+    <div class="modal-header">
+      <h2>Field Guide • Giraffe Locomotion &amp; Anatomy</h2>
+      <button class="close-btn" id="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="fact-item">
+        <strong>The Pacing Gait (Lateral Locomotion):</strong> Giraffes are true pacers. Unlike horses or dogs which walk with diagonal foot pairs, giraffes move both legs on the same side forward almost synchronously. This prevents their exceptionally long hind legs (up to 1.9m) from colliding with their front legs during each stride.
+      </div>
+      <div class="fact-item">
+        <strong>Pendulum Neck Counterbalance:</strong> The iconic 2-meter long neck acts as a dynamic physical pendulum. During each forward stride, the neck and heavy head (up to 45 kg) dip forward and down to pull the center of gravity over the stance legs, bobbing twice per complete stride cycle and leaning laterally to balance the ipsilateral shift.
+      </div>
+      <div class="fact-item">
+        <strong>7 Cervical Vertebrae:</strong> Like all mammals (including humans), giraffes have exactly 7 neck vertebrae. However, each giraffe vertebra can exceed 28 cm (11 inches) in length, articulated with deep ball-and-socket joints for extraordinary rotational flexibility.
+      </div>
+      <div class="fact-item">
+        <strong>Reticulated Coat Pattern:</strong> The polygonal spots separated by creamy white channels are not only camouflage among acacia shadows; each patch contains an underlying complex network of thermal blood vessels that act as biological radiators to dissipate African heat.
+      </div>
+      <div class="fact-item">
+        <strong>Cloven Hooves &amp; High Hock:</strong> Giraffe hooves are cloven (split into two weight-bearing digits) measuring up to 30 cm across. The prominent "backward knee" on the hind leg is actually the anatomical hock (ankle/calcaneus), elevated high above the ground on a massive cannon bone.
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Application Script -->
+  <script>
+  (function() {
+    'use strict';
+
+    // --- PROCEDURAL AUDIO SYNTHESIZER (Pure Web Audio API) ---
+    class SavannahAudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.isMuted = true;
+        this.windGain = null;
+        this.filterNode = null;
+        this.initialized = false;
+      }
+
+      init() {
+        if (this.initialized) return;
+        try {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+
+          // Savannah Wind: Filtered Pink Noise
+          const bufferSize = this.ctx.sampleRate * 4;
+          const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          let b0 = 0, b1 = 0, b2 = 0;
+          for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            output[i] = (b0 + b1 + b2) * 0.12;
+          }
+
+          const whiteNoise = this.ctx.createBufferSource();
+          whiteNoise.buffer = noiseBuffer;
+          whiteNoise.loop = true;
+
+          this.filterNode = this.ctx.createBiquadFilter();
+          this.filterNode.type = 'lowpass';
+          this.filterNode.frequency.setValueAtTime(420, this.ctx.currentTime);
+
+          this.windGain = this.ctx.createGain();
+          this.windGain.gain.setValueAtTime(this.isMuted ? 0 : 0.28, this.ctx.currentTime);
+
+          whiteNoise.connect(this.filterNode);
+          this.filterNode.connect(this.windGain);
+          this.windGain.connect(this.ctx.destination);
+          whiteNoise.start();
+
+          // Periodic wind gusts
+          setInterval(() => {
+            if (this.ctx && !this.isMuted) {
+              const targetFreq = 280 + Math.random() * 380;
+              this.filterNode.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 2.5);
+            }
+          }, 4000);
+
+          // Occasional savannah cicada chirps
+          setInterval(() => {
+            if (!this.isMuted && Math.random() < 0.6) {
+              this.playCicadaBurst();
+            }
+          }, 3500);
+
+          this.initialized = true;
+        } catch (e) {
+          console.warn("Audio init deferred or not supported:", e);
+        }
+      }
+
+      playCicadaBurst() {
+        if (!this.ctx || this.isMuted) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(4800 + Math.random() * 800, this.ctx.currentTime);
+
+          gain.gain.setValueAtTime(0, this.ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.02, this.ctx.currentTime + 0.1);
+          gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.6);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.65);
+        } catch(e){}
+      }
+
+      playFootstep() {
+        if (!this.ctx || this.isMuted) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(75, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(28, this.ctx.currentTime + 0.14);
+
+          gain.gain.setValueAtTime(0.04, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.16);
+        } catch(e){}
+      }
+
+      toggle() {
+        this.init();
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+        this.isMuted = !this.isMuted;
+        if (this.windGain && this.ctx) {
+          this.windGain.gain.setTargetAtTime(this.isMuted ? 0 : 0.28, this.ctx.currentTime, 0.2);
+        }
+        return !this.isMuted;
+      }
+    }
+
+    const audio = new SavannahAudioEngine();
+
+    // --- PROCEDURAL RETICULATED GIRAFFE TEXTURE GENERATOR ---
+    function generateGiraffeTextures() {
+      const w = 1024, h = 1024;
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+
+      const normCanvas = document.createElement('canvas');
+      normCanvas.width = w;
+      normCanvas.height = h;
+      const normCtx = normCanvas.getContext('2d');
+
+      // Precompute jittered Voronoi grid (18 x 18 cells)
+      const scaleX = 18, scaleY = 18;
+      const pts = [];
+      for (let gy = 0; gy < scaleY; gy++) {
+        pts[gy] = [];
+        for (let gx = 0; gx < scaleX; gx++) {
+          const h1 = Math.sin(gx * 12.9898 + gy * 78.233) * 43758.5453;
+          const r1 = h1 - Math.floor(h1);
+          const h2 = Math.cos(gx * 39.346 + gy * 11.234) * 43758.5453;
+          const r2 = h2 - Math.floor(h2);
+          pts[gy][gx] = {
+            x: gx + 0.18 + 0.64 * r1,
+            y: gy + 0.18 + 0.64 * r2,
+            seed: r1
+          };
+        }
+      }
+
+      const imgData = ctx.createImageData(w, h);
+      const data = imgData.data;
+      const heightMap = new Float32Array(w * h);
+
+      // Narrow channels for authentic reticulated pattern (85% patch coverage)
+      const channelThreshold = 0.065;
+
+      for (let y = 0; y < h; y++) {
+        const vNorm = y / h;
+        const v = vNorm * scaleY;
+        const iy = Math.floor(v);
+
+        for (let x = 0; x < w; x++) {
+          const uNorm = x / w;
+          const warpU = uNorm * scaleX + 0.06 * Math.sin(vNorm * 26.0) + 0.03 * Math.sin(vNorm * 65.0);
+          const warpV = vNorm * scaleY + 0.06 * Math.cos(uNorm * 26.0) + 0.03 * Math.cos(uNorm * 65.0);
+
+          const ix = Math.floor(warpU);
+          let d1 = 999, d2 = 999;
+          let cellSeed = 0;
+
+          for (let dy = -1; dy <= 1; dy++) {
+            const cy = (iy + dy + scaleY * 2) % scaleY;
+            for (let dx = -1; dx <= 1; dx++) {
+              const cx = (ix + dx + scaleX * 2) % scaleX;
+              const pt = pts[cy][cx];
+              const ox = pt.x - cx + (ix + dx);
+              const oy = pt.y - cy + (iy + dy);
+              const dist = Math.hypot(warpU - ox, warpV - oy);
+
+              if (dist < d1) {
+                d2 = d1;
+                d1 = dist;
+                cellSeed = pt.seed;
+              } else if (dist < d2) {
+                d2 = dist;
+              }
+            }
+          }
+
+          const edge = d2 - d1;
+          const pixelIdx = (y * w + x) * 4;
+          const furNoise = (Math.sin(x * 1.5 + y * 0.85) * 0.5 + 0.5) * 10;
+
+          let r, g, b, patchHeight;
+
+          if (edge < channelThreshold) {
+            // Creamy Interstitial Channels
+            const t = edge / channelThreshold;
+            r = 236 - (1 - t) * 14 + furNoise * 0.3;
+            g = 224 - (1 - t) * 16 + furNoise * 0.3;
+            b = 206 - (1 - t) * 18 + furNoise * 0.25;
+            patchHeight = t * 0.35;
+          } else {
+            // Rich Chestnut Polygonal Giraffe Patch
+            const distFromBorder = (edge - channelThreshold) / 0.20;
+            const borderFactor = Math.min(distFromBorder, 1.0);
+
+            const centerR = 158 + cellSeed * 25;
+            const centerG = 78 + cellSeed * 18;
+            const centerB = 28 + cellSeed * 12;
+
+            const borderR = 75 + cellSeed * 18;
+            const borderG = 30 + cellSeed * 10;
+            const borderB = 12 + cellSeed * 6;
+
+            r = borderR + (centerR - borderR) * borderFactor + furNoise;
+            g = borderG + (centerG - borderG) * borderFactor + furNoise * 0.6;
+            b = borderB + (centerB - borderB) * borderFactor + furNoise * 0.3;
+
+            patchHeight = 0.35 + borderFactor * 0.65;
+          }
+
+          data[pixelIdx] = Math.min(Math.max(r, 0), 255);
+          data[pixelIdx + 1] = Math.min(Math.max(g, 0), 255);
+          data[pixelIdx + 2] = Math.min(Math.max(b, 0), 255);
+          data[pixelIdx + 3] = 255;
+          heightMap[y * w + x] = patchHeight;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      // Tangent-space Normal Map from Height Map
+      const normImgData = normCtx.createImageData(w, h);
+      const normData = normImgData.data;
+      const bumpScale = 3.2;
+
+      for (let y = 0; y < h; y++) {
+        const yU = (y - 1 + h) % h;
+        const yD = (y + 1) % h;
+        for (let x = 0; x < w; x++) {
+          const xL = (x - 1 + w) % w;
+          const xR = (x + 1) % w;
+
+          const dX = (heightMap[y * w + xR] - heightMap[y * w + xL]) * bumpScale;
+          const dY = (heightMap[yD * w + x] - heightMap[yU * w + x]) * bumpScale;
+          const len = Math.hypot(dX, dY, 1.0);
+
+          const nx = -dX / len;
+          const ny = -dY / len;
+          const nz = 1.0 / len;
+
+          const idx = (y * w + x) * 4;
+          normData[idx] = Math.round((nx * 0.5 + 0.5) * 255);
+          normData[idx + 1] = Math.round((ny * 0.5 + 0.5) * 255);
+          normData[idx + 2] = Math.round((nz * 0.5 + 0.5) * 255);
+          normData[idx + 3] = 255;
+        }
+      }
+      normCtx.putImageData(normImgData, 0, 0);
+
+      // 2. Sock Texture (Specifically for the lower cannon bone & pastern)
+      const sockCanvas = document.createElement('canvas');
+      sockCanvas.width = 512;
+      sockCanvas.height = 512;
+      const sockCtx = sockCanvas.getContext('2d');
+
+      sockCtx.drawImage(canvas, 0, 0, 512, 512);
+
+      const sockGrad = sockCtx.createLinearGradient(0, 0, 0, 512);
+      sockGrad.addColorStop(0.0, 'rgba(236, 224, 206, 0.0)');  // Top of cannon has spots
+      sockGrad.addColorStop(0.35, 'rgba(236, 224, 206, 0.45)'); // Transition to stocking
+      sockGrad.addColorStop(0.70, 'rgba(244, 238, 226, 0.98)'); // Cream stocking
+      sockGrad.addColorStop(0.85, 'rgba(48, 42, 38, 0.95)');    // Hoof crown
+      sockGrad.addColorStop(1.0, 'rgba(24, 20, 18, 1.0)');      // Dark split hoof
+
+      sockCtx.fillStyle = sockGrad;
+      sockCtx.fillRect(0, 0, 512, 512);
+
+      // Hoof ridges
+      sockCtx.strokeStyle = 'rgba(10, 8, 6, 0.45)';
+      sockCtx.lineWidth = 1.5;
+      for (let y = 440; y < 512; y += 6) {
+        sockCtx.beginPath();
+        sockCtx.moveTo(0, y);
+        sockCtx.lineTo(512, y);
+        sockCtx.stroke();
+      }
+
+      const bodyTex = new THREE.CanvasTexture(canvas);
+      bodyTex.wrapS = THREE.RepeatWrapping;
+      bodyTex.wrapT = THREE.RepeatWrapping;
+
+      const bodyNorm = new THREE.CanvasTexture(normCanvas);
+      bodyNorm.wrapS = THREE.RepeatWrapping;
+      bodyNorm.wrapT = THREE.RepeatWrapping;
+
+      const sockTex = new THREE.CanvasTexture(sockCanvas);
+      sockTex.wrapS = THREE.RepeatWrapping;
+      sockTex.wrapT = THREE.ClampToEdgeWrapping;
+
+      return { bodyTex, bodyNorm, sockTex };
+    }
+
+    // --- APPLICATION CORE ---
+    let scene, camera, renderer, controls;
+    let giraffe;
+    let clock = new THREE.Clock();
+    let textures;
+
+    // Environment & Sun
+    let sunLight, hemiLight, terrain, grassMesh, kopjesGroup, dustParticles, sunMoteParticles;
+    let timePresets = {
+      sunset: {
+        skyColor: 0x8da4be,
+        groundColor: 0x7a4d2c,
+        sunColor: 0xffe0b8,
+        sunIntensity: 1.45,
+        sunPos: new THREE.Vector3(70, 32, 80),
+        fogColor: 0xd49b6a,
+        fogDensity: 0.0065,
+        ambientIntensity: 0.75
+      },
+      dawn: {
+        skyColor: 0xa498b8,
+        groundColor: 0x6e4a38,
+        sunColor: 0xffbe98,
+        sunIntensity: 1.35,
+        sunPos: new THREE.Vector3(80, 18, 70),
+        fogColor: 0xb8888e,
+        fogDensity: 0.0085,
+        ambientIntensity: 0.65
+      },
+      noon: {
+        skyColor: 0x5fa4db,
+        groundColor: 0xb38656,
+        sunColor: 0xfffcf0,
+        sunIntensity: 1.85,
+        sunPos: new THREE.Vector3(30, 110, 40),
+        fogColor: 0xc8baa0,
+        fogDensity: 0.0045,
+        ambientIntensity: 0.90
+      },
+      night: {
+        skyColor: 0x0a1024,
+        groundColor: 0x120e0c,
+        sunColor: 0x8898cc,
+        sunIntensity: 0.45,
+        sunPos: new THREE.Vector3(70, 45, 80),
+        fogColor: 0x090d18,
+        fogDensity: 0.009,
+        ambientIntensity: 0.25
+      }
+    };
+    let currentTime = 'sunset';
+
+    // Camera Mode & State
+    let cameraMode = 'follow';
+    let camTargetPos = new THREE.Vector3();
+    let camLookPos = new THREE.Vector3();
+    let panAngle = 0;
+
+    // Locomotion Parameters
+    let walkSpeed = 1.0;
+    let walkMode = 'world';
+    let isBrowsing = false;
+    let browseTimer = 0;
+
+    // --- PROCEDURAL GEOMETRY BUILDERS ---
+
+    // 1. Organic Sculpted Torso
+    function createSculptedTorsoGeometry(slicesZ = 32, radialSegments = 24) {
+      const geom = new THREE.BufferGeometry();
+      const positions = [];
+      const normals = [];
+      const uvs = [];
+      const indices = [];
+
+      for (let i = 0; i <= slicesZ; i++) {
+        const t = i / slicesZ; // 0 front (chest/withers), 1 back (rump)
+        const z = 1.05 - t * 2.20; // Spine axis
+
+        // Muscular withers peak at junction with neck
+        const withersHump = Math.exp(-Math.pow((t - 0.18) / 0.16, 2)) * 0.34;
+        const yCenter = 2.42 + (1.0 - t) * 0.30 + withersHump;
+
+        // Depth (sternum keel to spine) and Width
+        let depth = 0.58 * Math.sin(t * Math.PI * 0.86 + 0.14);
+        if (t < 0.35) depth += withersHump * 0.48;
+        let width = 0.36 * Math.sin(t * Math.PI * 0.88 + 0.12);
+
+        // Shoulder muscle swell on front flanks
+        if (t > 0.10 && t < 0.35) {
+          const shMod = Math.sin((t - 0.10) / 0.25 * Math.PI);
+          width += shMod * 0.065;
+        }
+
+        // Pelvic haunch flare at rear
+        if (t > 0.65) {
+          const hipMod = Math.sin((t - 0.65) / 0.35 * Math.PI);
+          width += hipMod * 0.09;
+        }
+
+        for (let j = 0; j <= radialSegments; j++) {
+          const phi = (j / radialSegments) * Math.PI * 2;
+          const cosP = Math.cos(phi);
+          const sinP = Math.sin(phi);
+
+          const rYMod = 1.0 + 0.15 * cosP;
+          const px = sinP * width;
+          const py = yCenter + cosP * depth * rYMod;
+          const pz = z;
+
+          positions.push(px, py, pz);
+          // 1:1 UV scale for authentic large polygonal patches on flanks
+          uvs.push((j / radialSegments) * 1.0, t * 1.0);
+        }
+      }
+
+      for (let i = 0; i < slicesZ; i++) {
+        for (let j = 0; j < radialSegments; j++) {
+          const a = i * (radialSegments + 1) + j;
+          const b = (i + 1) * (radialSegments + 1) + j;
+          const c = (i + 1) * (radialSegments + 1) + (j + 1);
+          const d = i * (radialSegments + 1) + (j + 1);
+          indices.push(a, b, d);
+          indices.push(b, c, d);
+        }
+      }
+
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geom.setIndex(indices);
+      geom.computeVertexNormals();
+      return geom;
+    }
+
+    // 2. Sculpted Giraffe Cranium & Muzzle
+    function createSculptedHeadGeometry() {
+      const geom = new THREE.BufferGeometry();
+      const slices = 18;
+      const radial = 16;
+      const positions = [];
+      const uvs = [];
+      const indices = [];
+
+      for (let i = 0; i <= slices; i++) {
+        const t = i / slices; // 0 at back of cranium, 1 at muzzle tip
+        const z = t * 0.66;
+
+        let w = (0.28 * (1.0 - t * 0.54));
+        let h = (0.30 * (1.0 - t * 0.50));
+
+        // Flare at eye orbit arches
+        if (t > 0.16 && t < 0.44) {
+          const orbitFlare = Math.sin((t - 0.16) / 0.28 * Math.PI);
+          w += orbitFlare * 0.065;
+          h += orbitFlare * 0.04;
+        }
+
+        // Slight nostril flare at muzzle tip
+        if (t > 0.82) {
+          const nostril = Math.sin((t - 0.82) / 0.18 * Math.PI);
+          w += nostril * 0.024;
+        }
+
+        const yOff = -t * 0.09;
+
+        for (let j = 0; j <= radial; j++) {
+          const phi = (j / radial) * Math.PI * 2;
+          const cosP = Math.cos(phi);
+          const sinP = Math.sin(phi);
+
+          const px = sinP * (w * 0.5);
+          const py = yOff + cosP * (h * 0.5);
+          const pz = z;
+
+          positions.push(px, py, pz);
+          uvs.push(j / radial, t);
+        }
+      }
+
+      for (let i = 0; i < slices; i++) {
+        for (let j = 0; j < radial; j++) {
+          const a = i * (radial + 1) + j;
+          const b = (i + 1) * (radial + 1) + j;
+          const c = (i + 1) * (radial + 1) + (j + 1);
+          const d = i * (radial + 1) + (j + 1);
+          indices.push(a, b, d);
+          indices.push(b, c, d);
+        }
+      }
+
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geom.setIndex(indices);
+      geom.computeVertexNormals();
+      return geom;
+    }
+
+    // --- GIRAFFE 3D RIG & ANATOMICAL HIERARCHY ---
+    class GiraffeModel {
+      constructor(textures) {
+        this.textures = textures;
+        this.root = new THREE.Group();
+        this.root.name = 'GiraffeRoot';
+
+        // Materials with realistic matte-satin animal fur roughness
+        this.bodyMaterial = new THREE.MeshStandardMaterial({
+          map: textures.bodyTex,
+          normalMap: textures.bodyNorm,
+          normalScale: new THREE.Vector2(0.85, 0.85),
+          roughness: 0.82,
+          metalness: 0.02
+        });
+
+        this.sockMaterial = new THREE.MeshStandardMaterial({
+          map: textures.sockTex,
+          normalMap: textures.bodyNorm,
+          normalScale: new THREE.Vector2(0.8, 0.8),
+          roughness: 0.78,
+          metalness: 0.03
+        });
+
+        this.maneMaterial = new THREE.MeshStandardMaterial({
+          color: 0x2e180d,
+          roughness: 0.9,
+          metalness: 0.0
+        });
+
+        this.ossiconeTuftMat = new THREE.MeshStandardMaterial({
+          color: 0x18120c,
+          roughness: 0.95
+        });
+
+        this.eyeCorneaMat = new THREE.MeshStandardMaterial({
+          color: 0x100b07,
+          roughness: 0.04,
+          metalness: 0.25
+        });
+
+        this.hoofMat = new THREE.MeshStandardMaterial({
+          color: 0x1f1b18,
+          roughness: 0.5,
+          metalness: 0.1
+        });
+
+        this.tailTuftMat = new THREE.MeshStandardMaterial({
+          color: 0x14100d,
+          roughness: 0.95
+        });
+
+        this.innerEarMat = new THREE.MeshStandardMaterial({
+          color: 0xecd7cf,
+          roughness: 0.8
+        });
+
+        this.muzzleMat = new THREE.MeshStandardMaterial({
+          color: 0x261f1b,
+          roughness: 0.88
+        });
+
+        this.buildModel();
+      }
+
+      buildModel() {
+        this.bodyGroup = new THREE.Group();
+        this.root.add(this.bodyGroup);
+
+        // 1. Torso Mesh
+        const torsoGeom = createSculptedTorsoGeometry();
+        this.torsoMesh = new THREE.Mesh(torsoGeom, this.bodyMaterial);
+        this.torsoMesh.castShadow = true;
+        this.torsoMesh.receiveShadow = true;
+        this.bodyGroup.add(this.torsoMesh);
+
+        // 2. Articulated Cervical Neck Chain (6 open-ended vertebrae segments with continuous UV flow)
+        this.neckSegments = [];
+        this.maneSegments = [];
+        const numNeckSegs = 6;
+        const segLen = 0.38;
+
+        // Base withers joint
+        this.withersJoint = new THREE.Group();
+        this.withersJoint.position.set(0, 2.70, 0.70);
+        this.bodyGroup.add(this.withersJoint);
+
+        let parentJoint = this.withersJoint;
+
+        // Natural rest angles for graceful cervical S-curve arch
+        const restAngles = [0.24, 0.04, 0.03, 0.02, 0.01, -0.02];
+
+        for (let i = 0; i < numNeckSegs; i++) {
+          const segGroup = new THREE.Group();
+          if (i === 0) {
+            segGroup.rotation.x = Math.PI * restAngles[0];
+          } else {
+            segGroup.position.set(0, segLen, 0);
+            segGroup.rotation.x = restAngles[i];
+          }
+
+          const t = i / (numNeckSegs - 1);
+          const topRadius = 0.23 * (1.0 - t * 0.44);
+          const btmRadius = 0.28 * (1.0 - t * 0.42);
+
+          // Overlapping open-ended cylinder for seamless articulation
+          const colGeom = new THREE.CylinderGeometry(topRadius, btmRadius, segLen * 1.15, 16, 2, true);
+          colGeom.scale(0.72, 1.0, 1.05);
+
+          const colUV = colGeom.attributes.uv;
+          for (let u = 0; u < colUV.count; u++) {
+            colUV.setX(u, colUV.getX(u) * 1.0);
+            colUV.setY(u, colUV.getY(u) * 0.7);
+          }
+          colUV.needsUpdate = true;
+
+          const colMesh = new THREE.Mesh(colGeom, this.bodyMaterial);
+          colMesh.position.y = segLen * 0.5;
+          colMesh.castShadow = true;
+          colMesh.receiveShadow = true;
+          segGroup.add(colMesh);
+
+          // Erect Bristle Mane along dorsal spine
+          const maneHeight = 0.13 * (1.0 - t * 0.32);
+          const maneGeom = new THREE.BoxGeometry(0.045, segLen * 0.98, maneHeight);
+          const maneMesh = new THREE.Mesh(maneGeom, this.maneMaterial);
+          maneMesh.position.set(0, segLen * 0.5, -(btmRadius * 0.95 + maneHeight * 0.45));
+          maneMesh.castShadow = true;
+          segGroup.add(maneMesh);
+
+          parentJoint.add(segGroup);
+          this.neckSegments.push(segGroup);
+          this.maneSegments.push(maneMesh);
+          parentJoint = segGroup;
+        }
+
+        // 3. Head & Cranium
+        this.headGroup = new THREE.Group();
+        this.headGroup.position.set(0, segLen, 0);
+        this.headGroup.rotation.x = -Math.PI * 0.28;
+        parentJoint.add(this.headGroup);
+
+        const headGeom = createSculptedHeadGeometry();
+        const headMesh = new THREE.Mesh(headGeom, this.bodyMaterial);
+        headMesh.castShadow = true;
+        headMesh.receiveShadow = true;
+        this.headGroup.add(headMesh);
+
+        // Prehensile muzzle tip & Nostrils
+        const muzzleTip = new THREE.Mesh(
+          new THREE.SphereGeometry(0.088, 12, 10),
+          this.muzzleMat
+        );
+        muzzleTip.scale.set(0.9, 0.8, 1.25);
+        muzzleTip.position.set(0, -0.065, 0.66);
+        this.headGroup.add(muzzleTip);
+
+        // Median Forehead Bump (frontal horn protuberance)
+        const frontalBump = new THREE.Mesh(
+          new THREE.SphereGeometry(0.052, 10, 8),
+          this.bodyMaterial
+        );
+        frontalBump.scale.set(0.8, 0.9, 1.2);
+        frontalBump.position.set(0, 0.13, 0.30);
+        this.headGroup.add(frontalBump);
+
+        // Realistic Lateral Eyes
+        this.eyes = [];
+        [-1, 1].forEach(side => {
+          const eyeOrbit = new THREE.Group();
+          eyeOrbit.position.set(side * 0.145, 0.055, 0.27);
+
+          const orbitRim = new THREE.Mesh(
+            new THREE.TorusGeometry(0.040, 0.015, 8, 14),
+            this.bodyMaterial
+          );
+          orbitRim.rotation.y = side * Math.PI * 0.5;
+          eyeOrbit.add(orbitRim);
+
+          const eyeball = new THREE.Mesh(
+            new THREE.SphereGeometry(0.036, 14, 12),
+            this.eyeCorneaMat
+          );
+          eyeOrbit.add(eyeball);
+
+          this.headGroup.add(eyeOrbit);
+          this.eyes.push(eyeOrbit);
+        });
+
+        // Ossicones (Horns with fur tufts)
+        [-1, 1].forEach(side => {
+          const ossiconeGroup = new THREE.Group();
+          ossiconeGroup.position.set(side * 0.09, 0.15, 0.16);
+          ossiconeGroup.rotation.x = -0.24;
+          ossiconeGroup.rotation.z = -side * 0.18;
+
+          const shaft = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.025, 0.034, 0.26, 10),
+            this.bodyMaterial
+          );
+          shaft.position.y = 0.13;
+          shaft.castShadow = true;
+          ossiconeGroup.add(shaft);
+
+          const tuft = new THREE.Mesh(
+            new THREE.SphereGeometry(0.045, 10, 10),
+            this.ossiconeTuftMat
+          );
+          tuft.scale.set(1.0, 1.15, 1.0);
+          tuft.position.y = 0.26;
+          tuft.castShadow = true;
+          ossiconeGroup.add(tuft);
+
+          this.headGroup.add(ossiconeGroup);
+        });
+
+        // Articulated Ears (swiveling & twitching)
+        this.ears = [];
+        [-1, 1].forEach(side => {
+          const earPivot = new THREE.Group();
+          earPivot.position.set(side * 0.12, 0.12, 0.06);
+          earPivot.rotation.z = -side * 0.65;
+          earPivot.rotation.y = -side * 0.35;
+          earPivot.rotation.x = -0.22;
+
+          const earGeom = new THREE.ConeGeometry(0.085, 0.30, 10);
+          earGeom.scale(0.45, 1.0, 1.0);
+          const earMesh = new THREE.Mesh(earGeom, this.bodyMaterial);
+          earMesh.position.y = 0.15;
+          earMesh.rotation.y = Math.PI;
+          earPivot.add(earMesh);
+
+          const innerShell = new THREE.Mesh(
+            new THREE.ConeGeometry(0.07, 0.26, 8),
+            this.innerEarMat
+          );
+          innerShell.scale.set(0.35, 1.0, 0.85);
+          innerShell.position.set(0, 0.14, 0.015);
+          innerShell.rotation.y = Math.PI;
+          earPivot.add(innerShell);
+
+          this.headGroup.add(earPivot);
+          this.ears.push(earPivot);
+        });
+
+        // 4. Forelegs (Front Legs)
+        this.frontLegs = [];
+        [-1, 1].forEach((side) => {
+          const leg = this.buildFrontLeg(side);
+          this.bodyGroup.add(leg.root);
+          this.frontLegs.push(leg);
+        });
+
+        // 5. Hind Legs
+        this.hindLegs = [];
+        [-1, 1].forEach((side) => {
+          const leg = this.buildHindLeg(side);
+          this.bodyGroup.add(leg.root);
+          this.hindLegs.push(leg);
+        });
+
+        // 6. Flexible Tail with Bushy Switch (positioned right at posterior tip of rump)
+        this.tailSegments = [];
+        this.tailRoot = new THREE.Group();
+        this.tailRoot.position.set(0, 2.38, -1.14);
+        this.tailRoot.rotation.x = -0.22;
+        this.bodyGroup.add(this.tailRoot);
+
+        let tailParent = this.tailRoot;
+        const tailSegLen = 0.32;
+        for (let i = 0; i < 3; i++) {
+          const tSeg = new THREE.Group();
+          tSeg.position.y = -tailSegLen;
+
+          const rad = 0.034 * (1.0 - i * 0.25);
+          const tMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(rad * 0.8, rad, tailSegLen, 8),
+            this.bodyMaterial
+          );
+          tMesh.position.y = tailSegLen * 0.5;
+          tMesh.castShadow = true;
+          tSeg.add(tMesh);
+
+          tailParent.add(tSeg);
+          this.tailSegments.push(tSeg);
+          tailParent = tSeg;
+        }
+
+        // Soft, flowing tail tassel (capsule/ellipsoid shape)
+        const tassel = new THREE.Mesh(
+          new THREE.SphereGeometry(0.075, 10, 8),
+          this.tailTuftMat
+        );
+        tassel.scale.set(0.85, 2.8, 0.85);
+        tassel.position.set(0, -0.20, -0.02);
+        tassel.castShadow = true;
+        tailParent.add(tassel);
+      }
+
+      // Front Leg Construction
+      buildFrontLeg(side) {
+        const root = new THREE.Group();
+        root.position.set(side * 0.30, 2.36, 0.55);
+
+        // Upper Arm (Humerus) - uses full rich bodyMaterial
+        const humerusJoint = new THREE.Group();
+        root.add(humerusJoint);
+
+        const humerusLen = 0.60;
+        const humerusMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.12, 0.095, humerusLen, 12),
+          this.bodyMaterial
+        );
+        humerusMesh.position.y = -humerusLen * 0.5;
+        humerusMesh.castShadow = true;
+        humerusJoint.add(humerusMesh);
+
+        // Forearm (Radius/Ulna) - uses full rich bodyMaterial
+        const elbowJoint = new THREE.Group();
+        elbowJoint.position.y = -humerusLen;
+        humerusJoint.add(elbowJoint);
+
+        const elbowCap = new THREE.Mesh(
+          new THREE.SphereGeometry(0.108, 12, 10),
+          this.bodyMaterial
+        );
+        elbowJoint.add(elbowCap);
+
+        const radiusLen = 0.82;
+        const radiusMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.09, 0.07, radiusLen, 12),
+          this.bodyMaterial
+        );
+        radiusMesh.position.y = -radiusLen * 0.5;
+        radiusMesh.castShadow = true;
+        elbowJoint.add(radiusMesh);
+
+        // Carpal Knee Joint
+        const kneeJoint = new THREE.Group();
+        kneeJoint.position.y = -radiusLen;
+        elbowJoint.add(kneeJoint);
+
+        const kneeCap = new THREE.Mesh(
+          new THREE.SphereGeometry(0.082, 12, 10),
+          this.bodyMaterial
+        );
+        kneeJoint.add(kneeCap);
+
+        // Cannon Bone (Metacarpal) - transitions to sockMaterial
+        const cannonLen = 0.72;
+        const cannonMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.064, 0.054, cannonLen, 10),
+          this.sockMaterial
+        );
+        cannonMesh.position.y = -cannonLen * 0.5;
+        cannonMesh.castShadow = true;
+        kneeJoint.add(cannonMesh);
+
+        // Fetlock, Pastern & Cloven Hoof
+        const fetlockJoint = new THREE.Group();
+        fetlockJoint.position.y = -cannonLen;
+        kneeJoint.add(fetlockJoint);
+
+        const fetlockCap = new THREE.Mesh(
+          new THREE.SphereGeometry(0.062, 10, 8),
+          this.sockMaterial
+        );
+        fetlockJoint.add(fetlockCap);
+
+        const pasternLen = 0.14;
+        const pastern = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.054, 0.062, pasternLen, 8),
+          this.sockMaterial
+        );
+        pastern.position.set(0, -pasternLen * 0.5, 0.02);
+        pastern.rotation.x = 0.28;
+        fetlockJoint.add(pastern);
+
+        const hoof = new THREE.Mesh(
+          new THREE.BoxGeometry(0.14, 0.08, 0.17),
+          this.hoofMat
+        );
+        hoof.position.set(0, -pasternLen - 0.02, 0.05);
+        hoof.castShadow = true;
+        fetlockJoint.add(hoof);
+
+        return {
+          side,
+          root,
+          humerusJoint,
+          elbowJoint,
+          kneeJoint,
+          fetlockJoint,
+          humerusLen,
+          radiusLen,
+          cannonLen
+        };
+      }
+
+      // Hind Leg Construction
+      buildHindLeg(side) {
+        const root = new THREE.Group();
+        root.position.set(side * 0.30, 2.22, -0.85);
+
+        // Thigh (Femur) - uses full rich bodyMaterial
+        const thighJoint = new THREE.Group();
+        root.add(thighJoint);
+
+        const thighLen = 0.62;
+        const thighMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.17, 0.12, thighLen, 14),
+          this.bodyMaterial
+        );
+        thighMesh.scale.set(0.85, 1.0, 1.3);
+        thighMesh.position.y = -thighLen * 0.5;
+        thighMesh.castShadow = true;
+        thighJoint.add(thighMesh);
+
+        // Stifle Joint (flexes forward)
+        const stifleJoint = new THREE.Group();
+        stifleJoint.position.y = -thighLen;
+        thighJoint.add(stifleJoint);
+
+        const stifleCap = new THREE.Mesh(
+          new THREE.SphereGeometry(0.125, 12, 10),
+          this.bodyMaterial
+        );
+        stifleJoint.add(stifleCap);
+
+        // Shank / Gaskin (slopes backward to hock) - uses full rich bodyMaterial
+        const shankLen = 0.68;
+        const shankMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.11, 0.075, shankLen, 12),
+          this.bodyMaterial
+        );
+        shankMesh.position.y = -shankLen * 0.5;
+        shankMesh.castShadow = true;
+        stifleJoint.add(shankMesh);
+
+        // Hock Joint (bends backward)
+        const hockJoint = new THREE.Group();
+        hockJoint.position.y = -shankLen;
+        stifleJoint.add(hockJoint);
+
+        const hockCap = new THREE.Mesh(
+          new THREE.SphereGeometry(0.082, 12, 10),
+          this.bodyMaterial
+        );
+        hockJoint.add(hockCap);
+
+        // Cannon Bone (Metatarsal) - transitions to sockMaterial
+        const cannonLen = 0.82;
+        const cannonMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.064, 0.054, cannonLen, 10),
+          this.sockMaterial
+        );
+        cannonMesh.position.y = -cannonLen * 0.5;
+        cannonMesh.castShadow = true;
+        hockJoint.add(cannonMesh);
+
+        // Fetlock, Pastern & Cloven Hoof
+        const fetlockJoint = new THREE.Group();
+        fetlockJoint.position.y = -cannonLen;
+        hockJoint.add(fetlockJoint);
+
+        const fetlockCap = new THREE.Mesh(
+          new THREE.SphereGeometry(0.062, 10, 8),
+          this.sockMaterial
+        );
+        fetlockJoint.add(fetlockCap);
+
+        const pasternLen = 0.14;
+        const pastern = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.054, 0.062, pasternLen, 8),
+          this.sockMaterial
+        );
+        pastern.position.set(0, -pasternLen * 0.5, 0.02);
+        pastern.rotation.x = 0.28;
+        fetlockJoint.add(pastern);
+
+        const hoof = new THREE.Mesh(
+          new THREE.BoxGeometry(0.13, 0.08, 0.16),
+          this.hoofMat
+        );
+        hoof.position.set(0, -pasternLen - 0.02, 0.05);
+        hoof.castShadow = true;
+        fetlockJoint.add(hoof);
+
+        return {
+          side,
+          root,
+          thighJoint,
+          stifleJoint,
+          hockJoint,
+          fetlockJoint,
+          thighLen,
+          shankLen,
+          cannonLen
+        };
+      }
+    }
+
+    // --- LOCOMOTION & KINEMATICS ENGINE ---
+    class GiraffeLocomotionEngine {
+      constructor(giraffeModel) {
+        this.model = giraffeModel;
+        this.phase = 0.0;
+        this.stepLength = 0.82;
+        this.stepHeight = 0.22;
+        this.strideRate = 0.68;
+
+        this.phases = {
+          LH: 0.00,  // Left Hind
+          LF: 0.14,  // Left Front (swings just after left hind)
+          RH: 0.50,  // Right Hind
+          RF: 0.64   // Right Front
+        };
+
+        this.earTwitchTimer = 2.0;
+        this.earTwitching = [0, 0];
+      }
+
+      update(delta, walkSpeedMultiplier, isBrowsingState) {
+        if (isBrowsingState) {
+          this.animateBrowsing(delta);
+          return;
+        }
+
+        const effectiveRate = this.strideRate * walkSpeedMultiplier;
+        const prevPhase = this.phase;
+        this.phase = (this.phase + delta * effectiveRate) % 1.0;
+
+        const footLH = this.calculateFootTrajectory(this.phase, this.phases.LH);
+        const footLF = this.calculateFootTrajectory(this.phase, this.phases.LF);
+        const footRH = this.calculateFootTrajectory(this.phase, this.phases.RH);
+        const footRF = this.calculateFootTrajectory(this.phase, this.phases.RF);
+
+        this.checkFootImpact('LH', prevPhase, this.phase, this.phases.LH, this.model.hindLegs[0]);
+        this.checkFootImpact('LF', prevPhase, this.phase, this.phases.LF, this.model.frontLegs[0]);
+        this.checkFootImpact('RH', prevPhase, this.phase, this.phases.RH, this.model.hindLegs[1]);
+        this.checkFootImpact('RF', prevPhase, this.phase, this.phases.RF, this.model.frontLegs[1]);
+
+        this.solveFrontLegIK(this.model.frontLegs[0], footLF);
+        this.solveFrontLegIK(this.model.frontLegs[1], footRF);
+        this.solveHindLegIK(this.model.hindLegs[0], footLH);
+        this.solveHindLegIK(this.model.hindLegs[1], footRH);
+
+        const twoPiPhase = this.phase * Math.PI * 2;
+        const fourPiPhase = this.phase * Math.PI * 4;
+
+        // Lateral sway towards standing support leg
+        const lateralSway = Math.sin(twoPiPhase) * 0.055;
+        this.model.bodyGroup.position.x = lateralSway;
+
+        // Vertical heave (2 bounces per full stride)
+        const heave = Math.cos(fourPiPhase) * 0.038;
+        this.model.bodyGroup.position.y = heave;
+
+        // Torso roll & yaw
+        this.model.bodyGroup.rotation.z = Math.sin(twoPiPhase) * 0.032;
+        this.model.bodyGroup.rotation.y = Math.cos(twoPiPhase) * 0.024;
+        this.model.bodyGroup.rotation.x = Math.sin(fourPiPhase) * 0.015;
+
+        // Dynamic Neck & Head Counterbalance
+        const neckNod = Math.sin(fourPiPhase - 0.7) * 0.085;
+        const neckSway = -Math.sin(twoPiPhase - 0.5) * 0.065;
+
+        const numSegs = this.model.neckSegments.length;
+        const restAngles = [0.24, 0.04, 0.03, 0.02, 0.01, -0.02];
+
+        this.model.neckSegments.forEach((seg, i) => {
+          if (i === 0) {
+            seg.rotation.x = (Math.PI * restAngles[0]) + (neckNod / numSegs);
+            seg.rotation.z = (neckSway / numSegs);
+          } else {
+            seg.rotation.x = restAngles[i] + (neckNod / numSegs);
+            seg.rotation.z = (neckSway / numSegs);
+          }
+        });
+
+        this.model.headGroup.rotation.x = (-Math.PI * 0.28) - (neckNod * 0.85);
+        this.model.headGroup.rotation.z = -(neckSway * 0.85);
+
+        // Tail Inertial Swish
+        const tailSwish = Math.sin(twoPiPhase - 1.2) * 0.28;
+        this.model.tailRoot.rotation.z = tailSwish;
+        this.model.tailSegments.forEach((tSeg, idx) => {
+          tSeg.rotation.z = tailSwish * (0.35 + idx * 0.2);
+        });
+
+        // Stochastic Ear Twitching
+        this.earTwitchTimer -= delta;
+        if (this.earTwitchTimer <= 0) {
+          const side = Math.random() < 0.5 ? 0 : 1;
+          this.earTwitching[side] = 0.26;
+          this.earTwitchTimer = 2.0 + Math.random() * 4.0;
+        }
+
+        this.model.ears.forEach((ear, idx) => {
+          if (this.earTwitching[idx] > 0) {
+            this.earTwitching[idx] -= delta;
+            ear.rotation.y = (- (idx === 0 ? -1 : 1) * 0.35) + Math.sin(this.earTwitching[idx] * 40.0) * 0.35;
+          } else {
+            ear.rotation.y = (- (idx === 0 ? -1 : 1) * 0.35);
+          }
+        });
+
+        // Breathing ribcage expansion
+        const breath = 1.0 + Math.sin(clock.getElapsedTime() * 1.5) * 0.015;
+        this.model.torsoMesh.scale.set(breath, breath, 1.0);
+      }
+
+      calculateFootTrajectory(currentPhase, legPhaseOffset) {
+        const phi = (currentPhase - legPhaseOffset + 1.0) % 1.0;
+        const swingDuration = 0.38;
+
+        let z, y, pasternFlex;
+
+        if (phi < swingDuration) {
+          const s = phi / swingDuration;
+          z = -this.stepLength * 0.5 + this.stepLength * (0.5 - 0.5 * Math.cos(s * Math.PI));
+          y = Math.sin(Math.pow(s, 0.85) * Math.PI) * this.stepHeight;
+          pasternFlex = Math.sin(s * Math.PI) * -0.32;
+        } else {
+          const p = (phi - swingDuration) / (1.0 - swingDuration);
+          z = this.stepLength * 0.5 - p * this.stepLength;
+          y = 0.0;
+          pasternFlex = 0.0;
+        }
+
+        return { z, y, pasternFlex, isStance: phi >= swingDuration };
+      }
+
+      solveFrontLegIK(leg, foot) {
+        const forwardAngle = foot.z * 0.45;
+        const liftAngle = foot.y * 2.2;
+
+        leg.humerusJoint.rotation.x = -0.15 + forwardAngle - liftAngle * 0.5;
+        leg.elbowJoint.rotation.x = 0.22 - forwardAngle * 0.6 + liftAngle * 1.2;
+        leg.kneeJoint.rotation.x = -liftAngle * 0.6;
+        leg.fetlockJoint.rotation.x = foot.pasternFlex;
+      }
+
+      solveHindLegIK(leg, foot) {
+        const forwardAngle = foot.z * 0.42;
+        const liftAngle = foot.y * 2.4;
+
+        leg.thighJoint.rotation.x = 0.25 - forwardAngle + liftAngle * 0.6;
+        leg.stifleJoint.rotation.x = -0.45 + forwardAngle * 0.8 - liftAngle * 1.3;
+        leg.hockJoint.rotation.x = 0.28 - forwardAngle * 0.4 + liftAngle * 0.8;
+        leg.fetlockJoint.rotation.x = foot.pasternFlex;
+      }
+
+      checkFootImpact(name, prevPhase, currPhase, offset, leg) {
+        const plantPhase = (offset + 0.38) % 1.0;
+        const crossed = (prevPhase < plantPhase && currPhase >= plantPhase) ||
+                        (prevPhase > 0.85 && currPhase < 0.15 && plantPhase < 0.15);
+
+        if (crossed) {
+          audio.playFootstep();
+          if (dustParticles) {
+            const worldPos = new THREE.Vector3();
+            leg.fetlockJoint.getWorldPosition(worldPos);
+            worldPos.y = 0.05;
+            dustParticles.spawnPuff(worldPos);
+          }
+        }
+      }
+
+      animateBrowsing(delta) {
+        browseTimer += delta;
+        const t = Math.sin(browseTimer * 1.5) * 0.5 + 0.5;
+
+        this.model.neckSegments.forEach((seg, i) => {
+          if (i === 0) {
+            seg.rotation.x = THREE.MathUtils.lerp(Math.PI * 0.24, Math.PI * 0.45, t);
+          } else {
+            seg.rotation.x = THREE.MathUtils.lerp(0.02, 0.08, t);
+          }
+          seg.rotation.z = Math.sin(browseTimer * 2.5) * 0.03;
+        });
+
+        this.model.headGroup.rotation.x = THREE.MathUtils.lerp(-Math.PI * 0.28, 0.15, t) + Math.sin(browseTimer * 8.0) * 0.04;
+
+        this.model.frontLegs.forEach(leg => {
+          leg.humerusJoint.rotation.x = -0.12;
+          leg.elbowJoint.rotation.x = 0.18;
+          leg.kneeJoint.rotation.x = 0;
+          leg.fetlockJoint.rotation.x = 0;
+        });
+        this.model.hindLegs.forEach(leg => {
+          leg.thighJoint.rotation.x = 0.20;
+          leg.stifleJoint.rotation.x = -0.38;
+          leg.hockJoint.rotation.x = 0.22;
+          leg.fetlockJoint.rotation.x = 0;
+        });
+
+        this.model.bodyGroup.position.set(0, 0, 0);
+        this.model.bodyGroup.rotation.set(0, 0, 0);
+      }
+    }
+
+    // --- PROCEDURAL SAVANNAH ENVIRONMENT ---
+
+    // Flat-Topped Umbrella Acacia Tree (Vachellia tortilis)
+    function createUmbrellaAcaciaTree(scale = 1.0) {
+      const tree = new THREE.Group();
+
+      const barkMat = new THREE.MeshStandardMaterial({
+        color: 0x362c24,
+        roughness: 0.9,
+        metalness: 0.05
+      });
+
+      const leavesMat = new THREE.MeshStandardMaterial({
+        color: 0x687440,
+        roughness: 0.78,
+        metalness: 0.04,
+        flatShading: true
+      });
+
+      const trunkLen = 4.0 * scale;
+      const trunkGeom = new THREE.CylinderGeometry(0.24 * scale, 0.42 * scale, trunkLen, 10, 4);
+      const pos = trunkGeom.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const y = pos.getY(i);
+        pos.setX(i, pos.getX(i) + Math.sin(y * 1.2) * 0.20 * scale);
+      }
+      trunkGeom.computeVertexNormals();
+
+      const trunk = new THREE.Mesh(trunkGeom, barkMat);
+      trunk.position.y = trunkLen * 0.5;
+      trunk.castShadow = true;
+      trunk.receiveShadow = true;
+      tree.add(trunk);
+
+      const numBranches = 4;
+      for (let i = 0; i < numBranches; i++) {
+        const angle = (i / numBranches) * Math.PI * 2 + (Math.random() * 0.4);
+        const branchGroup = new THREE.Group();
+        branchGroup.position.set(0, trunkLen * 0.9, 0);
+        branchGroup.rotation.y = angle;
+
+        const limbLen = 2.6 * scale;
+        const limb = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.09 * scale, 0.18 * scale, limbLen, 8),
+          barkMat
+        );
+        limb.position.set(0, limbLen * 0.38, limbLen * 0.35);
+        limb.rotation.x = Math.PI * 0.35;
+        limb.castShadow = true;
+        branchGroup.add(limb);
+
+        const canopyRadius = (2.6 + Math.random() * 1.4) * scale;
+        const canopyGeom = new THREE.CylinderGeometry(canopyRadius * 0.88, canopyRadius, 0.32 * scale, 14);
+        canopyGeom.scale(1.0, 0.5, 1.0);
+        const canopy = new THREE.Mesh(canopyGeom, leavesMat);
+        canopy.position.set(0, limbLen * 0.78, limbLen * 0.72);
+        canopy.castShadow = true;
+        canopy.receiveShadow = true;
+        branchGroup.add(canopy);
+
+        const topCanopy = new THREE.Mesh(
+          new THREE.CylinderGeometry(canopyRadius * 0.52, canopyRadius * 0.68, 0.26 * scale, 12),
+          leavesMat
+        );
+        topCanopy.position.set(0, limbLen * 0.78 + 0.30 * scale, limbLen * 0.72);
+        topCanopy.castShadow = true;
+        branchGroup.add(topCanopy);
+
+        tree.add(branchGroup);
+      }
+
+      return tree;
+    }
+
+    // Realistic Savannah Grass Bunchgrass (Tuft with curved organic blades)
+    function createGrassTuftGeometry() {
+      const geom = new THREE.BufferGeometry();
+      const positions = [];
+      const uvs = [];
+      const indices = [];
+
+      const numBlades = 5;
+      for (let b = 0; b < numBlades; b++) {
+        const angle = (b / numBlades) * Math.PI * 2 + (b * 0.3);
+        const bladeH = 0.45 + Math.sin(b * 1.5) * 0.14;
+        const lean = 0.18 + Math.cos(b * 2.1) * 0.08;
+
+        const cosA = Math.cos(angle);
+        const sinA = Math.sin(angle);
+        const w = 0.045;
+
+        const vBase = positions.length / 3;
+        positions.push(-sinA * w, 0, cosA * w);
+        positions.push(sinA * w, 0, -cosA * w);
+        const tipX = cosA * lean;
+        const tipZ = sinA * lean;
+        positions.push(-sinA * (w * 0.15) + tipX, bladeH, cosA * (w * 0.15) + tipZ);
+        positions.push(sinA * (w * 0.15) + tipX, bladeH, -cosA * (w * 0.15) + tipZ);
+
+        uvs.push(0, 0, 1, 0, 0, 1, 1, 1);
+        indices.push(vBase, vBase + 1, vBase + 2);
+        indices.push(vBase + 1, vBase + 3, vBase + 2);
+      }
+
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      geom.setIndex(indices);
+      geom.computeVertexNormals();
+      return geom;
+    }
+
+    // Hoof Dust Particle Burst System
+    class DustParticleSystem {
+      constructor(scene, count = 120) {
+        this.count = count;
+        this.geom = new THREE.BufferGeometry();
+        this.positions = new Float32Array(count * 3);
+        this.scales = new Float32Array(count);
+        this.opacities = new Float32Array(count);
+        this.velocities = [];
+        this.lifetimes = new Float32Array(count);
+        this.maxLifetimes = new Float32Array(count);
+
+        for (let i = 0; i < count; i++) {
+          this.positions[i * 3] = 0;
+          this.positions[i * 3 + 1] = -999;
+          this.positions[i * 3 + 2] = 0;
+          this.scales[i] = 0;
+          this.opacities[i] = 0;
+          this.lifetimes[i] = 1.0;
+          this.maxLifetimes[i] = 1.0;
+          this.velocities.push(new THREE.Vector3());
+        }
+
+        this.geom.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
+
+        const pCanvas = document.createElement('canvas');
+        pCanvas.width = 64;
+        pCanvas.height = 64;
+        const pCtx = pCanvas.getContext('2d');
+        const grad = pCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
+        grad.addColorStop(0.0, 'rgba(215, 185, 150, 0.8)');
+        grad.addColorStop(0.5, 'rgba(195, 160, 125, 0.35)');
+        grad.addColorStop(1.0, 'rgba(180, 140, 105, 0.0)');
+        pCtx.fillStyle = grad;
+        pCtx.fillRect(0, 0, 64, 64);
+        const pTexture = new THREE.CanvasTexture(pCanvas);
+
+        this.mat = new THREE.PointsMaterial({
+          size: 1.2,
+          map: pTexture,
+          transparent: true,
+          opacity: 0.5,
+          depthWrite: false,
+          blending: THREE.NormalBlending
+        });
+
+        this.points = new THREE.Points(this.geom, this.mat);
+        scene.add(this.points);
+        this.nextIdx = 0;
+      }
+
+      spawnPuff(origin) {
+        const burstCount = 6;
+        for (let k = 0; k < burstCount; k++) {
+          const i = (this.nextIdx + k) % this.count;
+          this.positions[i * 3] = origin.x + (Math.random() - 0.5) * 0.18;
+          this.positions[i * 3 + 1] = origin.y + Math.random() * 0.08;
+          this.positions[i * 3 + 2] = origin.z + (Math.random() - 0.5) * 0.18;
+
+          this.velocities[i].set(
+            (Math.random() - 0.5) * 0.35,
+            0.22 + Math.random() * 0.32,
+            -(0.45 + Math.random() * 0.5)
+          );
+
+          this.lifetimes[i] = 0.0;
+          this.maxLifetimes[i] = 0.9 + Math.random() * 0.6;
+        }
+        this.nextIdx = (this.nextIdx + burstCount) % this.count;
+      }
+
+      update(delta) {
+        let needsUpdate = false;
+        for (let i = 0; i < this.count; i++) {
+          if (this.lifetimes[i] < this.maxLifetimes[i]) {
+            this.lifetimes[i] += delta;
+            const progress = this.lifetimes[i] / this.maxLifetimes[i];
+
+            this.positions[i * 3] += this.velocities[i].x * delta;
+            this.positions[i * 3 + 1] += this.velocities[i].y * delta;
+            this.positions[i * 3 + 2] += this.velocities[i].z * delta;
+
+            this.velocities[i].multiplyScalar(0.95);
+
+            if (progress >= 1.0) {
+              this.positions[i * 3 + 1] = -999;
+            }
+            needsUpdate = true;
+          }
+        }
+        if (needsUpdate) {
+          this.geom.attributes.position.needsUpdate = true;
+        }
+      }
+    }
+
+    // --- SETUP SCENE, LIGHTS & ENVIRONMENT ---
+    function initScene() {
+      const container = document.getElementById('canvas-container');
+
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xd49b6a);
+      scene.fog = new THREE.FogExp2(0xd49b6a, 0.0065);
+
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.2, 500);
+      camera.position.set(5.5, 2.7, 5.0);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.maxPolarAngle = Math.PI * 0.49;
+      controls.minDistance = 2.0;
+      controls.maxDistance = 60.0;
+      controls.target.set(0, 2.4, 0.4);
+
+      // Lights
+      hemiLight = new THREE.HemisphereLight(0x8da4be, 0x7a4d2c, 0.75);
+      scene.add(hemiLight);
+
+      sunLight = new THREE.DirectionalLight(0xffe0b8, 1.45);
+      sunLight.position.set(70, 32, 80);
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.width = 2048;
+      sunLight.shadow.mapSize.height = 2048;
+      sunLight.shadow.camera.near = 10;
+      sunLight.shadow.camera.far = 250;
+      const d = 18;
+      sunLight.shadow.camera.left = -d;
+      sunLight.shadow.camera.right = d;
+      sunLight.shadow.camera.top = d;
+      sunLight.shadow.camera.bottom = -d;
+      sunLight.shadow.bias = -0.0004;
+      scene.add(sunLight);
+
+      // Terrain Mesh
+      const terrainGeom = new THREE.PlaneGeometry(280, 280, 64, 64);
+      terrainGeom.rotateX(-Math.PI * 0.5);
+
+      const tPos = terrainGeom.attributes.position;
+      for (let i = 0; i < tPos.count; i++) {
+        const x = tPos.getX(i);
+        const z = tPos.getZ(i);
+        const dist = Math.hypot(x, z);
+        if (dist > 15) {
+          const swell = Math.sin(x * 0.035) * Math.cos(z * 0.035) * 1.8;
+          tPos.setY(i, swell);
+        }
+      }
+      terrainGeom.computeVertexNormals();
+
+      // Procedural Savannah Ground Texture
+      const gCanvas = document.createElement('canvas');
+      gCanvas.width = 512;
+      gCanvas.height = 512;
+      const gCtx = gCanvas.getContext('2d');
+      gCtx.fillStyle = '#b58550';
+      gCtx.fillRect(0, 0, 512, 512);
+      for (let i = 0; i < 4000; i++) {
+        gCtx.fillStyle = Math.random() < 0.5 ? 'rgba(150, 100, 55, 0.25)' : 'rgba(215, 175, 115, 0.2)';
+        gCtx.fillRect(Math.random() * 512, Math.random() * 512, 2 + Math.random() * 6, 2 + Math.random() * 6);
+      }
+      const groundTex = new THREE.CanvasTexture(gCanvas);
+      groundTex.wrapS = THREE.RepeatWrapping;
+      groundTex.wrapT = THREE.RepeatWrapping;
+      groundTex.repeat.set(24, 24);
+
+      const terrainMat = new THREE.MeshStandardMaterial({
+        map: groundTex,
+        roughness: 0.92,
+        metalness: 0.05
+      });
+      terrain = new THREE.Mesh(terrainGeom, terrainMat);
+      terrain.receiveShadow = true;
+      scene.add(terrain);
+
+      // Distant Kopjes (Granite rocky hills on horizon)
+      kopjesGroup = new THREE.Group();
+      const kopjeMat = new THREE.MeshStandardMaterial({ color: 0x6e5240, roughness: 0.95 });
+      for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2 + Math.random() * 0.3;
+        const dist = 110 + Math.random() * 25;
+        const kGeom = new THREE.DodecahedronGeometry(12 + Math.random() * 10, 1);
+        kGeom.scale(1.8 + Math.random() * 0.8, 0.7 + Math.random() * 0.5, 1.4);
+        const kopje = new THREE.Mesh(kGeom, kopjeMat);
+        kopje.position.set(Math.cos(angle) * dist, 2 + Math.random() * 3, Math.sin(angle) * dist);
+        kopjesGroup.add(kopje);
+      }
+      scene.add(kopjesGroup);
+
+      // Umbrella Acacia Trees
+      const treesData = [
+        { x: -14.0, z: 16.0, scale: 1.25, rot: 0.4 }, // Placed to side so giraffe path is in open sunlight
+        { x: 22.0, z: -15.0, scale: 1.3, rot: 1.2 },
+        { x: -28.0, z: -30.0, scale: 1.4, rot: 2.1 },
+        { x: 32.0, z: 42.0, scale: 1.5, rot: 0.8 },
+        { x: -35.0, z: 45.0, scale: 1.6, rot: 1.7 }
+      ];
+
+      treesData.forEach(td => {
+        const tree = createUmbrellaAcaciaTree(td.scale);
+        tree.position.set(td.x, 0, td.z);
+        tree.rotation.y = td.rot;
+        scene.add(tree);
+      });
+
+      // Instanced Savannah Grass Bunchgrass (Realistic curved blades)
+      const numGrass = 2200;
+      const grassTuftGeom = createGrassTuftGeometry();
+      const grassMat = new THREE.MeshStandardMaterial({
+        color: 0xb59954,
+        roughness: 0.82,
+        side: THREE.DoubleSide
+      });
+      grassMesh = new THREE.InstancedMesh(grassTuftGeom, grassMat, numGrass);
+      const dummy = new THREE.Object3D();
+      for (let i = 0; i < numGrass; i++) {
+        const rad = 5 + Math.random() * 75;
+        const ang = Math.random() * Math.PI * 2;
+        dummy.position.set(Math.cos(ang) * rad, 0, Math.sin(ang) * rad);
+        const s = 0.7 + Math.random() * 0.7;
+        dummy.scale.set(s, s * (0.8 + Math.random() * 0.4), s);
+        dummy.rotation.y = Math.random() * Math.PI * 2;
+        dummy.updateMatrix();
+        grassMesh.setMatrixAt(i, dummy.matrix);
+      }
+      grassMesh.instanceMatrix.needsUpdate = true;
+      grassMesh.receiveShadow = true;
+      scene.add(grassMesh);
+
+      // Dust & Atmospheric Sun Motes
+      dustParticles = new DustParticleSystem(scene, 120);
+
+      const moteGeom = new THREE.BufferGeometry();
+      const moteCount = 200;
+      const motePos = new Float32Array(moteCount * 3);
+      for (let i = 0; i < moteCount * 3; i += 3) {
+        motePos[i] = (Math.random() - 0.5) * 40;
+        motePos[i + 1] = 0.5 + Math.random() * 7;
+        motePos[i + 2] = (Math.random() - 0.5) * 40;
+      }
+      moteGeom.setAttribute('position', new THREE.BufferAttribute(motePos, 3));
+      const moteMat = new THREE.PointsMaterial({
+        color: 0xffe6b0,
+        size: 0.08,
+        transparent: true,
+        opacity: 0.55
+      });
+      sunMoteParticles = new THREE.Points(moteGeom, moteMat);
+      scene.add(sunMoteParticles);
+    }
+
+    // --- TIME OF DAY CONTROLLER ---
+    function setSavannahTime(presetKey) {
+      const p = timePresets[presetKey];
+      if (!p) return;
+      currentTime = presetKey;
+
+      scene.background.setHex(p.fogColor);
+      scene.fog.color.setHex(p.fogColor);
+      scene.fog.density = p.fogDensity;
+
+      hemiLight.color.setHex(p.skyColor);
+      hemiLight.groundColor.setHex(p.groundColor);
+      hemiLight.intensity = p.ambientIntensity;
+
+      sunLight.color.setHex(p.sunColor);
+      sunLight.intensity = p.sunIntensity;
+      sunLight.position.copy(p.sunPos);
+
+      document.querySelectorAll('[data-time]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.time === presetKey);
+      });
+    }
+
+    // --- CAMERA CONTROLLER ---
+    function setCameraPreset(mode) {
+      cameraMode = mode;
+      document.querySelectorAll('[data-cam]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.cam === mode);
+      });
+    }
+
+    function updateCamera(delta) {
+      const gPos = giraffe.root.position;
+
+      if (cameraMode === 'follow') {
+        camTargetPos.set(gPos.x + 5.5, 2.7, gPos.z + 5.0);
+        camLookPos.set(gPos.x, 2.4, gPos.z + 0.4);
+        camera.position.lerp(camTargetPos, delta * 3.5);
+        controls.target.lerp(camLookPos, delta * 4.5);
+      } else if (cameraMode === 'ground') {
+        camTargetPos.set(gPos.x + 2.4, 0.40, gPos.z + 3.4);
+        camLookPos.set(gPos.x, 3.4, gPos.z + 0.4);
+        camera.position.lerp(camTargetPos, delta * 3.5);
+        controls.target.lerp(camLookPos, delta * 4.5);
+      } else if (cameraMode === 'head') {
+        camTargetPos.set(gPos.x + 1.0, 4.4, gPos.z + 2.4);
+        camLookPos.set(gPos.x, 4.4, gPos.z + 1.3);
+        camera.position.lerp(camTargetPos, delta * 4.0);
+        controls.target.lerp(camLookPos, delta * 5.0);
+      } else if (cameraMode === 'pan') {
+        panAngle += delta * 0.22;
+        const radius = 9.2;
+        camTargetPos.set(
+          gPos.x + Math.sin(panAngle) * radius,
+          3.0 + Math.cos(panAngle * 0.5) * 1.2,
+          gPos.z + Math.cos(panAngle) * radius
+        );
+        camLookPos.set(gPos.x, 2.4, gPos.z);
+        camera.position.lerp(camTargetPos, delta * 2.5);
+        controls.target.lerp(camLookPos, delta * 3.5);
+      } else if (cameraMode === 'free') {
+        if (walkMode === 'world') {
+          controls.target.set(gPos.x, 2.4, gPos.z);
+        }
+      }
+
+      controls.update();
+    }
+
+    // --- MAIN INITIALIZATION ---
+    function init() {
+      initScene();
+
+      textures = generateGiraffeTextures();
+
+      giraffe = new GiraffeModel(textures);
+      scene.add(giraffe.root);
+
+      const locomotion = new GiraffeLocomotionEngine(giraffe);
+
+      setSavannahTime('sunset');
+
+      const overlay = document.getElementById('loading-overlay');
+      overlay.classList.add('fade-out');
+      setTimeout(() => {
+        overlay.style.display = 'none';
+      }, 700);
+
+      // Sound button
+      const btnSound = document.getElementById('btn-sound');
+      const soundIcon = document.getElementById('sound-icon');
+      btnSound.addEventListener('click', () => {
+        const active = audio.toggle();
+        btnSound.classList.toggle('active', active);
+        soundIcon.textContent = active ? '🔊' : '🔈';
+      });
+
+      // Field guide modal
+      const btnInfo = document.getElementById('btn-info');
+      const modal = document.getElementById('info-modal');
+      const modalClose = document.getElementById('modal-close');
+      btnInfo.addEventListener('click', () => modal.classList.toggle('active'));
+      modalClose.addEventListener('click', () => modal.classList.remove('active'));
+
+      // Speed Slider
+      const sliderSpeed = document.getElementById('slider-speed');
+      const valSpeed = document.getElementById('val-speed');
+      const speedDisplay = document.getElementById('speed-display');
+      sliderSpeed.addEventListener('input', e => {
+        walkSpeed = parseFloat(e.target.value);
+        valSpeed.textContent = walkSpeed.toFixed(1) + '×';
+        speedDisplay.textContent = walkSpeed.toFixed(1) + '× ' + (walkSpeed < 0.8 ? 'Slow Amble' : walkSpeed > 1.3 ? 'Brisk Pace' : 'Normal');
+      });
+
+      // Walk Mode Buttons
+      const btnModeWorld = document.getElementById('btn-mode-world');
+      const btnModeTreadmill = document.getElementById('btn-mode-treadmill');
+      btnModeWorld.addEventListener('click', () => {
+        walkMode = 'world';
+        btnModeWorld.classList.add('active');
+        btnModeTreadmill.classList.remove('active');
+      });
+      btnModeTreadmill.addEventListener('click', () => {
+        walkMode = 'treadmill';
+        btnModeTreadmill.classList.add('active');
+        btnModeWorld.classList.remove('active');
+        giraffe.root.position.set(0, 0, 0);
+      });
+
+      // Browse Leaves Action
+      const btnBrowse = document.getElementById('btn-action-browse');
+      function triggerBrowse() {
+        if (isBrowsing) return;
+        isBrowsing = true;
+        btnBrowse.classList.add('active');
+        btnBrowse.textContent = '🌿 Browsing...';
+        setTimeout(() => {
+          isBrowsing = false;
+          btnBrowse.classList.remove('active');
+          btnBrowse.textContent = '🌿 Browse Tree';
+        }, 5500);
+      }
+      btnBrowse.addEventListener('click', triggerBrowse);
+
+      // Camera Preset Buttons
+      document.querySelectorAll('[data-cam]').forEach(btn => {
+        btn.addEventListener('click', () => setCameraPreset(btn.dataset.cam));
+      });
+
+      // Time of Day Buttons
+      document.querySelectorAll('[data-time]').forEach(btn => {
+        btn.addEventListener('click', () => setSavannahTime(btn.dataset.time));
+      });
+
+      // Keyboard Shortcuts
+      window.addEventListener('keydown', e => {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          triggerBrowse();
+        }
+      });
+
+      // Window resize
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // --- ANIMATION LOOP ---
+      function animate() {
+        requestAnimationFrame(animate);
+
+        const delta = Math.min(clock.getDelta(), 0.1);
+
+        locomotion.update(delta, walkSpeed, isBrowsing);
+
+        if (walkMode === 'world' && !isBrowsing) {
+          const forwardVelocity = locomotion.stepLength * (locomotion.strideRate * walkSpeed) * 1.62;
+          giraffe.root.position.z += forwardVelocity * delta;
+
+          if (giraffe.root.position.z > 80) {
+            giraffe.root.position.z -= 160;
+          }
+        }
+
+        dustParticles.update(delta);
+
+        if (sunMoteParticles) {
+          const mPos = sunMoteParticles.geometry.attributes.position;
+          for (let i = 1; i < mPos.count * 3; i += 3) {
+            mPos.array[i] += Math.sin(clock.getElapsedTime() + i) * 0.003;
+          }
+          mPos.needsUpdate = true;
+        }
+
+        updateCamera(delta);
+
+        renderer.render(scene, camera);
+      }
+
+      animate();
+    }
+
+    window.addEventListener('load', init);
+
+  })();
+  </script>
+</body>
+</html>

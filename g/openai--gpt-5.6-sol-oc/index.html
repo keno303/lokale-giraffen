@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Twiga — A Walking Giraffe</title>
+  <meta name="description" content="A procedural, animated giraffe study made with Three.js.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="scene" aria-label="Interactive 3D scene of a walking giraffe"></main>
+  <header class="masthead">
+    <div class="brand"><span class="brand-mark"></span><span>TWIGA</span></div>
+    <div class="edition">FIELD STUDY · 01</div>
+  </header>
+  <section class="intro">
+    <p class="eyebrow">Giraffa camelopardalis</p>
+    <h1>Grace<br>in motion.</h1>
+    <p class="dek">A study of the world’s tallest animal and its unmistakable, rolling gait.</p>
+  </section>
+  <aside class="facts" aria-label="Giraffe facts">
+    <div><strong>5.5m</strong><span>adult height</span></div>
+    <div><strong>55</strong><span>km/h sprint</span></div>
+    <div><strong>04</strong><span>footfalls</span></div>
+  </aside>
+  <div class="controls">
+    <button id="toggle" type="button" aria-label="Pause animation"><span class="pause-icon">Ⅱ</span><span class="control-label">PAUSE</span></button>
+    <label>PACE <input id="speed" type="range" min="0.35" max="1.8" value="1" step="0.01" aria-label="Walking speed"></label>
+  </div>
+  <p class="hint"><span></span> DRAG TO LOOK · SCROLL TO ZOOM</p>
+  <div class="loading" id="loading"><div class="loader-line"></div><span>ENTERING THE SAVANNA</span></div>
+  <script src="vendor/three.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

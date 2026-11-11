@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walking Giraffe</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #d9c9a6; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  canvas { display: block; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column;
+    background: linear-gradient(#9fc4e6, #ecd9ae 62%, #b89a5e); color: #4a3520; font-size: 18px; letter-spacing: .04em; transition: opacity .8s; z-index: 5; }
+  #loading.hidden { opacity: 0; pointer-events: none; }
+  #loading small { margin-top: 8px; opacity: .7; font-size: 13px; }
+  #hud { position: fixed; left: 14px; bottom: 12px; color: rgba(255,255,255,.92); font-size: 12.5px; line-height: 1.55;
+    text-shadow: 0 1px 3px rgba(0,0,0,.55); user-select: none; z-index: 2; }
+  #hud b { font-weight: 600; }
+  #panel { position: fixed; right: 14px; top: 12px; color: #fff; font-size: 12.5px; background: rgba(40,28,14,.42); padding: 10px 12px;
+    border-radius: 10px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); user-select: none; z-index: 2; min-width: 168px; }
+  #panel label { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 4px 0; }
+  #panel input[type=range] { width: 96px; accent-color: #e8b45a; }
+  #panel button { font: inherit; color: #fff; background: rgba(255,255,255,.16); border: 0; border-radius: 6px; padding: 4px 9px; cursor: pointer; }
+  #panel button:hover { background: rgba(255,255,255,.3); }
+  #panel .row { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<div id="loading">Growing a giraffe&hellip;<small>building the mesh procedurally</small></div>
+<div id="panel">
+  <label>Speed <input id="speed" type="range" min="0" max="1.6" step="0.01" value="1"></label>
+  <label>Time of day <input id="sun" type="range" min="0" max="1" step="0.001" value="0.3"></label>
+  <div class="row">
+    <button id="camFollow">Follow</button><button id="camSide">Side</button><button id="camFront">Front</button><button id="camLow">Low</button>
+  </div>
+  <div class="row"><button id="pause">Pause</button><button id="bones">Skeleton</button></div>
+</div>
+<div id="hud"><b>Drag</b> orbit &nbsp; <b>Scroll</b> zoom &nbsp; <b>Space</b> pause &nbsp; <b>1&ndash;4</b> camera</div>
+<script src="lib/three.bundle.js"></script>
+<script src="js/sdf.js"></script>
+<script src="js/giraffe.js"></script>
+<script src="js/gait.js"></script>
+<script src="js/env.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

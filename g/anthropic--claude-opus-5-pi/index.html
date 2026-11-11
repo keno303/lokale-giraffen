@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Walking Giraffe — Three.js</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; height:100%; overflow:hidden; background:#0d1117; }
+  canvas { display:block; width:100%; height:100%; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, sans-serif; }
+
+  #panel {
+    position:fixed; left:14px; top:14px; z-index:10;
+    background:rgba(16,19,24,.62); backdrop-filter:blur(12px) saturate(1.3);
+    -webkit-backdrop-filter:blur(12px) saturate(1.3);
+    border:1px solid rgba(255,255,255,.12); border-radius:12px;
+    padding:12px 14px; color:#e8e3d8; font-size:12.5px; line-height:1.55;
+    min-width:224px; box-shadow:0 10px 32px rgba(0,0,0,.42);
+    transition: opacity .25s, transform .25s;
+  }
+  #panel.hidden { opacity:0; transform:translateX(-12px); pointer-events:none; }
+  #panel h1 { margin:0 0 7px; font-size:13.5px; letter-spacing:.055em; text-transform:uppercase;
+               font-weight:650; color:#f3e4c6; }
+  #panel .row { display:flex; align-items:center; gap:8px; margin:7px 0; }
+  #panel label { flex:0 0 46px; opacity:.7; font-size:11.5px; }
+  input[type=range] { -webkit-appearance:none; flex:1; height:3px; border-radius:3px;
+    background:linear-gradient(90deg,#c08a3e,#e3c489); outline:none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:13px; height:13px;
+    border-radius:50%; background:#f6ecd6; border:1px solid #9b7033; cursor:pointer; }
+  button { background:rgba(255,255,255,.08); color:#eee4d2; border:1px solid rgba(255,255,255,.16);
+    border-radius:7px; padding:4px 9px; font-size:11.5px; cursor:pointer; font-family:inherit; }
+  button:hover { background:rgba(255,255,255,.16); }
+  button:active { transform:translateY(1px); }
+  .btns { display:flex; gap:6px; margin-top:9px; flex-wrap:wrap; }
+  .keys { margin-top:10px; padding-top:9px; border-top:1px solid rgba(255,255,255,.12);
+          font-size:11px; opacity:.6; line-height:1.7; }
+  kbd { background:rgba(255,255,255,.12); border-radius:4px; padding:0 4px;
+        font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:10.5px; }
+  #hud { position:fixed; right:14px; top:14px; z-index:10; text-align:right;
+         color:#e8e3d8; font-size:11.5px; opacity:.65;
+         text-shadow:0 1px 4px rgba(0,0,0,.8); }
+  #loading { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+     color:#d8cfbb; font-size:14px; letter-spacing:.1em; z-index:50; background:#10141a; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="loading">BUILDING GIRAFFE&hellip;</div>
+
+<div id="panel">
+  <h1>Giraffa camelopardalis</h1>
+  <div class="row">
+    <label>Speed</label>
+    <input id="speed" type="range" min="0" max="2.6" step="0.01" value="1.1">
+  </div>
+  <div class="btns">
+    <button id="cam">Camera</button>
+    <button id="pause">Pause</button>
+    <button id="skel">Skeleton</button>
+  </div>
+  <div class="keys">
+    <kbd>drag</kbd> orbit &middot; <kbd>scroll</kbd> zoom<br>
+    <kbd>W</kbd><kbd>S</kbd> speed &middot; <kbd>A</kbd><kbd>D</kbd> steer<br>
+    <kbd>1</kbd>–<kbd>4</kbd> gait &middot; <kbd>C</kbd> camera &middot; <kbd>K</kbd> skeleton<br>
+    <kbd>space</kbd> pause &middot; <kbd>H</kbd> hide panel
+  </div>
+</div>
+
+<div id="hud"><span id="info"></span><br><span id="fps"></span></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/noise.js"></script>
+<script src="js/geom.js"></script>
+<script src="js/material.js"></script>
+<script src="js/giraffe.js"></script>
+<script src="js/rig.js"></script>
+<script src="js/env.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

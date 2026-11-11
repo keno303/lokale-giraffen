@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Giraffa camelopardalis — a walking giraffe in Three.js</title>
+<style>
+  :root {
+    --panel: rgba(18, 16, 13, 0.62);
+    --edge: rgba(255, 238, 205, 0.16);
+    --text: #f3ead7;
+    --dim: #b8ab92;
+    --accent: #e0a24a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #0d0c0a; color: var(--text);
+    font: 13px/1.45 ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #view { position: fixed; inset: 0; display: block; }
+
+  .panel {
+    position: fixed;
+    background: var(--panel);
+    -webkit-backdrop-filter: blur(14px) saturate(130%);
+    backdrop-filter: blur(14px) saturate(130%);
+    border: 1px solid var(--edge);
+    border-radius: 12px;
+    box-shadow: 0 8px 34px rgba(0,0,0,0.38);
+  }
+
+  #title { top: 16px; left: 16px; padding: 12px 16px 12px; max-width: 290px; }
+  #title h1 {
+    margin: 0 0 2px; font-size: 15px; font-weight: 600; letter-spacing: 0.2px;
+  }
+  #title h1 em { font-style: italic; color: var(--accent); font-weight: 500; }
+  #title p { margin: 4px 0 0; font-size: 11.5px; color: var(--dim); }
+  #title .stats { margin-top: 8px; font-size: 11px; color: var(--dim);
+    font-variant-numeric: tabular-nums; display: flex; gap: 12px; flex-wrap: wrap; }
+  #title .stats b { color: var(--text); font-weight: 600; }
+
+  #ui { bottom: 16px; left: 50%; transform: translateX(-50%);
+        padding: 10px 14px; display: flex; gap: 16px; align-items: center;
+        flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 24px); }
+  .grp { display: flex; align-items: center; gap: 7px; }
+  .grp > span.lbl { font-size: 10.5px; text-transform: uppercase;
+    letter-spacing: 0.9px; color: var(--dim); }
+  .seg { display: flex; border: 1px solid var(--edge); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    background: transparent; border: 0; color: var(--dim); padding: 6px 11px;
+    font: inherit; font-size: 12px; cursor: pointer; transition: background .15s, color .15s;
+  }
+  .seg button + button { border-left: 1px solid var(--edge); }
+  .seg button:hover { background: rgba(255,255,255,0.07); color: var(--text); }
+  .seg button.on { background: rgba(224,162,74,0.22); color: #ffd79a; }
+  input[type=range] {
+    -webkit-appearance: none; appearance: none; width: 104px; height: 18px;
+    background: transparent; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 3px; background: rgba(255,238,205,0.25); border-radius: 2px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%;
+    background: var(--accent); margin-top: -5px; box-shadow: 0 1px 4px rgba(0,0,0,.5);
+  }
+  input[type=range]::-moz-range-track { height: 3px; background: rgba(255,238,205,0.25); }
+  input[type=range]::-moz-range-thumb { width: 13px; height: 13px; border: 0;
+    border-radius: 50%; background: var(--accent); }
+  .val { font-size: 11px; color: var(--dim); min-width: 46px;
+    font-variant-numeric: tabular-nums; }
+
+  #hint { position: fixed; bottom: 16px; right: 16px; font-size: 11px;
+    color: rgba(243,234,215,0.42); text-align: right; line-height: 1.6;
+    pointer-events: none; }
+  #hint kbd { font: inherit; background: rgba(255,255,255,0.09);
+    border-radius: 3px; padding: 0 4px; }
+
+  #loader { position: fixed; inset: 0; display: grid; place-items: center;
+    background: #14120f; z-index: 20; transition: opacity .6s ease; }
+  #loader .inner { text-align: center; }
+  #loader h2 { margin: 0 0 14px; font-size: 14px; font-weight: 500;
+    letter-spacing: 2.6px; text-transform: uppercase; color: var(--dim); }
+  #bar { width: 220px; height: 2px; background: rgba(255,238,205,0.14);
+    border-radius: 2px; overflow: hidden; margin: 0 auto; }
+  #bar i { display: block; height: 100%; width: 0%; background: var(--accent);
+    transition: width .25s ease; }
+  #loader p { margin: 12px 0 0; font-size: 11px; color: rgba(243,234,215,0.4); }
+
+  @media (max-width: 760px) {
+    #title { max-width: 200px; padding: 9px 12px; }
+    #title p { display: none; }
+    #hint { display: none; }
+    #ui { gap: 10px; padding: 8px 10px; }
+    .grp > span.lbl { display: none; }
+  }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+
+<div id="title" class="panel">
+  <h1><em>Giraffa camelopardalis</em> — reticulata</h1>
+  <p>Procedurally modelled, rigged and animated. Lateral-sequence walk with
+     non-slipping hoof placement and analytic leg IK.</p>
+  <div class="stats">
+    <span><b id="st-speed">0.00</b> m/s</span>
+    <span><b id="st-stride">0.00</b> m step</span>
+    <span><b id="st-fps">0</b> fps</span>
+  </div>
+</div>
+
+<div id="ui" class="panel">
+  <div class="grp">
+    <span class="lbl">Gait</span>
+    <div class="seg" id="seg-gait">
+      <button data-g="stand">Stand</button>
+      <button data-g="walk" class="on">Walk</button>
+      <button data-g="amble">Amble</button>
+    </div>
+  </div>
+  <div class="grp">
+    <span class="lbl">Speed</span>
+    <input id="sp" type="range" min="0" max="2.4" step="0.01" value="1.25">
+    <span class="val" id="sp-val">1.25 m/s</span>
+  </div>
+  <div class="grp">
+    <span class="lbl">Camera</span>
+    <div class="seg" id="seg-cam">
+      <button data-c="follow" class="on">Follow</button>
+      <button data-c="free">Free</button>
+      <button data-c="cine">Cinematic</button>
+    </div>
+  </div>
+  <div class="grp">
+    <span class="lbl">Sun</span>
+    <input id="tod" type="range" min="0.03" max="0.97" step="0.005" value="0.34">
+  </div>
+  <div class="grp">
+    <div class="seg" id="seg-view">
+      <button data-v="bones">Rig</button>
+      <button data-v="wire">Wire</button>
+      <button data-v="pause">Pause</button>
+    </div>
+  </div>
+</div>
+
+<div id="hint">
+  drag to orbit &middot; shift-drag to pan &middot; scroll to zoom<br>
+  <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> gait &middot;
+  <kbd>C</kbd> camera &middot; <kbd>R</kbd> rig &middot; <kbd>Space</kbd> pause
+</div>
+
+<div id="loader">
+  <div class="inner">
+    <h2>Giraffe</h2>
+    <div id="bar"><i></i></div>
+    <p id="loader-msg">starting&hellip;</p>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="src/util.js"></script>
+<script src="src/coat.js"></script>
+<script src="src/mesh.js"></script>
+<script src="src/giraffe.js"></script>
+<script src="src/gait.js"></script>
+<script src="src/world.js"></script>
+<script src="src/controls.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
