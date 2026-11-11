@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<script>/* German browsers get the German page, unless the reader picked a language before */(function(){try{if(document.documentElement.lang!=='en'||localStorage.getItem('lang'))return;var l=(navigator.languages&&navigator.languages[0])||navigator.language||'';if(/^de(-|$)/i.test(l))location.replace('de.html'+location.hash)}catch(e){}})()</script>
+<script>/* German browsers get the German page, unless the reader picked a language before. Chrome often lists en-US first among the website languages even with a German UI; Intl follows the UI/OS locale */(function(){try{if(document.documentElement.lang!=='en'||localStorage.getItem('lang'))return;var l=(navigator.languages&&navigator.languages[0])||navigator.language||'',u='';try{u=Intl.DateTimeFormat().resolvedOptions().locale}catch(e){}if(/^de(-|$)/i.test(l)||/^de(-|$)/i.test(u))location.replace('de.html'+location.hash)}catch(e){}})()</script>
 <title>Giraffe Benchmark</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23e0a53a'/%3E%3Ccircle cx='11' cy='11' r='4' fill='%236d3a17'/%3E%3Ccircle cx='22' cy='14' r='3' fill='%236d3a17'/%3E%3Ccircle cx='14' cy='23' r='4' fill='%236d3a17'/%3E%3C/svg%3E">
 <link rel="alternate" hreflang="en" href="index.html"><link rel="alternate" hreflang="de" href="de.html">
