@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Giraffe — Three.js</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #e8d9b8; }
+  canvas { display: block; }
+  #hud {
+    position: fixed; left: 14px; top: 12px; color: #3a2f1d;
+    font: 13px/1.5 -apple-system, "Segoe UI", sans-serif;
+    background: rgba(255,250,240,.72); border: 1px solid rgba(120,90,40,.25);
+    border-radius: 10px; padding: 10px 14px; pointer-events: none;
+    max-width: 320px; user-select: none;
+  }
+  #hud b { font-size: 15px; }
+  #hud .hint { color: #6b5a3d; margin-top: 4px; font-size: 12px; }
+  #loading {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    font: 600 16px -apple-system, "Segoe UI", sans-serif; color: #4a3a22;
+    background: linear-gradient(#8ec7f0, #e8d9b8); transition: opacity .5s;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <b>Giraffe · Three.js</b>
+  <div class="hint">
+    Drag — orbit camera · Scroll — zoom<br />
+    Space — pause / resume · R — reset view
+  </div>
+</div>
+<div id="loading">Painting the savanna…</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+<script src="giraffe.js"></script>
+</body>
+</html>

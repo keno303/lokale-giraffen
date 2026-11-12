@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giraffe — Three.js (opens directly via file://)</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #14100a; }
+  canvas { display: block; }
+  #hud {
+    position: fixed; left: 16px; bottom: 14px; z-index: 10;
+    color: #fff; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    user-select: none; pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0,0,0,.55);
+  }
+  #hud h1 { font-size: 15px; font-weight: 700; margin: 0; letter-spacing: .02em; opacity: .92; }
+  #hud p { font-size: 12px; margin: 5px 0 0; opacity: .72; line-height: 1.5; }
+  #hud b { opacity: 1; }
+  #hud .dim { opacity: .5; }
+  #err {
+    position: fixed; inset: 0; display: none; place-items: center;
+    color: #ffd7ba; font-family: ui-monospace, monospace; font-size: 14px;
+    background: rgba(8,6,3,.88); z-index: 20; padding: 24px; text-align: center; max-width: 640px;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <h1>Giraffe &mdash; Three.js savanna (no server, no build &mdash; just open index.html)</h1>
+  <p><b>Drag</b> orbit &nbsp;·&nbsp; <b>Scroll</b> zoom &nbsp;·&nbsp; <b>W / ↑</b> trot &nbsp;·&nbsp; <b>S / ↓</b> stand &nbsp;·&nbsp; <b>A / D</b> steer &nbsp;·&nbsp; <b>Space</b> trot toggle</p>
+</div>
+<div id="err"></div>
+<script src="lib/three.min.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
