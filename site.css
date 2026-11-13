@@ -244,3 +244,9 @@ html.dulock{overflow:hidden}
 .dupick2 .dd{display:none}.dupick2[aria-pressed=true]{background:var(--s1);border-color:var(--s1);color:#fff}.dupick2[aria-pressed=true] .dp{display:none}.dupick2[aria-pressed=true] .dd{display:inline}
 .dupick2:disabled{opacity:.6;cursor:default}
 .duside.big.mine .duframe{box-shadow:0 0 0 3px var(--s1),0 20px 60px rgba(0,0,0,.5)}
+
+/* small enlarge icon in the frame corner; it covers only this corner of the giraffe page */
+.duzoom{position:absolute;top:8px;right:8px;z-index:2;display:grid;place-items:center;width:34px;height:34px;padding:0;border:0;border-radius:9px;background:rgba(15,14,12,.55);color:#fff;cursor:pointer;opacity:.75;transition:opacity .15s,background .15s;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.duzoom:hover,.duzoom:focus-visible{opacity:1;background:rgba(15,14,12,.8)}
+.duzoom svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.duside.big .duzoom{display:none}

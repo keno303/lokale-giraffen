@@ -19,9 +19,9 @@
 <div id="dua" hidden>
 <p class="duq" id="duq" aria-live="polite">Which giraffe is better?</p>
 <div class="duback" id="duback" hidden></div><div class="dupair">
-<div class="duside" data-s="l"><div class="duframe"><iframe title="Left giraffe" allow="fullscreen" loading="eager"></iframe><span class="duload">Loading the giraffe …</span><div class="dubigbar"><span class="dk">Left giraffe</span><button type="button" class="dupick2" aria-pressed="false"><span class="dp">Pick this one</span><span class="dd">Picked</span></button><button type="button" class="dushrink">Shrink</button></div></div>
+<div class="duside" data-s="l"><div class="duframe"><iframe title="Left giraffe" allow="fullscreen" loading="eager"></iframe><span class="duload">Loading the giraffe …</span><button type="button" class="duzoom" aria-label="Enlarge" title="Enlarge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg></button><div class="dubigbar"><span class="dk">Left giraffe</span><button type="button" class="dupick2" aria-pressed="false"><span class="dp">Pick this one</span><span class="dd">Picked</span></button><button type="button" class="dushrink">Shrink</button></div></div>
 <div class="dubar"><button type="button" class="dupick" aria-pressed="false"><span class="dk">Left giraffe</span><span class="dp">Pick this one</span><span class="dd">Picked</span></button><button type="button" class="dufull">Enlarge</button></div><div class="durev" hidden></div></div>
-<div class="duside" data-s="r"><div class="duframe"><iframe title="Right giraffe" allow="fullscreen" loading="eager"></iframe><span class="duload">Loading the giraffe …</span><div class="dubigbar"><span class="dk">Right giraffe</span><button type="button" class="dupick2" aria-pressed="false"><span class="dp">Pick this one</span><span class="dd">Picked</span></button><button type="button" class="dushrink">Shrink</button></div></div>
+<div class="duside" data-s="r"><div class="duframe"><iframe title="Right giraffe" allow="fullscreen" loading="eager"></iframe><span class="duload">Loading the giraffe …</span><button type="button" class="duzoom" aria-label="Enlarge" title="Enlarge"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg></button><div class="dubigbar"><span class="dk">Right giraffe</span><button type="button" class="dupick2" aria-pressed="false"><span class="dp">Pick this one</span><span class="dd">Picked</span></button><button type="button" class="dushrink">Shrink</button></div></div>
 <div class="dubar"><button type="button" class="dupick" aria-pressed="false"><span class="dk">Right giraffe</span><span class="dp">Pick this one</span><span class="dd">Picked</span></button><button type="button" class="dufull">Enlarge</button></div><div class="durev" hidden></div></div>
 </div>
 <p class="duact"><span id="duag" class="muted">Pick a giraffe with the button or by clicking into it. You can change your mind until you submit.</span><button type="button" class="dubtn ghost" id="dusk">Skip</button><button type="button" class="dubtn" id="dusend" disabled>Submit</button><button type="button" class="dubtn" id="dunx" hidden>Next duel</button></p>
@@ -42,12 +42,13 @@ function fail(k){$('due').textContent=T[k]||T.err;$('due').hidden=false;$('dua')
 function post(p,b){return fetch(API+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){return r.json().then(function(j){if(!r.ok)throw j.error||'err';return j})})}
 function mark(c){if(revealed)return;choice=c;sides.forEach(function(s){var on=s.dataset.s===c;s.classList.toggle('mine',on);[].forEach.call(s.querySelectorAll('.dupick,.dupick2'),function(b){b.setAttribute('aria-pressed',on)})});$('dusend').disabled=!c}
 // a click into a giraffe picks it: the Worker adds a one-line listener to each served page that reports clicks here
+window.addEventListener('blur',function(){setTimeout(function(){var a=document.activeElement;if(!pair||busy)return;sides.forEach(function(s){if(a===s.querySelector('iframe'))mark(s.dataset.s)})},0)});
 window.addEventListener('message',function(e){if(e.data!=='duel-tap'||!pair||busy)return;sides.forEach(function(s){if(e.source===s.querySelector('iframe').contentWindow)mark(s.dataset.s)})});
 function big(s,on){sides.forEach(function(x){x.classList.toggle('big',on&&x===s)});$('duback').hidden=!on;document.documentElement.classList.toggle('dulock',on);if(!on&&s)s.querySelector('.dufull').focus()}
 $('duback').addEventListener('click',function(){big(null,false)});document.addEventListener('keydown',function(e){if(e.key==='Escape')big(null,false)});
 function show(p){pair=p;busy=false;revealed=false;big(null,false);mark(null);$('duq').textContent=T.q;$('duag').textContent=T.hint;$('dunx').hidden=true;$('dusk').hidden=false;$('dusend').hidden=false;
  sides.forEach(function(s){var f=s.querySelector('iframe'),l=s.querySelector('.duload');s.classList.add('wait');l.hidden=false;
-  f.onload=function(){s.classList.remove('wait');l.hidden=true};f.src=API+'/f/'+p[s.dataset.s]+'/index.html';
+  f.onload=function(){s.classList.remove('wait');l.hidden=true};f.src=API+'/f/'+p[s.dataset.s]+'/index.html?v=2';
   s.querySelector('.dupick').disabled=false;s.querySelector('.dupick2').disabled=false;var v=s.querySelector('.durev');v.hidden=true;v.innerHTML=''})}
 function revealSide(s,d){var x=d[s.dataset.s],v=s.querySelector('.durev'),mine=s.dataset.s===d.choice;
  var meta=[x.h==='pi'?'pi':'OpenCode',dur(x.sec)];if(x.date)meta.unshift(T.released.replace('{d}',day(x.date)));if(x.cloud&&x.cost!=null)meta.push(usd(x.cost));
@@ -69,7 +70,7 @@ function start(){$('dugo').disabled=true;
  var s=document.createElement('script');s.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';s.onload=render;s.onerror=function(){fail('err')};document.head.appendChild(s)}
 $('dugo').addEventListener('click',start);$('dusk').addEventListener('click',skip);$('dusend').addEventListener('click',send);
 sides.forEach(function(s){[].forEach.call(s.querySelectorAll('.dupick,.dupick2'),function(b){b.addEventListener('click',function(){if(!busy)mark(s.dataset.s)})});
- s.querySelector('.dufull').addEventListener('click',function(){big(s,true);s.querySelector('.dushrink').focus()});s.querySelector('.dushrink').addEventListener('click',function(){big(s,false)})});
+ [].forEach.call(s.querySelectorAll('.dufull,.duzoom'),function(b){b.addEventListener('click',function(){big(s,true);s.querySelector('.dushrink').focus()})});s.querySelector('.dushrink').addEventListener('click',function(){big(s,false)})});
 function ranking(){fetch(API+'/ranking').then(function(r){return r.json()}).then(function(d){
  $('durd').textContent=(d.rows.length?T.rank_d:T.rank_empty).replace('{n}',d.min).replace('{v}',d.votes);
  $('durt').tBodies[0].innerHTML=d.rows.map(function(x,i){return '<tr><td>'+(i+1)+'</td><td><a href="'+(x.stem?MAIN+'#m-'+encodeURIComponent(x.stem):QUANT)+'">'+esc(x.name)+'</a> <span class="muted">· '+(x.h==='pi'?'pi':'OpenCode')+'</span></td><td>'+x.elo+'</td><td>'+x.n+'</td></tr>'}).join('');
