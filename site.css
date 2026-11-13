@@ -231,3 +231,16 @@ dialog iframe{display:block;width:100%;height:calc(100% - 3rem);border:0;backgro
 .tile{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr)}.tpics{height:12rem;min-height:0}.tpics img{min-height:0}
 @media(max-width:40rem){.tpics{height:6.5rem}}
 @media(max-width:40rem){.tile{grid-template-columns:1fr}}
+
+/* duel: one side enlarged to almost the whole window */
+.dubigbar{display:none}
+.duback{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.72)}
+html.dulock{overflow:hidden}
+.duside.big .duframe{position:fixed;inset:3vh 3vw;z-index:50;aspect-ratio:auto;display:flex;flex-direction:column;background:var(--card);box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.duside.big .duframe iframe{flex:1;height:auto}
+.duside.big .dubigbar{display:flex;align-items:center;gap:.6rem;padding:.6rem .8rem;border-top:1px solid var(--line)}
+.dubigbar .dk{margin-right:auto;color:var(--muted);font-weight:600}
+.dupick2,.dushrink{font:inherit;font-weight:700;border-radius:12px;cursor:pointer;border:1.5px solid var(--line);background:var(--card);color:var(--fg);padding:.55rem 1rem}
+.dupick2 .dd{display:none}.dupick2[aria-pressed=true]{background:var(--s1);border-color:var(--s1);color:#fff}.dupick2[aria-pressed=true] .dp{display:none}.dupick2[aria-pressed=true] .dd{display:inline}
+.dupick2:disabled{opacity:.6;cursor:default}
+.duside.big.mine .duframe{box-shadow:0 0 0 3px var(--s1),0 20px 60px rgba(0,0,0,.5)}
