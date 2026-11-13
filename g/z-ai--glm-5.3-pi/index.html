@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walking Giraffe</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #a8c8e8; }
+  canvas { display: block; }
+  #hint {
+    position: fixed; left: 12px; bottom: 10px; color: rgba(255,255,255,.85);
+    font: 13px/1.4 -apple-system, "Segoe UI", sans-serif;
+    text-shadow: 0 1px 3px rgba(0,0,0,.5); pointer-events: none; user-select: none;
+  }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<div id="hint">Drag to orbit &middot; scroll to zoom &middot; a walking reticulated giraffe</div>
+<script type="module">
+import * as THREE from 'three';
+
+// ------------------------------------------------------------------ renderer / scene
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xbdd6ea, 70, 220);
+
+// sky gradient
+{
+  const c = document.createElement('canvas'); c.width = 2; c.height = 256;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0.0, '#5d92c8');
+  grad.addColorStop(0.45, '#a5c8e6');
+  grad.addColorStop(0.75, '#d8e6ea');
+  grad.addColorStop(1.0, '#e8dfc8');
+  g.fillStyle = grad; g.fillRect(0, 0, 2, 256);
+  const skyTex = new THREE.CanvasTexture(c);
+  skyTex.colorSpace = THREE.SRGBColorSpace;
+  scene.background = skyTex;
+}
+
+const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 600);
+
+// ------------------------------------------------------------------ lights
+const hemi = new THREE.HemisphereLight(0xcfe4ff, 0x8a7a55, 0.85);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2d8, 2.6);
+sun.position.set(24, 34, 14);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -28; sun.shadow.camera.right = 28;
+sun.shadow.camera.top = 28;   sun.shadow.camera.bottom = -28;
+sun.shadow.camera.far = 120;
+sun.shadow.bias = -0.0006;
+scene.add(sun, sun.target);
+
+// ------------------------------------------------------------------ procedural textures
+function makeHideTexture() {
+  // reticulated giraffe: cream base with dark polygonal network patches
+  const s = 512, c = document.createElement('canvas'); c.width = c.height = s;
+  const g = c.getContext('2d');
+  g.fillStyle = '#f2e0b8'; g.fillRect(0, 0, s, s);
+  // subtle mottling
+  for (let i = 0; i < 900; i++) {
+    g.fillStyle = `rgba(210,180,130,${0.04 + Math.random() * 0.06})`;
+    const r = 2 + Math.random() * 7;
+    g.beginPath(); g.arc(Math.random() * s, Math.random() * s, r, 0, 7); g.fill();
+  }
+  const dark = ['#8a5424', '#7d4b1f', '#935c28'];
+  for (let i = 0; i < 130; i++) {
+    const cx = Math.random() * s, cy = Math.random() * s;
+    const R = 16 + Math.random() * 16, n = 5 + (Math.random() * 3 | 0);
+    g.fillStyle = dark[(Math.random() * 3) | 0];
+    g.beginPath();
+    for (let v = 0; v <= n; v++) {
+      const a = (v / n) * Math.PI * 2 + Math.random() * 0.5;
+      const rr = R * (0.75 + Math.random() * 0.5);
+      const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+      v === 0 ? g.moveTo(x, y) : g.lineTo(x, y);
+    }
+    g.closePath(); g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+
+function makeGroundTexture() {
+  const s = 512, c = document.createElement('canvas'); c.width = c.height = s;
+  const g = c.getContext('2d');
+  g.fillStyle = '#9aa86a'; g.fillRect(0, 0, s, s);
+  for (let i = 0; i < 3500; i++) {
+    const shade = Math.random();
+    g.fillStyle = shade < .5
+      ? `rgba(110,120,60,${0.15 + Math.random() * 0.2})`
+      : `rgba(190,180,120,${0.10 + Math.random() * 0.2})`;
+    const r = 1 + Math.random() * 4;
+    g.beginPath(); g.arc(Math.random() * s, Math.random() * s, r, 0, 7); g.fill();
+  }
+  // dry dirt streaks
+  for (let i = 0; i < 60; i++) {
+    g.fillStyle = `rgba(160,130,80,${0.08 + Math.random() * 0.12})`;
+    g.beginPath();
+    g.ellipse(Math.random() * s, Math.random() * s, 6 + Math.random() * 22, 3 + Math.random() * 9, Math.random() * 3, 0, 7);
+    g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(60, 60);           // 5 m tiles on a 300 m plane
+  return t;
+}
+
+const hideTex = makeHideTexture();
+const groundTex = makeGroundTexture();
+
+// ------------------------------------------------------------------ ground
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(300, 300),
+  new THREE.MeshStandardMaterial({ map: groundTex, roughness: 1 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ------------------------------------------------------------------ scenery (treadmill band)
+const scenery = new THREE.Group();
+scene.add(scenery);
+const TREE_WRAP = 240, TREE_ZMIN = -120;
+
+function makeAcacia(scale) {
+  const tree = new THREE.Group();
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a30, roughness: 0.95 });
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.38, 3.4, 7), trunkMat);
+  trunk.position.y = 1.7; trunk.castShadow = true;
+  const canopyMat = new THREE.MeshStandardMaterial({ color: 0x557a33, roughness: 0.9 });
+  const c1 = new THREE.Mesh(new THREE.SphereGeometry(1.9, 10, 7), canopyMat);
+  c1.scale.set(1, 0.55, 1); c1.position.y = 3.6; c1.castShadow = true;
+  const c2 = new THREE.Mesh(new THREE.SphereGeometry(1.3, 9, 7), canopyMat);
+  c2.scale.set(1, 0.6, 1); c2.position.set(0.9, 3.1, 0.5); c2.castShadow = true;
+  const c3 = c2.clone(); c3.position.set(-0.8, 2.9, -0.6);
+  tree.add(trunk, c1, c2, c3);
+  tree.scale.setScalar(scale);
+  return tree;
+}
+const rockMat = new THREE.MeshStandardMaterial({ color: 0x8d8678, roughness: 0.95 });
+const rockGeo = new THREE.DodecahedronGeometry(0.5, 0);
+
+const sceneryItems = [];
+function addScenery(mesh, x, z) {
+  mesh.position.x = x; mesh.position.z = z;
+  scenery.add(mesh);
+  sceneryItems.push(mesh);
+}
+for (let i = 0; i < 26; i++) {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const x = side * (10 + Math.random() * 60);
+  const z = TREE_ZMIN + Math.random() * TREE_WRAP;
+  addScenery(makeAcacia(0.8 + Math.random() * 0.8), x, z);
+}
+for (let i = 0; i < 14; i++) {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const x = side * (8 + Math.random() * 55);
+  const rock = new THREE.Mesh(rockGeo, rockMat);
+  rock.scale.setScalar(0.6 + Math.random() * 1.6);
+  rock.rotation.set(Math.random(), Math.random(), Math.random());
+  rock.position.y = 0.15;
+  rock.castShadow = true;
+  const grp = new THREE.Group(); grp.add(rock);
+  addScenery(grp, x, TREE_ZMIN + Math.random() * TREE_WRAP);
+}
+for (let i = 0; i < 18; i++) { // shrubs
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const bushMat = new THREE.MeshStandardMaterial({ color: 0x6f8a40, roughness: 0.95 });
+  const b = new THREE.Mesh(new THREE.SphereGeometry(0.7, 8, 6), bushMat);
+  b.scale.set(1 + Math.random(), 0.6, 1 + Math.random());
+  b.position.y = 0.35; b.castShadow = true;
+  const grp = new THREE.Group(); grp.add(b);
+  addScenery(grp, side * (7 + Math.random() * 45), TREE_ZMIN + Math.random() * TREE_WRAP);
+}
+
+// ------------------------------------------------------------------ giraffe
+// Faces +z. Built from articulated groups so every joint can animate.
+const giraffe = new THREE.Group();
+scene.add(giraffe);
+
+const skinMat = new THREE.MeshStandardMaterial({ map: hideTex, roughness: 0.85 });
+const darkMat = new THREE.MeshStandardMaterial({ color: 0x5a3a1c, roughness: 0.9 });
+const paleMat = new THREE.MeshStandardMaterial({ color: 0xf2e0b8, roughness: 0.85 });
+const eyeMat  = new THREE.MeshStandardMaterial({ color: 0x1a120a, roughness: 0.3 });
+const hoofMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.9 });
+const knobMat = new THREE.MeshStandardMaterial({ color: 0x7a4a22, roughness: 0.8 });
+
+function box(w, h, d, mat, x = 0, y = 0, z = 0) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z); m.castShadow = true;
+  return m;
+}
+function cyl(rTop, rBot, h, mat, seg = 9) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(rTop, rBot, h, seg), mat);
+  m.castShadow = true;
+  return m;
+}
+
+// ---- torso ---------------------------------------------------------
+const body = new THREE.Group();           // bob / roll / pitch happens here
+giraffe.add(body);
+const TORSO_Y = 3.085;                    // hip 2.535 m, straight leg just kisses the ground
+body.position.y = TORSO_Y;
+
+const torso = box(1.15, 1.45, 2.7, skinMat); torso.rotation.x = -0.08;
+const chest = box(1.05, 0.9, 1.0, skinMat, 0, 0.35, 0.95); chest.rotation.x = -0.22; // shoulder hump
+
+body.add(torso, chest);
+
+// ---- neck ----------------------------------------------------------
+// chained segments give the characteristic S-curve
+const neckBase = new THREE.Group();
+neckBase.position.set(0, 0.62, 1.18);
+body.add(neckBase);
+
+const neckSegs = [];
+const neckAngles = [0.50, 0.16, 0.02, 0.0]; // cumulative pitch per segment (S-curve)
+const cum = [0, 0, 0, 0];
+{ let acc = 0; for (let i = 0; i < 4; i++) { acc += neckAngles[i]; cum[i] = acc; } }
+let parent = neckBase;
+for (let i = 0; i < 4; i++) {
+  const seg = new THREE.Group();
+  parent.add(seg);
+  const len = 0.78;
+  const r = 0.36 - i * 0.05;
+  const mesh = cyl(r * 0.82, r, len, skinMat);
+  mesh.position.y = len / 2;
+  seg.add(mesh);
+  // mane along the back of the neck
+  for (let m = 0; m < 3; m++) {
+    const mane = box(0.07, 0.15, 0.12, darkMat, 0, 0.12 + m * 0.24, -r * 0.9);
+    seg.add(mane);
+  }
+  if (i > 0) seg.position.y = neckSegs[i - 1].userData.len;
+  seg.rotation.x = cum[i];
+  seg.userData.len = len;
+  neckSegs.push(seg);
+  parent = seg;
+}
+
+// ---- head ----------------------------------------------------------
+const head = new THREE.Group();
+neckSegs[3].add(head);
+head.position.y = neckSegs[3].userData.len + 0.05;
+head.rotation.x = -0.50; // level the muzzle against the neck's forward pitch
+
+const skull = box(0.42, 0.42, 0.5, skinMat);
+const forehead = box(0.36, 0.3, 0.22, skinMat, 0, 0.16, 0.18);
+const muzzle = box(0.3, 0.26, 0.42, paleMat, 0, -0.1, 0.42);
+const lowerJaw = box(0.26, 0.12, 0.3, paleMat, 0, -0.25, 0.34);
+head.add(skull, forehead, muzzle, lowerJaw);
+// nostrils
+const nostrilMat = new THREE.MeshStandardMaterial({ color: 0x7a5a40 });
+const nL = new THREE.Mesh(new THREE.SphereGeometry(0.035, 6, 5), nostrilMat);
+nL.position.set(-0.09, -0.06, 0.61);
+const nR = nL.clone(); nR.position.x = 0.09;
+head.add(nL, nR);
+
+// eyes (grouped so we can blink by scaling y)
+const eyeL = new THREE.Group(), eyeR = new THREE.Group();
+const eL = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 7), eyeMat);
+const eR = eL.clone();
+eyeL.add(eL); eyeR.add(eR);
+eyeL.position.set(-0.185, 0.07, 0.14);
+eyeR.position.set(0.185, 0.07, 0.14);
+head.add(eyeL, eyeR);
+
+// ossicones
+const ossiL = new THREE.Group();
+const stemL = cyl(0.035, 0.05, 0.42, darkMat, 7); stemL.position.y = 0.21;
+const knobL = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 7), knobMat);
+knobL.position.y = 0.46;
+ossiL.add(stemL, knobL);
+ossiL.position.set(-0.11, 0.3, 0.0); ossiL.rotation.z = 0.12; ossiL.rotation.x = -0.15;
+const ossiR = ossiL.clone(); ossiR.position.x = 0.11; ossiR.rotation.z = -0.12;
+head.add(ossiL, ossiR);
+
+// ears
+const earGeo = new THREE.SphereGeometry(0.14, 8, 7);
+const earMat = skinMat;
+const earL = new THREE.Mesh(earGeo, earMat);
+earL.scale.set(0.5, 1, 0.8);
+const earLPivot = new THREE.Group();
+earLPivot.add(earL);
+earL.position.set(0, -0.05, 0);
+earLPivot.position.set(-0.24, 0.16, -0.02);
+earLPivot.rotation.z = -1.15;
+const earRPivot = new THREE.Group();
+const earR = earL.clone();
+earRPivot.add(earR);
+earRPivot.position.set(0.24, 0.16, -0.02);
+earRPivot.rotation.z = 1.15;
+head.add(earLPivot, earRPivot);
+
+// ---- tail ----------------------------------------------------------
+const tailPivot = new THREE.Group();
+tailPivot.position.set(0, 0.45, -1.32);
+body.add(tailPivot);
+const tail = cyl(0.045, 0.06, 1.1, skinMat, 7);
+tail.position.y = -0.55;
+const tuft = box(0.1, 0.28, 0.1, darkMat, 0, -1.2, 0);
+tailPivot.add(tail, tuft);
+
+// ---- legs ----------------------------------------------------------
+// Pacing gait: both left legs share a phase, both right legs share phase + PI.
+const HIP_AMPL = 0.30;   // rad, leg swing
+const KNEE_SWING = 0.55; // rad, extra knee bend during swing
+const KNEE_BASE_BACK = 0.16;
+const legs = { frontL: null, frontR: null, backL: null, backR: null };
+
+function makeLeg(front) {
+  const thighLen = 1.25, shinLen = 1.05;
+  const root = new THREE.Group();          // hip / shoulder joint
+  const thigh = cyl(front ? 0.21 : 0.24, front ? 0.15 : 0.17, thighLen, skinMat);
+  thigh.position.y = -thighLen / 2;
+  root.add(thigh);
+
+  const knee = new THREE.Group();          // knee joint
+  knee.position.y = -thighLen;
+  root.add(knee);
+  const shin = cyl(front ? 0.11 : 0.13, 0.08, shinLen, front ? skinMat : skinMat);
+  shin.position.y = -shinLen / 2;
+  knee.add(shin);
+
+  const ankle = new THREE.Group();         // ankle joint
+  ankle.position.y = -shinLen;
+  knee.add(ankle);
+  const footLen = 0.42;
+  const foot = box(0.22, 0.16, footLen, front ? skinMat : skinMat, 0, -0.08, 0.1);
+  ankle.add(foot);
+  const hoof = box(0.23, 0.09, 0.3, hoofMat, 0, -0.19, 0.13);
+  ankle.add(hoof);
+
+  return { root, knee, ankle, front, thighLen, shinLen, base: front ? 0.06 : KNEE_BASE_BACK };
+}
+
+legs.frontL = makeLeg(true);  legs.frontR = makeLeg(true);
+legs.backL  = makeLeg(false); legs.backR  = makeLeg(false);
+
+legs.frontL.root.position.set(-0.46, -0.55, 1.02);  // relative to body group
+legs.frontR.root.position.set( 0.46, -0.55, 1.02);
+legs.backL.root.position.set( -0.44, -0.55, -1.05);
+legs.backR.root.position.set(  0.44, -0.55, -1.05);
+for (const k of ['frontL', 'frontR', 'backL', 'backR']) body.add(legs[k].root);
+// hip joint y world = 3.085 - 0.55 = 2.535; leg reach = 1.25 + 1.05 + 0.235 ≈ 2.535 → feet just touch ground.
+
+// ---- gait / animation ---------------------------------------------
+const clock = new THREE.Clock();
+let phase = 0;
+const CYCLE = 1.7;              // seconds per full gait cycle
+const SPEED = (4 * HIP_AMPL * 2.45) / CYCLE;   // ≈ forward speed matched to stride (m/s)
+
+let earFlickTimer = 2, earFlickAt = -10;
+let nextBlink = 3.5, blinkStart = -10;
+
+function animateLeg(leg, p) {
+  const hipRot = HIP_AMPL * Math.sin(p);                  // + = leg forward
+  const airness = Math.max(0, Math.cos(p));               // 1 mid-swing, 0 during stance
+  leg.root.rotation.x = -hipRot;                          // negative tips a -y limb forward
+  leg.knee.rotation.x = leg.base * Math.max(0, -Math.cos(p)) + KNEE_SWING * Math.pow(airness, 1.4); // straight at touchdown, flexes mid-stance/swing
+  leg.ankle.rotation.x = -(leg.root.rotation.x + leg.knee.rotation.x) * 0.85; // keep sole level
+}
+
+// camera orbit
+let camAzimuth = Math.PI * 0.58, camElev = 0.22, camDist = 12;
+let dragging = false, lastX = 0, lastY = 0, autoOrbit = true;
+renderer.domElement.addEventListener('pointerdown', e => {
+  dragging = true; autoOrbit = false; lastX = e.clientX; lastY = e.clientY;
+});
+addEventListener('pointerup', () => dragging = false);
+addEventListener('pointermove', e => {
+  if (!dragging) return;
+  camAzimuth -= (e.clientX - lastX) * 0.005;
+  camElev = Math.max(0.02, Math.min(1.25, camElev + (e.clientY - lastY) * 0.004));
+  lastX = e.clientX; lastY = e.clientY;
+});
+addEventListener('wheel', e => {
+  camDist = Math.max(5, Math.min(40, camDist + e.deltaY * 0.01));
+}, { passive: true });
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  phase += (Math.PI * 2 / CYCLE) * dt;
+
+  // ---- legs (pacing walk: left side together, right side together)
+  animateLeg(legs.frontL, phase);
+  animateLeg(legs.backL, phase);
+  animateLeg(legs.frontR, phase + Math.PI);
+  animateLeg(legs.backR, phase + Math.PI);
+
+  // ---- body dynamics
+  // planted legs tilt out to HIP_AMPL, so the hips must dip by L*(1-cos(A*sin p))
+  // ~ 0.052 - 0.052 cos(2p) to keep the feet planted instead of floating
+  const dip = 0.052 * (1 - Math.cos(2 * phase));
+  body.position.y = TORSO_Y - dip;
+  body.rotation.z = 0.05 * Math.sin(phase + Math.PI * 0.5);   // pacing roll
+  body.rotation.x = 0.015 * Math.sin(2 * phase + 1.2);        // slight pitch
+  body.rotation.y = 0.02 * Math.sin(phase);
+
+  // ---- neck & head secondary motion
+  neckBase.rotation.z = -body.rotation.z * 1.6;                // counter the roll
+  neckBase.rotation.x = 0.03 * Math.sin(2 * phase + 2.0);
+  neckSegs[1].rotation.x = cum[1] + 0.025 * Math.sin(2 * phase + 1.5);
+  neckSegs[2].rotation.x = cum[2] - 0.02 * Math.sin(2 * phase + 1.5);
+  head.rotation.x = -0.50 + 0.05 * Math.sin(2 * phase + 0.8);
+  head.rotation.z = -body.rotation.z * 0.8;
+
+  // ---- tail
+  tailPivot.rotation.y = 0.4 * Math.sin(t * 2.4);
+  tailPivot.rotation.x = 0.25 + 0.08 * Math.sin(t * 3.7);
+
+  // ---- ear flicks
+  earFlickTimer -= dt;
+  if (earFlickTimer <= 0) { earFlickAt = t; earFlickTimer = 2.5 + Math.random() * 4; }
+  const ft = t - earFlickAt;
+  const flick = ft < 0.28 ? Math.sin((ft / 0.28) * Math.PI) : 0;
+  earLPivot.rotation.z = -1.15 - flick * 0.7;
+  earRPivot.rotation.z = 1.15 + flick * 0.45;
+
+  // ---- blink
+  if (t > nextBlink) { blinkStart = t; nextBlink = t + 3 + Math.random() * 3.5; }
+  const bt = t - blinkStart;
+  const blink = bt < 0.13 ? Math.sin((bt / 0.13) * Math.PI) : 0;
+  eyeL.scale.y = eyeR.scale.y = 1 - 0.85 * blink;
+
+  // ---- treadmill world scroll
+  const v = SPEED;
+  for (const item of sceneryItems) {
+    item.position.z -= v * dt;
+    if (item.position.z < TREE_ZMIN) item.position.z += TREE_WRAP;
+  }
+  // ground texture scroll: v axis maps to world -z => decrease offset.y to move pattern to -z
+  groundTex.offset.y -= (v * dt) / 5;
+
+  // ---- camera
+  if (autoOrbit) camAzimuth += dt * 0.045;
+  const cx = Math.sin(camAzimuth) * Math.cos(camElev) * camDist;
+  const cz = Math.cos(camAzimuth) * Math.cos(camElev) * camDist;
+  const cy = 2.8 + Math.sin(camElev) * camDist;
+  camera.position.set(cx, Math.max(1.2, cy), cz);
+  camera.lookAt(0, 3.0, 0);
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>

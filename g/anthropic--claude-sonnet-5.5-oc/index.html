@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Walking Giraffe</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #cdbb98; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  canvas:active { cursor: grabbing; }
+  #ui { position: fixed; left: 14px; top: 14px; padding: 12px 14px 10px; width: 232px; color: #fff; font-size: 12px;
+        background: rgba(30, 24, 16, 0.42); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); user-select: none; }
+  #ui h1 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 8px; font-weight: 600; opacity: .95; }
+  #ui .row { display: flex; align-items: center; gap: 8px; margin: 7px 0; }
+  #ui label { opacity: .85; }
+  #ui input[type=range] { flex: 1; accent-color: #e9a24a; }
+  #ui button { background: rgba(255,255,255,0.14); color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px;
+        padding: 4px 8px; font-size: 11.5px; cursor: pointer; }
+  #ui button:hover { background: rgba(255,255,255,0.26); }
+  #ui .views { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+  #ui .hint { opacity: .6; font-size: 10.5px; margin-top: 8px; line-height: 1.4; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #5b4a30; font-size: 15px; background: #e4d7bb; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="loading">Building giraffe…</div>
+<div id="ui">
+  <h1>Walking Giraffe</h1>
+  <div class="row"><label for="speed">Pace</label><input id="speed" type="range" min="0.2" max="1.8" step="0.05" value="1"><span id="speedv">1.0×</span></div>
+  <div class="row"><button id="pause">Pause</button>
+    <label><input id="follow" type="checkbox"> Follow heading</label></div>
+  <div class="row"><label><input id="drift" type="checkbox"> Gentle camera drift</label></div>
+  <div class="views">
+    <button data-view="side">Side</button><button data-view="threeq">¾</button><button data-view="front">Front</button>
+    <button data-view="rear">Rear</button><button data-view="head">Head</button><button data-view="legs">Legs</button><button data-view="wide">Wide</button>
+  </div>
+  <div class="hint">Drag to orbit · wheel to zoom · space pauses<br>keys 1–7 views · H hides this panel</div>
+</div>
+<script src="lib/three.min.js"></script>
+<script src="js/util.js"></script>
+<script src="js/skin.js"></script>
+<script src="js/giraffe.js"></script>
+<script src="js/world.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

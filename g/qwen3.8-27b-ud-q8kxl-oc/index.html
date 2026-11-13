@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giraffe · Three.js</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #cfe0ee; }
+  canvas { display: block; }
+  #hud {
+    position: fixed; top: 14px; left: 14px; z-index: 10;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #2c2418; background: rgba(255, 250, 238, 0.72);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(90, 70, 40, 0.25); border-radius: 12px;
+    padding: 12px 14px; box-shadow: 0 4px 18px rgba(60, 40, 10, 0.18);
+    user-select: none; min-width: 200px;
+  }
+  #hud .t { font-size: 15px; font-weight: 650; letter-spacing: 0.2px; }
+  #hud .t span { font-weight: 400; opacity: 0.6; font-size: 12px; }
+  #hud .s { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+  #hud .row { display: flex; align-items: center; gap: 8px; margin-top: 9px; font-size: 11px; opacity: 0.9; }
+  #hud input[type=range] { width: 128px; accent-color: #8a5a22; }
+  #hud .val { min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+  #err {
+    position: fixed; top: 14px; right: 14px; z-index: 20; display: none;
+    max-width: 420px; padding: 12px 14px; border-radius: 10px;
+    font: 12px/1.45 ui-sans-serif, system-ui, sans-serif;
+    background: #ffe3e0; color: #7a1f14; border: 1px solid #e08a7d;
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="hud">
+  <div class="t">Giraffe <span>· Three.js</span></div>
+  <div class="s">drag to orbit · scroll to zoom</div>
+  <div class="row"><label for="pace">pace</label>
+    <input id="pace" type="range" min="0" max="1.6" step="0.01" value="1">
+    <div class="val" id="paceVal">1.00×</div>
+  </div>
+</div>
+<div id="err"></div>
+<script>
+  // Boot guard: surface CDN / runtime failures in the DOM.
+  window.__booted = false;
+  window.addEventListener('error', (e) => {
+    const el = document.getElementById('err');
+    if (el) { el.style.display = 'block'; el.textContent = 'Error: ' + (e.message || (e.error && e.error.message) || 'unknown'); }
+  });
+  setTimeout(() => {
+    if (!window.__booted) {
+      const el = document.getElementById('err');
+      if (el && el.style.display !== 'block') {
+        el.style.display = 'block';
+        el.textContent = 'Could not load Three.js from cdn.jsdelivr.net. An internet connection is required.';
+      }
+    }
+  }, 8000);
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* ================= deterministic RNG ================= */
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const R = mulberry32(0xC0FFEE);
+const rr = (a, b) => a + R() * (b - a);
+
+/* ================= renderer / scene / camera ================= */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xe2cfa5, 90, 430);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1500);
+camera.position.set(-6.8, 3.4, 9.8);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2.5, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 2.5;
+controls.maxDistance = 60;
+controls.maxPolarAngle = Math.PI * 0.495;
+
+/* ================= sky dome ================= */
+const SUN_DIR = new THREE.Vector3(0.55, 0.72, 0.35).normalize();
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(600, 24, 16),
+  new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: {
+      topColor:     { value: new THREE.Color(0x3d6ea8) },
+      midColor:     { value: new THREE.Color(0xa3c4de) },
+      horizonColor: { value: new THREE.Color(0xe8d5ac) },
+      sunDir:       { value: SUN_DIR }
+    },
+    vertexShader: `
+      varying vec3 vDir;
+      void main() {
+        vDir = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      uniform vec3 topColor, midColor, horizonColor, sunDir;
+      varying vec3 vDir;
+      void main() {
+        float h = clamp(vDir.y, 0.0, 1.0);
+        vec3 col = mix(horizonColor, midColor, smoothstep(0.0, 0.18, h));
+        col = mix(col, topColor, smoothstep(0.18, 0.65, h));
+        float s = max(dot(normalize(vDir), sunDir), 0.0);
+        col += vec3(1.0, 0.93, 0.78) * (pow(s, 600.0) * 1.3 + pow(s, 12.0) * 0.18);
+        gl_FragColor = vec4(col, 1.0);
+      }`
+  })
+);
+scene.add(sky);
+
+/* ================= lights ================= */
+const hemi = new THREE.HemisphereLight(0xcfe0f0, 0xc7a568, 0.65);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight(0xffe3b8, 2.6);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -14; sun.shadow.camera.right = 14;
+sun.shadow.camera.top = 14;  sun.shadow.camera.bottom = -14;
+sun.shadow.camera.near = 5;  sun.shadow.camera.far = 90;
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.03;
+scene.add(sun);
+scene.add(sun.target);
+
+const fill = new THREE.DirectionalLight(0xbcd0e8, 0.35);
+fill.position.set(-15, 10, -18);
+scene.add(fill);
+/* ================= procedural textures ================= */
+function canvasTex(size, draw, repeat) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  draw(c.getContext('2d'), size);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  if (repeat) t.repeat.set(repeat[0], repeat[1]);
+  return t;
+}
+
+// Giraffe coat: cream base, mottling, irregular polygonal spots (tile-safe).
+// u=0.25 is the belly, u=0.75 the topline for the lofted body/neck.
+function drawCoat(g, size, opts) {
+  const { spots = 90, spotMin = 0.028, spotMax = 0.075, bellyBand = true, vFade = 0, sock = 0 } = opts;
+  const base = g.createLinearGradient(0, 0, 0, size);
+  base.addColorStop(0, '#f2dfb0');
+  base.addColorStop(0.55, '#ecd29c');
+  base.addColorStop(1, '#e5c489');
+  g.fillStyle = base;
+  g.fillRect(0, 0, size, size);
+
+  for (let i = 0; i < 420; i++) {
+    const x = R() * size, y = R() * size, r = 10 + R() * 46;
+    const col = R() < 0.55 ? '255,240,200' : '206,168,106';
+    const grad = g.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, `rgba(${col},${(0.08 + R() * 0.10).toFixed(3)})`);
+    grad.addColorStop(1, `rgba(${col},0)`);
+    g.fillStyle = grad;
+    g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+  }
+
+  const tileDraw = (cx, cy, fillStyle, pts) => {
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+      g.beginPath();
+      for (let j = 0; j < pts.length; j += 2) {
+        const px = cx + dx * size + pts[j], py = cy + dy * size + pts[j + 1];
+        j ? g.lineTo(px, py) : g.moveTo(px, py);
+      }
+      g.closePath();
+      g.fillStyle = fillStyle;
+      g.fill();
+    }
+  };
+
+  for (let i = 0; i < spots; i++) {
+    const cx = R() * size, cy = R() * size;
+    let alpha = 1;
+    if (vFade > 0 && cy < vFade * size) alpha = cy / (vFade * size); // fade toward canvas top
+    if (alpha <= 0.05) continue;
+    const rad = (spotMin + Math.pow(R(), 1.35) * (spotMax - spotMin)) * size;
+    const k = 6 + (R() * 6 | 0);
+    const pts = [];
+    for (let j = 0; j < k; j++) {
+      const a = j / k * Math.PI * 2 + R() * 0.55;
+      const d = rad * (0.7 + R() * 0.55);
+      pts.push(Math.cos(a) * d, Math.sin(a) * d * 0.88);
+    }
+    const hue = 20 + R() * 12, sat = 42 + R() * 18, lum = 23 + R() * 15;
+    tileDraw(cx, cy, `hsla(${hue},${sat}%,${lum}%,${(alpha * (0.9 + R() * 0.1)).toFixed(3)})`, pts);
+    if (R() < 0.55) tileDraw(cx, cy, `hsla(${hue},${sat + 5}%,${Math.max(12, lum - 7)}%,${(alpha * 0.55).toFixed(3)})`, pts);
+  }
+
+  if (bellyBand) {
+    const band = (u0, col, w = 0.17) => {
+      const bx = u0 * size;
+      const gr = g.createLinearGradient(bx - w * size, 0, bx + w * size, 0);
+      gr.addColorStop(0, 'rgba(244,229,186,0)');
+      gr.addColorStop(0.5, col);
+      gr.addColorStop(1, 'rgba(244,229,186,0)');
+      g.fillStyle = gr;
+      g.fillRect(bx - w * size, 0, 2 * w * size, size);
+    };
+    band(0.25, 'rgba(246,232,190,0.30)'); // lighter belly
+    band(0.75, 'rgba(150,116,64,0.12)');  // slightly darker topline
+  }
+  if (sock > 0) { // pale "sock" at canvas top = ankles/hoof area
+    const gr = g.createLinearGradient(0, 0, 0, sock * size);
+    gr.addColorStop(0, 'rgba(203,190,158,0.75)');
+    gr.addColorStop(1, 'rgba(203,190,158,0)');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, size, sock * size);
+  }
+}
+
+const coatTex = canvasTex(1024, (g, s) => drawCoat(g, s, { spots: 90, spotMin: 0.03, spotMax: 0.075 }), [1.5, 1.5]);
+const coatNeckTex = coatTex.clone();
+coatNeckTex.repeat.set(1.15, 2.1);
+coatNeckTex.needsUpdate = true;
+const legTex = canvasTex(512, (g, s) => drawCoat(g, s, { spots: 20, spotMin: 0.02, spotMax: 0.048, bellyBand: false, vFade: 0.38, sock: 0.16 }));
+const headTex = coatTex.clone();
+headTex.repeat.set(0.38, 0.38);
+headTex.needsUpdate = true;
+
+// Savanna ground: sandy base with mottled patches and fine specks (tile-safe).
+const groundTex = canvasTex(512, (g, size) => {
+  g.fillStyle = '#c7a469';
+  g.fillRect(0, 0, size, size);
+  for (let i = 0; i < 50; i++) {
+    const x = R() * size, y = R() * size, r = 30 + R() * 85;
+    const c = R() < 0.5 ? '186,154,92' : '221,194,134';
+    const gr = g.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, `rgba(${c},0.32)`);
+    gr.addColorStop(1, `rgba(${c},0)`);
+    g.fillStyle = gr;
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+      g.beginPath(); g.arc(x + dx * size, y + dy * size, r, 0, 7); g.fill();
+    }
+  }
+  for (let i = 0; i < 3200; i++) {
+    const x = R() * size, y = R() * size, s = 1 + R() * 3;
+    g.fillStyle = R() < 0.5 ? `rgba(112,88,50,${(0.12 + R() * 0.18).toFixed(3)})` : `rgba(233,209,155,${(0.10 + R() * 0.16).toFixed(3)})`;
+    g.fillRect(x, y, s, s);
+    if (x < s) g.fillRect(x + size, y, s, s);
+    if (y < s) g.fillRect(x, y + size, s, s);
+  }
+}, [88, 88]);
+/* ================= loft helper (organic body surfaces) ================= */
+// Loft elliptical cross-sections along a 3D centerline with parallel-transport frames.
+// u wraps around the section (u=0 along initialNormal), v runs 0..1 along the path.
+function loftGeometry(pathPts, radiiFn, radialSegs, { initialNormal = new THREE.Vector3(0, 0, 1), caps = true } = {}) {
+  const n = pathPts.length;
+  const tangents = [];
+  for (let i = 0; i < n; i++) {
+    const a = pathPts[Math.max(0, i - 1)], b = pathPts[Math.min(n - 1, i + 1)];
+    tangents.push(new THREE.Vector3().subVectors(b, a).normalize());
+  }
+  const normals = [];
+  for (let i = 0; i < n; i++) {
+    const v = (i === 0) ? initialNormal.clone() : normals[i - 1].clone();
+    v.addScaledVector(tangents[i], -v.dot(tangents[i]));
+    if (v.lengthSq() < 1e-10) v.set(0, 0, 1).addScaledVector(tangents[i], -tangents[i].z);
+    v.normalize();
+    normals.push(v);
+  }
+  const bins = normals.map((nm, i) => new THREE.Vector3().crossVectors(tangents[i], nm));
+
+  const N = radialSegs;
+  const pos = [], uv = [], idx = [];
+  for (let i = 0; i < n; i++) {
+    const [ry, rz] = radiiFn(i, i / (n - 1));
+    for (let j = 0; j <= N; j++) {
+      const a = (j % N) / N * Math.PI * 2;
+      const p = pathPts[i].clone()
+        .addScaledVector(normals[i], Math.cos(a) * ry)
+        .addScaledVector(bins[i], Math.sin(a) * rz);
+      pos.push(p.x, p.y, p.z);
+      uv.push((j % N) / N, i / (n - 1));
+    }
+  }
+  for (let i = 0; i < n - 1; i++)
+    for (let j = 0; j < N; j++) {
+      const a = i * (N + 1) + j, b = a + 1, c = a + (N + 1), d = c + 1;
+      idx.push(a, b, d, a, d, c);
+    }
+  if (caps) {
+    pos.push(...pathPts[n - 1].clone().addScaledVector(tangents[n - 1], 0.02).toArray());
+    uv.push(0.5, 0.5);
+    const endC = pos.length / 3 - 1;
+    for (let j = 0; j < N; j++) {
+      const a = (n - 1) * (N + 1) + j, b = a + 1;
+      idx.push(endC, a, b);
+    }
+    pos.push(...pathPts[0].clone().addScaledVector(tangents[0], -0.02).toArray());
+    uv.push(0.5, 0.5);
+    const startC = pos.length / 3 - 1;
+    for (let j = 0; j < N; j++) {
+      const a = j, b = j + 1;
+      idx.push(startC, b, a);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// 1-D Catmull-Rom resampling of control values (xCtl must be increasing).
+function catmull1(p0, p1, p2, p3, t) {
+  const t2 = t * t, t3 = t2 * t;
+  return 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (3 * p1 - 3 * p2 + p3 - p0) * t3);
+}
+function sampleTrack(xCtl, yCtl, n) {
+  const m = xCtl.length, out = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = xCtl[0] + (xCtl[m - 1] - xCtl[0]) * i / (n - 1);
+    let s = 0;
+    while (s < m - 2 && x > xCtl[s + 1]) s++;
+    const u = (x - xCtl[s]) / (xCtl[s + 1] - xCtl[s]);
+    out[i] = catmull1(yCtl[Math.max(0, s - 1)], yCtl[s], yCtl[s + 1], yCtl[Math.min(m - 1, s + 2)], u);
+  }
+  return out;
+}
+
+/* ================= ground & scenery ================= */
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(700, 700),
+  new THREE.MeshStandardMaterial({ map: groundTex, roughness: 1, metalness: 0 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const scenery = new THREE.Group(); // periodic band, wraps at x = ±64
+scene.add(scenery);
+
+const barkMat = new THREE.MeshStandardMaterial({ color: 0x6d5138, roughness: 1 });
+const leafMatA = new THREE.MeshStandardMaterial({ color: 0x6f7d3c, roughness: 0.95 });
+const leafMatB = new THREE.MeshStandardMaterial({ color: 0x7d8a45, roughness: 0.95 });
+const rockMat = new THREE.MeshStandardMaterial({ color: 0x8a7f72, roughness: 1 });
+
+function makeTree(rng, s) {
+  const g = new THREE.Group();
+  const h = rr(2.2, 3.0);
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.15, h, 8), barkMat);
+  trunk.position.y = h / 2;
+  trunk.castShadow = true;
+  g.add(trunk);
+  const nb = 2 + (rng() * 2 | 0);
+  for (let b = 0; b < nb; b++) {
+    const br = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.05, rr(1.1, 1.7), 6), barkMat);
+    const a = rng() * Math.PI * 2;
+    br.position.set(Math.cos(a) * 0.35, h * rr(0.75, 0.95), Math.sin(a) * 0.35);
+    br.rotation.set(Math.sin(a) * 0.9, 0, -Math.cos(a) * 0.9);
+    br.castShadow = true;
+    g.add(br);
+  }
+  const nc = 2 + (rng() * 2 | 0);
+  for (let c = 0; c < nc; c++) {
+    const cl = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), c % 2 ? leafMatA : leafMatB);
+    cl.scale.set(rr(1.5, 2.4), rr(0.5, 0.75), rr(1.3, 2.1));
+    cl.position.set(rr(-0.5, 0.5), h + rr(0.15, 0.5), rr(-0.4, 0.4));
+    cl.castShadow = true;
+    g.add(cl);
+  }
+  g.scale.setScalar(s);
+  return g;
+}
+
+const treeSpots = [[4, -16, 1.1], [16, 9, 0.9], [30, -22, 1.3], [44, 14, 0.85], [58, -7, 1.0]];
+for (const [x, z, s] of treeSpots) {
+  const t = makeTree(R, s);
+  t.position.set(x, 0, z);
+  t.rotation.y = rr(0, Math.PI * 2);
+  scenery.add(t);
+}
+
+for (let i = 0; i < 10; i++) {
+  const m = new THREE.Mesh(new THREE.DodecahedronGeometry(rr(0.25, 0.7), 0), rockMat);
+  m.position.set(rr(0, 64), 0.12, rr(-24, 24));
+  m.scale.set(1, rr(0.5, 0.8), rr(0.8, 1.3));
+  m.rotation.set(rr(0, 3), rr(0, 3), rr(0, 3));
+  m.castShadow = true;
+  m.receiveShadow = true;
+  scenery.add(m);
+}
+
+// Grass tufts: merged cones with per-blade vertex colors.
+{
+  const bladeGeos = [];
+  for (let i = 0; i < 60; i++) {
+    const tx = rr(0, 64), tz = rr(-24, 24);
+    const blades = 5 + (R() * 5 | 0);
+    const col = new THREE.Color().setHSL(0.22 + R() * 0.05, 0.38 + R() * 0.2, 0.32 + R() * 0.14);
+    for (let b = 0; b < blades; b++) {
+      const h = rr(0.2, 0.5);
+      const geo = new THREE.ConeGeometry(rr(0.012, 0.02), h, 4, 1);
+      geo.translate(0, h / 2, 0);
+      geo.rotateX(rr(-0.25, 0.25));
+      geo.rotateZ(rr(-0.25, 0.25));
+      geo.translate(tx + rr(-0.08, 0.08), 0, tz + rr(-0.08, 0.08));
+      const count = geo.attributes.position.count;
+      const colors = new Float32Array(count * 3);
+      for (let v = 0; v < count; v++) colors.set([col.r, col.g, col.b], v * 3);
+      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      bladeGeos.push(geo);
+    }
+  }
+  const grassGeo = mergeGeometries(bladeGeos, false);
+  const grass = new THREE.Mesh(grassGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+  grass.castShadow = true;
+  scenery.add(grass);
+}
+
+// Drifting dust motes.
+const DUST_N = 260;
+const dustGeo = new THREE.BufferGeometry();
+const dustPos = new Float32Array(DUST_N * 3);
+const dustSeed = new Float32Array(DUST_N * 2);
+for (let i = 0; i < DUST_N; i++) {
+  dustPos[i * 3] = rr(0, 64);
+  dustPos[i * 3 + 1] = rr(0.05, 5.5);
+  dustPos[i * 3 + 2] = rr(-24, 24);
+  dustSeed[i * 2] = rr(0.05, 0.35);   // drift speed
+  dustSeed[i * 2 + 1] = rr(0, Math.PI * 2);
+}
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({
+  color: 0xd9c69c, size: 0.07, transparent: true, opacity: 0.32, depthWrite: false, sizeAttenuation: true
+}));
+scenery.add(dust);
+/* ================= giraffe ================= */
+const G_SCALE = 1.15;
+const giraffe = new THREE.Group();
+giraffe.scale.setScalar(G_SCALE);
+scene.add(giraffe);
+
+const coatMat = new THREE.MeshStandardMaterial({ map: coatTex, roughness: 0.88, metalness: 0 });
+const legMat = new THREE.MeshStandardMaterial({ map: legTex, roughness: 0.88, metalness: 0 });
+const creamMat = new THREE.MeshStandardMaterial({ color: 0xe6cd9e, roughness: 0.9 });
+const darkMat = new THREE.MeshStandardMaterial({ color: 0x3a2310, roughness: 0.9 });
+const hoofMat = new THREE.MeshStandardMaterial({ color: 0x2f2620, roughness: 0.8 });
+const shadowOn = (m) => { m.castShadow = true; m.receiveShadow = true; return m; };
+
+/* ---- torso: lofted cross-sections (facing +x) ---- */
+const TORSO_X  = [-1.16, -1.05, -0.85, -0.55, -0.20, 0.20, 0.50, 0.80, 0.95, 1.02];
+const TORSO_CY = [1.57, 1.53, 1.49, 1.47, 1.45, 1.47, 1.51, 1.55, 1.51, 1.49];
+const TORSO_RY = [0.08, 0.26, 0.43, 0.43, 0.42, 0.43, 0.46, 0.42, 0.26, 0.10];
+const TORSO_RZ = [0.07, 0.22, 0.42, 0.43, 0.42, 0.43, 0.46, 0.40, 0.25, 0.09];
+const T_N = 26;
+const torsoX  = sampleTrack(TORSO_X, TORSO_X, T_N);
+const torsoCY = sampleTrack(TORSO_X, TORSO_CY, T_N);
+const torsoRY = sampleTrack(TORSO_X, TORSO_RY, T_N);
+const torsoRZ = sampleTrack(TORSO_X, TORSO_RZ, T_N);
+const torsoPts = torsoX.map((x, i) => new THREE.Vector3(x, torsoCY[i], 0));
+const torso = shadowOn(new THREE.Mesh(loftGeometry(torsoPts, (i) => [torsoRY[i], torsoRZ[i]], 24), coatMat));
+giraffe.add(torso);
+
+/* ---- neck: lofted, pivots at the withers ---- */
+const NECK_ORIGIN = new THREE.Vector3(0.45, 1.92, 0);
+const neckCurve = new THREE.CatmullRomCurve3([
+  [0.45, 1.86], [0.68, 2.14], [0.92, 2.47], [1.14, 2.77], [1.33, 3.03], [1.47, 3.22], [1.57, 3.34]
+].map(p => new THREE.Vector3(p[0], p[1], 0)));
+const NECK_R = [0.30, 0.265, 0.235, 0.21, 0.185, 0.165, 0.148];
+const N_N = 20;
+const neckPtsW = neckCurve.getPoints(N_N - 1);
+const neckR = [];
+for (let i = 0; i < N_N; i++) {
+  const f = i / (N_N - 1) * (NECK_R.length - 1);
+  const s = Math.min(NECK_R.length - 2, Math.floor(f));
+  const u = f - s;
+  neckR.push(catmull1(NECK_R[Math.max(0, s - 1)], NECK_R[s], NECK_R[s + 1], NECK_R[Math.min(NECK_R.length - 1, s + 2)], u));
+}
+const neckPts = neckPtsW.map(p => p.clone().sub(NECK_ORIGIN));
+
+const neckGroup = new THREE.Group();
+neckGroup.position.copy(NECK_ORIGIN);
+giraffe.add(neckGroup);
+const neck = shadowOn(new THREE.Mesh(
+  loftGeometry(neckPts, (i) => [neckR[i] * 0.94, neckR[i] * 1.06], 18),
+  new THREE.MeshStandardMaterial({ map: coatNeckTex, roughness: 0.88 })
+));
+neckGroup.add(neck);
+
+/* ---- head ---- */
+const HEAD_PITCH = 0.45;
+const head = new THREE.Group();
+head.position.set(1.57 - NECK_ORIGIN.x, 3.34 - NECK_ORIGIN.y, 0);
+head.rotation.z = HEAD_PITCH;
+neckGroup.add(head);
+
+const skull = shadowOn(new THREE.Mesh(new THREE.SphereGeometry(1, 24, 18), coatMat));
+skull.scale.set(0.30, 0.22, 0.21);
+skull.position.set(0.16, 0.05, 0);
+head.add(skull);
+
+const muzzleMat = new THREE.MeshStandardMaterial({ color: 0xd8c5a0, roughness: 0.9 });
+const muzzle = shadowOn(new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), muzzleMat));
+muzzle.scale.set(0.26, 0.15, 0.17);
+muzzle.position.set(0.40, -0.03, 0);
+head.add(muzzle);
+
+const jaw = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), muzzleMat);
+jaw.scale.set(0.20, 0.10, 0.14);
+jaw.position.set(0.34, -0.11, 0);
+head.add(jaw);
+
+const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.012, 0.05), new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 0.9 }));
+mouth.position.set(0.63, -0.08, 0);
+head.add(mouth);
+
+const nostrilMat = new THREE.MeshStandardMaterial({ color: 0x4a3a2c, roughness: 0.8 });
+for (const s of [-1, 1]) {
+  const n = new THREE.Mesh(new THREE.SphereGeometry(0.013, 10, 8), nostrilMat);
+  n.scale.set(0.7, 1, 1);
+  n.position.set(0.55, 0.045, s * 0.05);
+  head.add(n);
+}
+
+// Ears: flat ellipsoids, long axis pointing out/back/up.
+const earMat = new THREE.MeshStandardMaterial({ color: 0xe3cda2, roughness: 0.9 });
+const earInMat = new THREE.MeshStandardMaterial({ color: 0xb06a55, roughness: 0.9 });
+const ears = [];
+for (const s of [-1, 1]) {
+  const L = new THREE.Vector3(-0.62, 0.18, s * 0.77).normalize();     // long axis: out, slightly back
+  const F = new THREE.Vector3(0, 0.35, s * 0.94).normalize();        // flat normal
+  const Yv = new THREE.Vector3().crossVectors(F, L).normalize();
+  const m4 = new THREE.Matrix4().makeBasis(L, Yv, F);
+  const ear = new THREE.Group();
+  ear.quaternion.setFromRotationMatrix(m4);
+  ear.position.set(0.02, 0.16, s * 0.16);
+  const blade = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), earMat);
+  blade.scale.set(0.15, 0.07, 0.018);
+  ear.add(blade);
+  const inner = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), earInMat);
+  inner.scale.set(0.125, 0.05, 0.01);
+  inner.position.z = -s * 0.011;
+  ear.add(inner);
+  head.add(ear);
+  ears.push({ grp: ear, baseQ: ear.quaternion.clone(), s, offset: 0, target: 0, next: 2 + R() * 5 });
+}
+
+// Ossicones (horn-like bumps) with knobs.
+const ossMat = new THREE.MeshStandardMaterial({ color: 0xc1935a, roughness: 0.85 });
+const knobMat = new THREE.MeshStandardMaterial({ color: 0x8f6a3c, roughness: 0.85 });
+for (const s of [-1, 1]) {
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.024, 0.16, 10), ossMat);
+  shaft.position.set(0.10, 0.24, s * 0.055);
+  shaft.rotation.x = s * 0.10;
+  head.add(shaft);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.034, 12, 10), knobMat);
+  knob.position.set(0.10, 0.33, s * 0.061);
+  head.add(knob);
+}
+
+// Eyes with highlights and long lashes.
+const eyeMat = new THREE.MeshStandardMaterial({ color: 0x241812, roughness: 0.25 });
+const hiMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+const lashMat = new THREE.MeshStandardMaterial({ color: 0x1a120c, roughness: 0.9 });
+const eyes = [];
+for (const s of [-1, 1]) {
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.034, 14, 10), eyeMat);
+  eye.scale.set(0.85, 1, 1);
+  eye.position.set(0.27, 0.075, s * 0.185);
+  head.add(eye);
+  const hi = new THREE.Mesh(new THREE.SphereGeometry(0.009, 8, 6), hiMat);
+  hi.position.set(0.285, 0.095, s * 0.20);
+  head.add(hi);
+  const lashes = new THREE.Group();
+  lashes.position.set(0.27, 0.05, s * 0.19);
+  for (let k = 0; k < 4; k++) {
+    const fan = new THREE.Group();
+    fan.rotation.z = -0.5 + k * 0.35;
+    const lash = new THREE.Mesh(new THREE.CylinderGeometry(0.0028, 0.002, 0.055, 5), lashMat);
+    lash.position.y = -0.028;
+    fan.add(lash);
+    lashes.add(fan);
+  }
+  head.add(lashes);
+  eyes.push({ eye, hi });
+}
+
+/* ---- mane: stiff bristles along topline and neck ---- */
+function maneSpikeGeo(r, h) { return new THREE.ConeGeometry(r, h, 7); }
+
+const torsoManeGeos = [];
+{
+  const nSpikes = 16;
+  const cone = maneSpikeGeo(0.021, 0.085);
+  for (let i = 0; i < nSpikes; i++) {
+    const f = i / (nSpikes - 1);
+    const idx = Math.round(f * (T_N - 1));
+    const x = -0.98 + f * 1.90;
+    const y = torsoCY[idx] + torsoRY[idx] + 0.004;
+    const geo = cone.clone();
+    geo.rotateZ(Math.PI / 2); // tip toward -x (tail)
+    geo.translate(x, y, 0);
+    torsoManeGeos.push(geo);
+  }
+}
+const torsoMane = new THREE.Mesh(mergeGeometries(torsoManeGeos, false), darkMat);
+shadowOn(torsoMane);
+giraffe.add(torsoMane);
+
+const neckManeGeos = [];
+{
+  const cone = maneSpikeGeo(0.019, 0.08);
+  for (let i = 2; i < N_N - 1; i += 1) {
+    const p = neckPtsW[i];
+    const a = neckPtsW[Math.max(0, i - 1)], b = neckPtsW[Math.min(N_N - 1, i + 1)];
+    const t = new THREE.Vector3().subVectors(b, a).normalize();
+    const d = new THREE.Vector3(-t.y, t.x, 0).normalize(); // dorsal direction
+    const spike = cone.clone();
+    spike.rotateZ(Math.atan2(t.x, -t.y)); // tip along -t (backs along the neck)
+    spike.translate(p.x + d.x * neckR[i] * 0.92 - NECK_ORIGIN.x, p.y + d.y * neckR[i] * 0.92 - NECK_ORIGIN.y, 0);
+    neckManeGeos.push(spike);
+  }
+}
+const neckMane = new THREE.Mesh(mergeGeometries(neckManeGeos, false), darkMat);
+neckGroup.add(neckMane);
+
+const headManeGeos = [];
+{
+  const cone = maneSpikeGeo(0.02, 0.10);
+  for (const x of [0.08, 0.15, 0.22]) {
+    const geo = cone.clone();
+    geo.rotateZ(Math.PI / 2);
+    geo.translate(x, 0.265, 0);
+    headManeGeos.push(geo);
+  }
+}
+const headMane = new THREE.Mesh(mergeGeometries(headManeGeos, false), darkMat);
+head.add(headMane);
+
+/* ---- legs ---- */
+function buildLeg(isFront, px, py, pz) {
+  const upperLen = isFront ? 0.77 : 0.72;
+  const cannonLen = isFront ? 0.63 : 0.64;
+  const standHip = isFront ? 0.05 : -0.12;
+  const standKnee = isFront ? -0.22 : 0.30; // front knee flexes back, hock flexes forward
+  const bendDir = isFront ? -1 : 1;
+
+  const root = new THREE.Group();
+  root.position.set(px, py, pz);
+  const upper = new THREE.Group();
+  upper.rotation.z = standHip;
+  root.add(upper);
+  const knee = new THREE.Group();
+  knee.position.y = -upperLen;
+  knee.rotation.z = standKnee;
+  upper.add(knee);
+
+  const r0 = isFront ? 0.128 : 0.118, r1 = isFront ? 0.084 : 0.076;
+  const upGeo = loftGeometry(
+    [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -upperLen * 0.55, 0), new THREE.Vector3(0, -upperLen, 0)],
+    (i, t) => [THREE.MathUtils.lerp(r0, r1, t), THREE.MathUtils.lerp(r0, r1, t) * 1.04],
+    14, { caps: false }
+  );
+  upper.add(shadowOn(new THREE.Mesh(upGeo, legMat)));
+  const kneecap = shadowOn(new THREE.Mesh(new THREE.SphereGeometry(0.072, 12, 10), legMat));
+  kneecap.position.y = -upperLen;
+  kneecap.scale.set(1, 1.1, 1);
+  upper.add(kneecap);
+
+  const c0 = isFront ? 0.074 : 0.068, c1 = isFront ? 0.056 : 0.054;
+  const caGeo = loftGeometry(
+    [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, -cannonLen * 0.5, 0), new THREE.Vector3(0, -cannonLen, 0)],
+    (i, t) => [THREE.MathUtils.lerp(c0, c1, t), THREE.MathUtils.lerp(c0, c1, t)],
+    14, { caps: false }
+  );
+  knee.add(shadowOn(new THREE.Mesh(caGeo, legMat)));
+
+  const hoof = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), hoofMat);
+  hoof.scale.set(0.060, 0.075, 0.086);
+  hoof.position.set(0.014, -cannonLen - 0.04, 0);
+  shadowOn(hoof);
+  knee.add(hoof);
+
+  const leg = { root, upper, knee, hoof, upperLen, cannonLen, standHip, standKnee, bendDir,
+                shoulderY: py, front: isFront };
+
+  // Fit: standing pose must leave ~5 cm of clearance under the hoof.
+  // need = vertical distance from knee pivot to hoof center (along leg axis).
+  const total = standHip + standKnee;
+  const need = (py - 0.05 - hoof.scale.y - upperLen * Math.cos(standHip)) / Math.cos(total);
+  hoof.position.y = -need - 0.002;
+  hoof.position.x = cannonLen * Math.sin(total) + 0.015; // follow the tilted cannon, toe slightly forward
+  return leg;
+}
+
+const SHOULDER = { x: 0.55, y: 1.52, z: 0.30 };
+const HIP = { x: -0.75, y: 1.48, z: 0.32 };
+const legs = [
+  Object.assign(buildLeg(true,  SHOULDER.x, SHOULDER.y,  SHOULDER.z), { id: 'LF', phase: 0, amp: 0.30 }),
+  Object.assign(buildLeg(true,  SHOULDER.x, SHOULDER.y, -SHOULDER.z), { id: 'RF', phase: Math.PI, amp: 0.30 }),
+  Object.assign(buildLeg(false, HIP.x, HIP.y, -HIP.z), { id: 'RH', phase: 0, amp: 0.27 }),
+  Object.assign(buildLeg(false, HIP.x, HIP.y, HIP.z), { id: 'LH', phase: Math.PI, amp: 0.27 }),
+];
+for (const L of legs) giraffe.add(L.root);
+
+/* ---- tail ---- */
+const tailGroup = new THREE.Group();
+tailGroup.position.set(-1.04, 1.90, 0);
+giraffe.add(tailGroup);
+const tailMat = new THREE.MeshStandardMaterial({ color: 0xd9bd8d, roughness: 0.9 });
+const tail = shadowOn(new THREE.Mesh(
+  loftGeometry(
+    [new THREE.Vector3(0, 0, 0), new THREE.Vector3(-0.02, -0.28, 0), new THREE.Vector3(-0.07, -0.56, 0),
+     new THREE.Vector3(-0.14, -0.82, 0), new THREE.Vector3(-0.24, -1.05, 0)],
+    (i, t) => { const r = THREE.MathUtils.lerp(0.045, 0.011, t); return [r, r]; },
+    10, { caps: false }
+  ),
+  tailMat
+));
+tailGroup.add(tail);
+const tuftGroup = new THREE.Group();
+tuftGroup.position.set(-0.24, -1.05, 0);
+tuftGroup.rotation.z = -0.40;
+tailGroup.add(tuftGroup);
+const tuft = shadowOn(new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.030, 0.24, 9), darkMat));
+tuft.position.y = -0.12;
+tuftGroup.add(tuft);
+
+/* ================= gait (diagonal walk) ================= */
+const OMEGA = 2.6;            // stride frequency, rad/s
+let gaitT = 0;
+let simT = 0;
+let pace = 1.0;               // 0 = stand still, 1.6 = brisk
+const WALK_SPEED = 0.85;      // m/s at pace 1 (unscaled)
+
+const paceEl = document.getElementById('pace');
+const paceVal = document.getElementById('paceVal');
+paceEl.addEventListener('input', () => {
+  pace = parseFloat(paceEl.value);
+  paceVal.textContent = pace.toFixed(2) + '×';
+});
+
+let blinkNext = 2.5, blinkEnd = -1;
+function updateGait(dt) {
+  const p = THREE.MathUtils.smoothstep(pace, 0, 0.15); // pose blend: 0 = standing, 1 = walking
+  const T = gaitT;
+
+  for (const L of legs) {
+    const s = Math.sin(T + L.phase), c = Math.cos(T + L.phase);
+    L.upper.rotation.z = L.standHip + p * L.amp * s;
+    const bend = Math.pow(Math.max(0, c), 1.35);
+    L.knee.rotation.z = L.standKnee + p * L.bendDir * 0.38 * bend;
+  }
+
+  const bob = p * 0.045 * (1 + Math.cos(2 * T)) * 0.5;
+  giraffe.position.y = -bob;
+  giraffe.rotation.x = p * 0.020 * Math.sin(2 * T + 0.6);
+  giraffe.rotation.z = p * 0.012 * Math.sin(2 * T);
+  neckGroup.rotation.z = p * 0.032 * Math.cos(2 * T);
+  head.rotation.z = HEAD_PITCH + p * 0.025 * Math.sin(2 * T + 0.8);
+  head.rotation.y = p * 0.05 * Math.sin(T + 0.3);
+
+  tailGroup.rotation.y = 0.08 + p * 0.40 * Math.sin(T + 1.2);
+  tailGroup.rotation.x = p * 0.10 * Math.sin(T * 0.9 + 0.4);
+  tuftGroup.rotation.y = p * 0.30 * Math.sin(T + 1.9);
+
+  // life details: blinking + ear twitches
+  if (simT > blinkNext) { blinkEnd = simT + 0.18; blinkNext = simT + 2.5 + R() * 4.5; }
+  const blinking = simT < blinkEnd;
+  for (const e of eyes) e.eye.scale.y = blinking ? 0.12 : 1;
+  for (const e of ears) {
+    if (simT > e.next) { e.target = (R() < 0.5 ? -1 : 1) * rr(0.2, 0.5); e.next = simT + 2 + R() * 5; }
+    e.offset += (e.target - e.offset) * Math.min(1, dt * 10);
+    if (Math.abs(e.target - e.offset) < 0.005) e.target = 0;
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), e.offset).multiply(e.baseQ);
+    e.grp.quaternion.copy(q);
+  }
+
+  // forward motion + periodic world wrap (scenery period = 64 m)
+  giraffe.position.x += WALK_SPEED * pace * dt;
+  if (giraffe.position.x > 32) {
+    giraffe.position.x -= 64;
+    scenery.position.x -= 64;
+  }
+
+  // dust drift
+  const arr = dustGeo.attributes.position.array;
+  const gx = giraffe.position.x;
+  for (let i = 0; i < DUST_N; i++) {
+    let x = arr[i * 3] - dustSeed[i * 2] * dt;
+    if (x < gx - 32) x += 64; else if (x > gx + 32) x -= 64;
+    arr[i * 3] = x;
+    arr[i * 3 + 1] += Math.sin(simT * 0.6 + dustSeed[i * 2 + 1]) * dt * 0.02;
+  }
+  dustGeo.attributes.position.needsUpdate = true;
+}
+
+/* ================= camera follow / sun follow ================= */
+const follow = new THREE.Vector3(0, 2.5, 0);
+const lastFollow = follow.clone();
+
+/* ================= main loop ================= */
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  simT += dt;
+  gaitT += OMEGA * pace * dt;
+  updateGait(dt);
+
+  follow.set(giraffe.position.x, giraffe.position.y + 2.55, giraffe.position.z);
+  camera.position.x += follow.x - lastFollow.x;
+  camera.position.y += follow.y - lastFollow.y;
+  camera.position.z += follow.z - lastFollow.z;
+  controls.target.copy(follow);
+  lastFollow.copy(follow);
+
+  sun.position.set(giraffe.position.x + 20, 32, giraffe.position.z + 14);
+  sun.target.position.copy(giraffe.position);
+  sun.target.updateMatrixWorld();
+
+  sky.position.copy(camera.position);
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+animate();
+window.__booted = true;
+console.log('giraffe: booted ok');
+</script>
+</script>
+</body>
+</html>

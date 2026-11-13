@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e9e3d4">
+  <title>The Quiet Giant — A Giraffe Study</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="experience">
+    <div id="scene" aria-label="An animated three-dimensional giraffe walking across a savanna"></div>
+    <div class="grain" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Fieldnotes home"><span class="brand-mark">✳</span><span>FIELDNOTES<small>THE NATURAL WORLD, OBSERVED</small></span></a>
+      <div class="top-center"><span class="status-dot"></span> AN INTERACTIVE FIELD STUDY</div>
+      <div class="top-right">ISSUE 01 <span>/</span> THE SAVANNA</div>
+    </header>
+
+    <section class="intro" aria-labelledby="title">
+      <div class="eyebrow"><span class="short-line"></span> MEET THE EXTRAORDINARY</div>
+      <h1 id="title">The quiet<br><em>giant.</em></h1>
+      <p>Above the tall grass, a gentle giant moves to the rhythm of the savanna.</p>
+      <div class="species"><span>01</span><div><strong>THE GIRAFFE</strong><i>Giraffa camelopardalis</i></div></div>
+    </section>
+
+    <aside class="side-note"><span>AN ELEVATED POINT OF VIEW</span><span class="side-line"></span><span>01 — 04</span></aside>
+
+    <div class="scene-label"><span class="label-cross">✳</span><span>THE SAVANNA<br><small>EAST AFRICA</small></span></div>
+
+    <footer class="bottom">
+      <div class="fact"><span class="fact-number">01 / 03</span><div><strong>MADE FOR THE LONG VIEW</strong><p>The tallest land animal on Earth.</p></div></div>
+      <div class="player">
+        <button id="toggle" class="play-button" type="button" aria-label="Pause walking animation" title="Pause walking animation"><span id="play-icon">Ⅱ</span></button>
+        <div class="player-copy"><strong id="motion-label">IN MOTION</strong><span>THE SAVANNA WALK</span></div>
+        <div class="sound-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="hint"><span class="drag-icon">↔</span><span>DRAG TO EXPLORE<br><small>SCROLL TO ZOOM</small></span></div>
+    </footer>
+    <div id="fallback" hidden>Sorry, this experience needs a browser with WebGL enabled.</div>
+  </main>
+  <script src="three.min.js"></script>
+  <script src="scene.js"></script>
+</body>
+</html>

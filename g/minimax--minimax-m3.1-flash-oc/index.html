@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giraffe — procedural walk cycle in Three.js</title>
+<style>
+  :root {
+    --ink: #f2ece2;
+    --dim: rgba(242, 236, 226, 0.62);
+    --panel: rgba(18, 16, 13, 0.42);
+    --edge: rgba(242, 236, 226, 0.16);
+    --accent: #e8b877;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #0d1117; color: var(--ink);
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #view { display: block; width: 100%; height: 100%; }
+  .vignette {
+    position: fixed; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(120% 95% at 50% 42%, rgba(0,0,0,0) 42%, rgba(0,0,0,0.30) 82%, rgba(0,0,0,0.55) 100%);
+    mix-blend-mode: multiply;
+  }
+  .grain {
+    position: fixed; inset: 0; pointer-events: none; opacity: .05;
+    background-image: repeating-linear-gradient(0deg, rgba(255,255,255,.6) 0 1px, transparent 1px 2px);
+  }
+  .ui { position: fixed; z-index: 10; transition: opacity .35s ease; }
+  body.hide-ui .ui { opacity: 0; }
+
+  #title { top: 26px; left: 30px; }
+  #title h1 {
+    margin: 0; font-size: 30px; font-weight: 300; letter-spacing: .34em;
+    text-transform: uppercase;
+    text-shadow: 0 2px 18px rgba(0,0,0,.6);
+  }
+  #title h1 b { font-weight: 600; color: var(--accent); letter-spacing: .3em; }
+  #title p {
+    margin: 7px 0 0; font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--dim); max-width: 380px; line-height: 1.7;
+  }
+
+  #hud { top: 28px; right: 30px; text-align: right; font-variant-numeric: tabular-nums; }
+  #hud .row { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--dim); line-height: 2.05; }
+  #hud .row span { color: var(--ink); }
+
+  #panel {
+    left: 30px; bottom: 28px; background: var(--panel); border: 1px solid var(--edge);
+    border-radius: 12px; padding: 14px 18px; backdrop-filter: blur(9px);
+    font-size: 11px; letter-spacing: .1em; color: var(--dim);
+  }
+  #panel table { border-collapse: collapse; }
+  #panel td { padding: 2.5px 0; vertical-align: middle; }
+  #panel td:first-child { padding-right: 18px; color: rgba(242,236,226,.45); text-transform: uppercase; }
+  #panel kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px;
+    background: rgba(255,255,255,.09); border: 1px solid var(--edge); border-radius: 4px;
+    padding: 1.5px 5px; color: var(--ink);
+  }
+  #viewname { color: var(--accent); }
+  #pausetag { color: #ff9b6a; letter-spacing: .2em; }
+
+  #loader {
+    position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+    background: #10151c; transition: opacity .35s ease; font-size: 11px;
+    letter-spacing: .3em; text-transform: uppercase; color: var(--dim);
+  }
+  #loader.gone { opacity: 0; pointer-events: none; }
+  #loader .bar { width: 190px; height: 1px; background: rgba(255,255,255,.12); margin-top: 14px; overflow: hidden; }
+  #loader .bar i { display: block; height: 100%; width: 40%; background: var(--accent); animation: slide 1.1s ease-in-out infinite; }
+  @keyframes slide { 0% { transform: translateX(-110%);} 100% { transform: translateX(280%);} }
+
+  @media (max-width: 720px) {
+    #title h1 { font-size: 20px; }
+    #panel { display: none; }
+  }
+</style>
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <div class="vignette"></div>
+  <div class="grain"></div>
+
+  <div id="title" class="ui">
+    <h1>Gira<b>f</b>e</h1>
+    <p>Procedural animal &mdash; lofted geometry, skin-bound rig, CCD&nbsp;IK walk cycle</p>
+  </div>
+
+  <div id="hud" class="ui">
+    <div class="row">view <span id="viewname">WIDE 3/4</span></div>
+    <div class="row">speed <span id="speedval">1.00x</span></div>
+    <div class="row">frame <span id="fps">-- fps</span> <span id="pausetag"></span></div>
+  </div>
+
+  <div id="panel" class="ui">
+    <table>
+      <tr><td>camera</td><td><kbd>C</kbd></td></tr>
+      <tr><td>orbit / zoom</td><td><kbd>drag</kbd> <kbd>wheel</kbd></td></tr>
+      <tr><td>pause</td><td><kbd>space</kbd></td></tr>
+      <tr><td>speed</td><td><kbd>[</kbd> <kbd>]</kbd></td></tr>
+      <tr><td>hide ui</td><td><kbd>H</kbd></td></tr>
+      <tr><td>reset gait</td><td><kbd>R</kbd></td></tr>
+    </table>
+  </div>
+
+  <div id="loader"><div style="text-align:center">building the animal<div class="bar"><i></i></div></div></div>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="src/util.js"></script>
+  <script src="src/textures.js"></script>
+  <script src="src/giraffe.js"></script>
+  <script src="src/world.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Walking Giraffe — Three.js</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#d9c7a0;font-family:system-ui,sans-serif}
+  canvas{display:block}
+  #ui{position:fixed;left:14px;bottom:14px;padding:10px 14px;background:rgba(30,20,10,.55);color:#f5e9d2;border-radius:10px;font-size:13px;backdrop-filter:blur(6px);display:flex;gap:12px;align-items:center}
+  #ui.hide{display:none}
+  #ui button{background:#f3dfb7;border:0;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:12px}
+  #ui input{vertical-align:middle}
+  #hint{position:fixed;right:14px;top:12px;color:rgba(40,25,10,.7);font-size:12px;text-align:right;text-shadow:0 1px 0 rgba(255,255,255,.3)}
+</style></head><body>
+<div id="ui"><label>Speed <input id="speed" type="range" min="0" max="2" step="0.05" value="1"> <span id="sv">1.00×</span></label><button id="pause">Pause</button><button id="orbit">Auto-orbit: off</button></div>
+<div id="hint">Drag to orbit · wheel to zoom · right-drag to pan<br>Space: pause · H: hide controls</div>
+<script src="lib/three.min.js"></script>
+<script src="lib/OrbitControls.js"></script>
+<script src="js/tube.js"></script>
+<script src="js/coat.js"></script>
+<script src="js/giraffe.js"></script>
+<script src="js/main.js"></script>
+</script></body></html>

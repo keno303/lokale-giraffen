@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Walking Giraffe — Three.js</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #b8d4e8;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    #app { position: fixed; inset: 0; }
+    canvas { display: block; }
+    #hint {
+      position: fixed;
+      left: 16px;
+      bottom: 16px;
+      color: rgba(20, 30, 40, 0.75);
+      background: rgba(255, 255, 255, 0.55);
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      backdrop-filter: blur(6px);
+      pointer-events: none;
+      max-width: 320px;
+    }
+    #title {
+      position: fixed;
+      left: 16px;
+      top: 16px;
+      color: rgba(20, 30, 40, 0.85);
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+      pointer-events: none;
+    }
+    #err {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: #7a1d1d;
+      background: #f4e3e3;
+      font-size: 16px;
+      padding: 40px;
+      text-align: center;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="title">Walking Giraffe</div>
+  <div id="hint">
+    <b>Drag</b> to orbit &nbsp;·&nbsp; <b>Scroll</b> to zoom &nbsp;·&nbsp; <b>Right-drag</b> to pan<br/>
+    <b>Space</b> pause &nbsp;·&nbsp; <b>↑ / ↓</b> walk speed
+  </div>
+  <div id="err"></div>
+  <script>
+    window.addEventListener('error', (e) => {
+      const el = document.getElementById('err');
+      el.style.display = 'flex';
+      el.textContent = 'Failed to start: ' + (e.message || e.error || 'unknown error');
+    });
+  </script>
+  <script src="./lib/three.min.js"></script>
+  <script src="./textures.js"></script>
+  <script src="./geometry.js"></script>
+  <script src="./giraffe.js"></script>
+  <script src="./main.js"></script>
+</body>
+</html>

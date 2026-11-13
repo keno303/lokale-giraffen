@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#e8decb">
+  <title>The long walk — A giraffe field study</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="experience">
+    <div id="scene" aria-label="An animated three-dimensional giraffe walking in a savanna"></div>
+    <div class="grain" aria-hidden="true"></div>
+    <header class="masthead">
+      <a class="brand" href="#" aria-label="Fieldnotes home"><span class="brand-mark">✳</span><span>FIELDNOTES<small>THE NATURAL WORLD, OBSERVED</small></span></a>
+      <div class="edition"><span class="edition-line"></span> AN INTERACTIVE STUDY <span class="edition-number"> / &nbsp; NO. 01</span></div>
+      <div class="top-right"><span class="status-dot"></span> ON THE SAVANNA</div>
+    </header>
+
+    <section class="intro" aria-label="About the giraffe">
+      <div class="eyebrow"><span>01</span> &nbsp; / &nbsp; THE GIRAFFE</div>
+      <h1>The long<br><em>walk.</em></h1>
+      <p>In a world of their own, even the tallest<br class="desktop"> take life one step at a time.</p>
+      <div class="species"><span class="species-icon">✳</span><div><strong>GIRAFFA CAMELOPARDALIS</strong><small>Northern giraffe &nbsp;·&nbsp; East Africa</small></div></div>
+    </section>
+
+    <aside class="field-card" aria-label="Field notes">
+      <div class="card-top"><span>FIELD NOTE</span><span>01 / 03</span></div>
+      <div class="card-rule"></div>
+      <p class="card-heading">A little closer<br><em>to the wild.</em></p>
+      <p class="card-copy">A giraffe's walk is a gentle rhythm: both legs on one side move together, then the other pair follows.</p>
+      <div class="card-rule"></div>
+      <div class="stat"><span>HEIGHT</span><strong>UP TO 5.5 M</strong></div>
+      <div class="stat"><span>HABITAT</span><strong>OPEN SAVANNA</strong></div>
+    </aside>
+
+    <div class="scene-label"><span class="crosshair">✳</span> <span>GIRAFFA<br><b>01 — WALKING</b></span></div>
+    <div class="instructions"><span class="drag-icon">↔</span> DRAG TO EXPLORE <span class="instruction-sep">/</span> SCROLL TO ZOOM</div>
+
+    <footer class="bottom-bar">
+      <div class="footer-title"><span class="footer-index">01</span><span>THE ART OF<br><strong>MOVING SLOWLY</strong></span></div>
+      <div class="playback">
+        <button id="toggle" class="play-button" aria-label="Pause walking" title="Pause walking"><span id="playIcon">Ⅱ</span></button>
+        <div class="play-copy"><strong id="playLabel">WALKING</strong><span id="playHint">A NATURAL PACE</span></div>
+        <div class="soundwave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="footer-end">A MOMENT IN NATURE <span>✳</span> TAKE YOUR TIME</div>
+    </footer>
+  </main>
+  <script src="lib/three.min.js"></script>
+  <script src="scene.js"></script>
+</body>
+</html>

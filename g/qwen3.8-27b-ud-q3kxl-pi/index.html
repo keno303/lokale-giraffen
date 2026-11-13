@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giraffa camelopardalis — Three.js</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #100c08; }
+  #scene { position: fixed; inset: 0; display: block; }
+  .ui {
+    position: fixed; top: 14px; left: 16px; z-index: 10;
+    color: #f7ecd8; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    text-shadow: 0 1px 4px rgba(0,0,0,.55); user-select: none; pointer-events: none;
+  }
+  .ui h1 { margin: 0 0 2px 0; font-size: 17px; font-weight: 600; letter-spacing: .3px; }
+  .ui h1 em { font-style: italic; opacity: .85; }
+  .ui .sub { font-size: 12px; opacity: .75; }
+  .help {
+    position: fixed; bottom: 12px; left: 16px; z-index: 10;
+    color: #f7ecd8; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 12px; line-height: 1.5; text-shadow: 0 1px 4px rgba(0,0,0,.55);
+    background: rgba(20,12,4,.35); border: 1px solid rgba(255,235,200,.18);
+    border-radius: 8px; padding: 8px 12px; user-select: none; pointer-events: none;
+    backdrop-filter: blur(3px);
+  }
+  .help kbd {
+    font-family: ui-monospace, monospace; font-size: 11px;
+    background: rgba(255,235,200,.14); border: 1px solid rgba(255,235,200,.25);
+    border-radius: 4px; padding: 0 5px; margin-right: 2px;
+  }
+  .gait {
+    position: fixed; bottom: 12px; right: 16px; z-index: 10;
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px;
+    color: #f7ecd8; text-shadow: 0 1px 4px rgba(0,0,0,.55);
+    background: rgba(20,12,4,.35); border: 1px solid rgba(255,235,200,.18);
+    border-radius: 8px; padding: 8px 12px; user-select: none; pointer-events: none;
+    backdrop-filter: blur(3px);
+  }
+  .gait b { font-weight: 600; }
+  #err {
+    position: fixed; inset: 0; display: none; z-index: 20;
+    align-items: center; justify-content: center; text-align: center;
+    color: #ffd9c2; font-family: ui-sans-serif, system-ui, sans-serif;
+    background: #20100a; padding: 40px; font-size: 15px; line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div class="ui">
+  <h1>Giraffa <em>camelopardalis</em></h1>
+  <div class="sub">procedural Three.js &mdash; no assets, no build step</div>
+</div>
+
+<div class="help">
+  <kbd>drag</kbd> orbit &nbsp; <kbd>scroll</kbd> zoom &nbsp;
+  <kbd>space</kbd> pause &nbsp; <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> gait speed &nbsp; <kbd>r</kbd> reset camera
+</div>
+
+<div class="gait" id="gait">gait: <b>walk</b></div>
+<div id="err"></div>
+
+<script src="lib/three.min.js"></script>
+<script src="giraffe.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Giraffe — Three.js</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1a1a1a; }
+  canvas { display: block; }
+  #info {
+    position: fixed; left: 14px; bottom: 14px;
+    font: 13px/1.6 system-ui, -apple-system, sans-serif;
+    color: #fff; background: rgba(20, 24, 18, 0.55);
+    padding: 8px 14px; border-radius: 10px;
+    pointer-events: none; user-select: none;
+    backdrop-filter: blur(4px);
+  }
+  #info b { letter-spacing: 0.4px; }
+  #info .keys { opacity: 0.75; font-size: 12px; }
+  #nogl {
+    position: fixed; inset: 0; display: none;
+    place-items: center; color: #fff; font: 16px system-ui, sans-serif;
+  }
+</style>
+</head>
+<body>
+<div id="info">
+  <b>Giraffe</b> — Ziehen: Kamera drehen &middot; Mausrad: Zoom<br>
+  <span class="keys">[1] stehen &middot; [2] gehen &middot; [3] traben</span>
+</div>
+<div id="nogl">WebGL is not available in this browser.</div>
+<script src="three.min.js"></script>
+<script src="giraffe.js"></script>
+</body>
+</html>

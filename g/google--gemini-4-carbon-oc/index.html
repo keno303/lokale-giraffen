@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Giraffa camelopardalis — Realistic Walking Giraffe in Three.js</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1b1611;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #f5efe6;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+    }
+
+    #hud-root {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-width: 310px;
+      pointer-events: none;
+    }
+
+    .hud-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      background: rgba(24, 19, 14, 0.72);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(235, 206, 165, 0.22);
+      border-radius: 12px;
+      pointer-events: auto;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.34);
+    }
+
+    .hud-title {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hud-title h1 {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: #faeedc;
+    }
+
+    .hud-title span {
+      font-size: 11px;
+      font-style: italic;
+      color: rgba(238, 217, 188, 0.74);
+    }
+
+    .hud-btn-small {
+      background: rgba(245, 222, 188, 0.12);
+      color: #f4e6d2;
+      border: 1px solid rgba(245, 222, 188, 0.24);
+      border-radius: 7px;
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.16s, border-color 0.16s;
+    }
+
+    .hud-btn-small:hover {
+      background: rgba(245, 222, 188, 0.24);
+      border-color: rgba(245, 222, 188, 0.45);
+    }
+
+    #hud-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 14px;
+      background: rgba(24, 19, 14, 0.72);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(235, 206, 165, 0.20);
+      border-radius: 12px;
+      pointer-events: auto;
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.38);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    #hud-panel.collapsed {
+      display: none;
+    }
+
+    .ctrl-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .ctrl-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 10.5px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(236, 212, 179, 0.78);
+    }
+
+    .ctrl-val {
+      font-variant-numeric: tabular-nums;
+      color: #f7dfc0;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .pill-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 5px;
+    }
+
+    .pill-btn {
+      background: rgba(255, 244, 228, 0.07);
+      color: rgba(247, 234, 216, 0.86);
+      border: 1px solid rgba(235, 206, 165, 0.16);
+      border-radius: 7px;
+      padding: 6px 6px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+
+    .pill-btn:hover {
+      background: rgba(255, 244, 228, 0.15);
+      color: #fff;
+    }
+
+    .pill-btn.active {
+      background: rgba(219, 154, 76, 0.34);
+      border-color: rgba(243, 189, 118, 0.68);
+      color: #fff6e8;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      background: rgba(245, 224, 195, 0.18);
+      border-radius: 99px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #eeb163;
+      border: 2px solid #fff3e0;
+      cursor: pointer;
+    }
+
+    .ctrl-check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+      color: rgba(245, 231, 212, 0.86);
+      cursor: pointer;
+      padding-top: 2px;
+    }
+
+    .ctrl-check input {
+      accent-color: #eeb163;
+      cursor: pointer;
+    }
+
+    .hud-hint {
+      font-size: 10.5px;
+      color: rgba(230, 208, 179, 0.60);
+      line-height: 1.4;
+      border-top: 1px solid rgba(235, 206, 165, 0.12);
+      padding-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container"></div>
+
+  <div id="hud-root">
+    <div class="hud-header">
+      <div class="hud-title">
+        <h1>African Giraffe</h1>
+        <span>Giraffa camelopardalis &bull; Lateral Gait</span>
+      </div>
+      <button id="hud-toggle" class="hud-btn-small" type="button">Hide</button>
+    </div>
+
+    <div id="hud-panel">
+      <div class="ctrl-section">
+        <div class="ctrl-label"><span>Camera Angle</span></div>
+        <div class="pill-grid">
+          <button class="pill-btn active" data-cam="hero" type="button">3/4 Hero</button>
+          <button class="pill-btn" data-cam="side" type="button">Side Gait</button>
+          <button class="pill-btn" data-cam="front" type="button">Front</button>
+          <button class="pill-btn" data-cam="rear" type="button">Rear 3/4</button>
+          <button class="pill-btn" data-cam="head" type="button">Head</button>
+          <button class="pill-btn" data-cam="hooves" type="button">Hooves</button>
+        </div>
+      </div>
+
+      <div class="ctrl-section">
+        <div class="ctrl-label"><span>Coat Subspecies</span></div>
+        <div class="pill-grid">
+          <button class="pill-btn active" data-coat="reticulated" type="button">Reticulated</button>
+          <button class="pill-btn" data-coat="masai" type="button">Masai</button>
+          <button class="pill-btn" data-coat="rothschild" type="button">Rothschild</button>
+        </div>
+      </div>
+
+      <div class="ctrl-section">
+        <div class="ctrl-label"><span>Savanna Sun</span></div>
+        <div class="pill-grid">
+          <button class="pill-btn active" data-light="golden" type="button">Golden Hr</button>
+          <button class="pill-btn" data-light="morning" type="button">Morning</button>
+          <button class="pill-btn" data-light="midday" type="button">Midday</button>
+        </div>
+      </div>
+
+      <div class="ctrl-section">
+        <div class="ctrl-label">
+          <span>Walk Speed</span>
+          <span id="val-speed" class="ctrl-val">1.00x</span>
+        </div>
+        <input id="ctrl-speed" type="range" min="0" max="1.6" step="0.05" value="1.0" />
+      </div>
+
+      <div class="ctrl-section">
+        <div class="ctrl-label">
+          <span>Stride Phase</span>
+          <span id="val-phase" class="ctrl-val">22%</span>
+        </div>
+        <input id="ctrl-phase" type="range" min="0" max="1" step="0.005" value="0.22" />
+      </div>
+
+      <div class="ctrl-section">
+        <div class="ctrl-label">
+          <span>Neck Counter-Bob</span>
+          <span id="val-bob" class="ctrl-val">100%</span>
+        </div>
+        <input id="ctrl-bob" type="range" min="0" max="1.8" step="0.05" value="1.0" />
+      </div>
+
+      <label class="ctrl-check">
+        <input id="ctrl-skeleton" type="checkbox" />
+        <span>Show 44-Bone Anatomical Rig</span>
+      </label>
+
+      <div class="hud-hint">
+        Drag to orbit &bull; Scroll to zoom &bull; Right-drag to pan &bull; <b>Space</b> pause &bull; <b>H</b> UI
+      </div>
+    </div>
+  </div>
+
+  <script src="lib/three.min.js"></script>
+  <script src="js/math-utils.js"></script>
+  <script src="js/giraffe-coat.js"></script>
+  <script src="js/giraffe-mesh.js"></script>
+  <script src="js/giraffe-gait.js"></script>
+  <script src="js/savanna-world.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

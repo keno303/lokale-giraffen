@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Giraffe — a procedural walk cycle in Three.js</title>
+  <style>
+    :root {
+      --ink: #f4ece0;
+      --dim: #cbb9a1;
+      --panel: rgba(30, 24, 18, 0.62);
+      --line: rgba(244, 236, 224, 0.16);
+      --accent: #e8b06a;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #0d0b09;
+      font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #view { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: grab; }
+    #view:active { cursor: grabbing; }
+
+    /* ---------------- panel ---------------- */
+    #ui {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      width: 262px;
+      padding: 18px 18px 16px;
+      background: var(--panel);
+      backdrop-filter: blur(14px) saturate(1.2);
+      -webkit-backdrop-filter: blur(14px) saturate(1.2);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+      user-select: none;
+      transition: opacity .35s ease, transform .35s ease;
+    }
+    #ui.hidden { opacity: 0; transform: translateX(-14px); pointer-events: none; }
+
+    h1 {
+      margin: 0;
+      font-size: 19px;
+      letter-spacing: .30em;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .sub {
+      margin: 5px 0 15px;
+      font-size: 11px;
+      letter-spacing: .09em;
+      color: var(--dim);
+      text-transform: uppercase;
+    }
+    .rule { height: 1px; background: var(--line); margin: 0 0 14px; }
+
+    .label {
+      font-size: 10px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin: 0 0 8px;
+    }
+
+    .row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+
+    button {
+      font: inherit;
+      font-size: 11px;
+      letter-spacing: .04em;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.055);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px 10px;
+      cursor: pointer;
+      transition: background .16s ease, border-color .16s ease, color .16s ease;
+    }
+    button:hover { background: rgba(255, 255, 255, 0.13); }
+    button.active {
+      background: rgba(232, 176, 106, 0.2);
+      border-color: rgba(232, 176, 106, 0.55);
+      color: #ffd9a6;
+    }
+    button.wide { flex: 1 1 100%; }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 3px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--accent), rgba(255, 255, 255, 0.16));
+      outline: none;
+      margin: 4px 0 8px;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: #f6e2c4;
+      border: 2px solid #7a5a33;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,.4);
+    }
+    input[type=range]::-moz-range-thumb {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #f6e2c4; border: 2px solid #7a5a33; cursor: pointer;
+    }
+
+    .val { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; }
+
+    /* ---------------- hints ---------------- */
+    #hints {
+      position: fixed;
+      right: 20px;
+      bottom: 18px;
+      font-size: 10.5px;
+      letter-spacing: .07em;
+      color: rgba(244, 236, 224, 0.5);
+      text-shadow: 0 1px 3px rgba(0, 0, 0, .6);
+      text-align: right;
+      line-height: 1.7;
+      pointer-events: none;
+    }
+    #hints b { color: rgba(244, 236, 224, 0.78); font-weight: 600; }
+
+    #ui-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 5;
+    }
+
+    /* ---------------- loading ---------------- */
+    #loading {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0d0b09;
+      color: var(--dim);
+      font-size: 11px;
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      transition: opacity .6s ease;
+      z-index: 10;
+    }
+    #loading.gone { opacity: 0; pointer-events: none; }
+
+    @media (max-width: 640px) {
+      #ui { width: calc(100vw - 40px); }
+      #hints { display: none; }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="view"></canvas>
+
+  <div id="ui">
+    <h1>Giraffe</h1>
+    <div class="sub">procedural anatomy · three.js r160</div>
+    <div class="rule"></div>
+
+    <div class="label">Camera</div>
+    <div class="row">
+      <button data-mode="follow" class="active">Follow</button>
+      <button data-mode="side">Side</button>
+      <button data-mode="front">Front</button>
+      <button data-mode="wide">Wide</button>
+      <button data-mode="cinema">Cinema</button>
+    </div>
+
+    <div class="label">Gait</div>
+    <div class="row">
+      <button id="play" class="wide">❚❚&nbsp; Pause</button>
+    </div>
+
+    <div class="label">Walking speed</div>
+    <input id="speed" type="range" min="0" max="1.8" step="0.01" value="1.05">
+    <div class="row" style="margin-bottom:0">
+      <span class="val" id="speed-val">1.05 m/s</span>
+    </div>
+  </div>
+
+  <button id="ui-toggle">☰</button>
+
+  <div id="hints">
+    <b>drag</b> orbit &nbsp;·&nbsp; <b>scroll</b> zoom<br>
+    <b>space</b> pause &nbsp;·&nbsp; <b>1–5</b> camera &nbsp;·&nbsp; <b>H</b> hide ui
+  </div>
+
+  <div id="loading">building anatomy…</div>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="js/patterns.js"></script>
+  <script src="js/geom.js"></script>
+  <script src="js/giraffe.js"></script>
+  <script src="js/environment.js"></script>
+  <script src="js/main.js"></script>
+</body>
+
+</html>
