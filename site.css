@@ -250,3 +250,5 @@ html.dulock{overflow:hidden}
 .duzoom:hover,.duzoom:focus-visible{opacity:1;background:rgba(15,14,12,.8)}
 .duzoom svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .duside.big .duzoom{display:none}
+
+.card{scroll-margin-top:9.5rem}

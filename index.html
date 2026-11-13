@@ -3083,8 +3083,13 @@ function run(){
 }
 function more(open){mf.hidden=!open;mb.setAttribute('aria-expanded',open)}
 mb.addEventListener('click',function(){more(mf.hidden)});
-try{var p=new URLSearchParams(location.hash.slice(1));q.value=p.get('q')||'';fok.value=p.get('ok')||'';fhw.value=p.get('hw')||'';fh.value=p.get('h')||'';fa.value=p.get('a')||'';fo.value=p.get('or')||'';ft.value=p.get('t')||'';if(p.get('s'))s.value=p.get('s');if(!s.value)s.value='date:-1';if(fh.value||fa.value||fo.value||ft.value)more(true)}catch(e){}
+var H0='';try{H0=decodeURIComponent(location.hash.slice(1))}catch(e){}
+ try{var p=new URLSearchParams(location.hash.slice(1));q.value=p.get('q')||'';fok.value=p.get('ok')||'';fhw.value=p.get('hw')||'';fh.value=p.get('h')||'';fa.value=p.get('a')||'';fo.value=p.get('or')||'';ft.value=p.get('t')||'';if(p.get('s'))s.value=p.get('s');if(!s.value)s.value='date:-1';if(fh.value||fa.value||fo.value||ft.value)more(true)}catch(e){}
 [q,fok,fhw,fh,fa,fo,ft,s].forEach(function(el){el.addEventListener('input',run);el.addEventListener('change',run)});run();
+ // a link to a card (#m-…, e.g. from the duel ranking): the cards are sorted by script, so jump after the first sort
+ (function(){var h=H0;if(!/^m-/.test(h))return;var c=$(h);if(!c)return;if(c.hidden){q.value='';[fok,fhw,fh,fa,fo,ft].forEach(function(f){f.value=''});run()}
+  function go(){c.scrollIntoView({block:'start'})}go();c.classList.remove('flash');void c.offsetWidth;c.classList.add('flash');
+  addEventListener('load',function(){if(Math.abs(c.getBoundingClientRect().top-c._t)>40)go()});c._t=c.getBoundingClientRect().top})();
 [].forEach.call(document.querySelectorAll('.lang a'),function(a){a.addEventListener('click',function(){a.href=a.getAttribute('href').split('#')[0]+location.hash})});
 // chart: tooltip and jump to card
 [].forEach.call(document.querySelectorAll('.cw'),function(cw){cw.scrollLeft=cw.scrollWidth});
