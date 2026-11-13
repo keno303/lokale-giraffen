@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<script>/* German browsers get the German page, unless the reader picked a language before */(function(){try{if(document.documentElement.lang!=='en'||localStorage.getItem('lang'))return;var l=(navigator.languages&&navigator.languages[0])||navigator.language||'',u='';try{u=Intl.DateTimeFormat().resolvedOptions().locale}catch(e){}if(/^de(-|$)/i.test(l)||/^de(-|$)/i.test(u))location.replace('duell.html'+location.hash)}catch(e){}})()</script>
+<title>Giraffe duel · Giraffe Benchmark</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23e0a53a'/%3E%3Ccircle cx='11' cy='11' r='4' fill='%236d3a17'/%3E%3Ccircle cx='22' cy='14' r='3' fill='%236d3a17'/%3E%3Ccircle cx='14' cy='23' r='4' fill='%236d3a17'/%3E%3C/svg%3E">
+<link rel="alternate" hreflang="en" href="duel.html"><link rel="alternate" hreflang="de" href="duell.html">
+<link rel="stylesheet" href="site.css">
+</head><body>
+<header class="wrap">
+<div class="top">
+<a class="logo" href="https://www.youtube.com/ct3003" title="c't 3003 on YouTube"><picture><source srcset="logo-dark.png" media="(prefers-color-scheme: dark)"><img src="logo-light.png" alt="c't 3003 on YouTube" width="184" height="192"></picture></a>
+<div class="ttl"><p class="kicker">c't 3003</p><h1>Giraffe Benchmark</h1></div>
+<nav class="lang" aria-label="Language"><a href="duel.html" hreflang="en" lang="en" aria-current="page">EN</a><a href="duell.html" hreflang="de" lang="de">DE</a></nav>
+<script>[].forEach.call(document.querySelectorAll('.lang a'),function(a){a.addEventListener('click',function(){try{localStorage.setItem('lang',a.hreflang)}catch(e){}})})</script>
+</div></header>
+<main class="wrap quant duel"><a class="back" href="index.html">← Back to the benchmark</a><h2>Giraffe duel</h2><p class="qi">Two giraffes run side by side, without model names. Rotate them, zoom in, watch the walk and pick the better one. You can change your pick until you submit; only then does the page show which models made them. All votes form a ranking.</p>
+<div id="du" class="du" data-api="https://giraffen-duell.ct3003.workers.dev" data-key="0x4AAAAAAF_hftynezfjt-xO" data-main="index.html">
+<div class="dustart" id="dus"><button type="button" class="dubtn" id="dugo">Start the duel</button><p class="small muted">To keep the ranking from being manipulated, Cloudflare Turnstile checks at the start that a human is voting. For this the page loads a script from Cloudflare. Stored are the votes and a hash of the IP address that changes daily, no cookies.</p><div id="duts"></div></div>
+<div id="dua" hidden>
+<p class="duq" id="duq" aria-live="polite">Which giraffe is better?</p>
+<div class="dupair">
+<div class="duside" data-s="l"><div class="duframe"><iframe title="Left giraffe" allow="fullscreen" loading="eager"></iframe><span class="duload">Loading the giraffe …</span></div>
+<div class="dubar"><button type="button" class="dupick" aria-pressed="false"><span class="dk">Left giraffe</span><span class="dp">Pick this one</span><span class="dd">Picked</span></button><button type="button" class="dufull">Full screen</button></div><div class="durev" hidden></div></div>
+<div class="duside" data-s="r"><div class="duframe"><iframe title="Right giraffe" allow="fullscreen" loading="eager"></iframe><span class="duload">Loading the giraffe …</span></div>
+<div class="dubar"><button type="button" class="dupick" aria-pressed="false"><span class="dk">Right giraffe</span><span class="dp">Pick this one</span><span class="dd">Picked</span></button><button type="button" class="dufull">Full screen</button></div><div class="durev" hidden></div></div>
+</div>
+<p class="duact"><span id="duag" class="muted">Pick a giraffe. You can change your mind until you submit.</span><button type="button" class="dubtn ghost" id="dusk">Skip</button><button type="button" class="dubtn" id="dusend" disabled>Submit</button><button type="button" class="dubtn" id="dunx" hidden>Next duel</button></p>
+</div>
+<p class="note why" id="due" hidden></p>
+</div>
+<section class="durank"><h2>Community ranking</h2><p class="muted" id="durd"></p>
+<div class="cw" id="durw" hidden><table id="durt"><thead><tr><th>Rank</th><th>Model</th><th>Points</th><th>Duels</th></tr></thead><tbody></tbody></table></div></section>
+<script>(function(){
+var T={"title": "Giraffe duel", "intro": "Two giraffes run side by side, without model names. Rotate them, zoom in, watch the walk and pick the better one. You can change your pick until you submit; only then does the page show which models made them. All votes form a ranking.", "start": "Start the duel", "privacy": "To keep the ranking from being manipulated, Cloudflare Turnstile checks at the start that a human is voting. For this the page loads a script from Cloudflare. Stored are the votes and a hash of the IP address that changes daily, no cookies.", "q": "Which giraffe is better?", "left": "Left giraffe", "right": "Right giraffe", "skip": "Skip", "next": "Next duel", "you": "Your pick", "agree": "{p}% voted the same way in this duel.", "first": "You are among the first in this duel.", "card": "Open the card", "live": "Run the giraffe", "usd": "${v}", "rank_t": "Community ranking", "rank_d": "Elo points from {v} duels, starting at 1000. Every run with at least {n} duels is listed.", "rank_empty": "Not enough votes for a ranking yet.", "err": "The duel is not reachable right now. Please try again later.", "limit": "You have compared enough giraffes for today. Come back tomorrow.", "c_rank": "Rank", "c_model": "Model", "c_pts": "Points", "c_n": "Duels", "hint": "Pick a giraffe. You can change your mind until you submit.", "pick": "Pick this one", "picked": "Picked", "send": "Submit", "full": "Full screen", "loading": "Loading the giraffe …", "done": "Revealed:", "num": function(s){return s}},root=document.getElementById('du'),loc=/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+var API=loc?'http://localhost:8787':root.dataset.api,KEY=loc?'1x00000000000000000000AA':root.dataset.key,/* on localhost: Cloudflare's always-pass test key */MAIN=root.dataset.main,QUANT=MAIN==='de.html'?'quant-vergleich.html':'quants.html';
+var session=null,pair=null,choice=null,busy=false,$=function(i){return document.getElementById(i)},sides=[].slice.call(root.querySelectorAll('.duside'));
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function dur(s){return s<120?s+' s':s<5400?Math.round(s/60)+' min':T.num((s/3600).toFixed(1))+' h'}
+function usd(x){var v=T.num(x<0.01?x.toFixed(4):x<1?x.toFixed(3):x.toFixed(2));return T.usd.replace('{v}',v)}
+function fail(k){$('due').textContent=T[k]||T.err;$('due').hidden=false;$('dua').hidden=true;$('dus').hidden=true}
+function post(p,b){return fetch(API+p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}).then(function(r){return r.json().then(function(j){if(!r.ok)throw j.error||'err';return j})})}
+function mark(c){choice=c;sides.forEach(function(s){var on=s.dataset.s===c;s.classList.toggle('mine',on);s.querySelector('.dupick').setAttribute('aria-pressed',on)});$('dusend').disabled=!c}
+function show(p){pair=p;busy=false;mark(null);$('duq').textContent=T.q;$('duag').textContent=T.hint;$('dunx').hidden=true;$('dusk').hidden=false;$('dusend').hidden=false;
+ sides.forEach(function(s){var f=s.querySelector('iframe'),l=s.querySelector('.duload');s.classList.add('wait');l.hidden=false;
+  f.onload=function(){s.classList.remove('wait');l.hidden=true};f.src=API+'/f/'+p[s.dataset.s]+'/index.html';
+  s.querySelector('.dupick').disabled=false;var v=s.querySelector('.durev');v.hidden=true;v.innerHTML=''})}
+function revealSide(s,d){var x=d[s.dataset.s],v=s.querySelector('.durev'),mine=s.dataset.s===d.choice;
+ var meta=[x.h==='pi'?'pi':'OpenCode',dur(x.sec)];if(x.cloud&&x.cost!=null)meta.push(usd(x.cost));
+ var card=x.stem?MAIN+'#m-'+encodeURIComponent(x.stem):QUANT;
+ v.innerHTML=(mine?'<span class="tag lo">'+esc(T.you)+'</span>':'')+'<b>'+esc(x.name)+'</b><small>'+esc(meta.join(' · '))+'</small>'+
+  '<small><a href="'+card+'">'+esc(T.card)+'</a> · <a href="g/'+encodeURIComponent(x.folder)+'/index.html" target="_blank" rel="noopener">'+esc(T.live)+'</a></small>';
+ v.hidden=false;s.querySelector('.dupick').disabled=true}
+function send(){if(busy||!pair||!choice)return;busy=true;$('dusend').disabled=true;
+ post('/vote',{session:session,ticket:pair,choice:choice}).then(function(d){
+  sides.forEach(function(s){revealSide(s,d)});
+  $('duq').textContent=T.done;$('duag').textContent=d.agree==null?T.first:T.agree.replace('{p}',d.agree);
+  $('dusk').hidden=true;$('dusend').hidden=true;var n=$('dunx');n.hidden=false;n.onclick=function(){show(d.next);root.scrollIntoView({block:'start'})};n.focus();ranking()
+ }).catch(function(e){if(e==='session'){start();return}if(e==='early'){busy=false;$('dusend').disabled=false;return}fail(e==='limit'?'limit':'err')})}
+function skip(){if(busy)return;busy=true;post('/pair',{session:session}).then(function(d){show(d.pair)}).catch(function(){fail('err')})}
+function begin(tok){post('/session',{token:tok}).then(function(d){session=d.session;$('dus').hidden=true;$('dua').hidden=false;show(d.pair)}).catch(function(){fail('err')})}
+function start(){$('dugo').disabled=true;
+ function render(){turnstile.render('#duts',{sitekey:KEY,callback:begin,'error-callback':function(){fail('err')}})}
+ if(window.turnstile){render();return}
+ var s=document.createElement('script');s.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';s.onload=render;s.onerror=function(){fail('err')};document.head.appendChild(s)}
+$('dugo').addEventListener('click',start);$('dusk').addEventListener('click',skip);$('dusend').addEventListener('click',send);
+sides.forEach(function(s){s.querySelector('.dupick').addEventListener('click',function(){if(!busy)mark(s.dataset.s)});
+ s.querySelector('.dufull').addEventListener('click',function(){var f=s.querySelector('iframe');(f.requestFullscreen||f.webkitRequestFullscreen||function(){}).call(f)})});
+function ranking(){fetch(API+'/ranking').then(function(r){return r.json()}).then(function(d){
+ $('durd').textContent=(d.rows.length?T.rank_d:T.rank_empty).replace('{n}',d.min).replace('{v}',d.votes);
+ $('durt').tBodies[0].innerHTML=d.rows.map(function(x,i){return '<tr><td>'+(i+1)+'</td><td><a href="'+(x.stem?MAIN+'#m-'+encodeURIComponent(x.stem):QUANT)+'">'+esc(x.name)+'</a> <span class="muted">· '+(x.h==='pi'?'pi':'OpenCode')+'</span></td><td>'+x.elo+'</td><td>'+x.n+'</td></tr>'}).join('');
+ $('durw').hidden=!d.rows.length}).catch(function(){$('durd').textContent=T.rank_empty})}
+ranking();
+})()</script>
+</main>
+</body></html>
