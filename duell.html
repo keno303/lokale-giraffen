@@ -48,7 +48,7 @@ function big(s,on){sides.forEach(function(x){x.classList.toggle('big',on&&x===s)
 $('duback').addEventListener('click',function(){big(null,false)});document.addEventListener('keydown',function(e){if(e.key==='Escape')big(null,false)});
 function show(p){pair=p;busy=false;revealed=false;big(null,false);mark(null);$('duq').textContent=T.q;$('duag').textContent=T.hint;$('dunx').hidden=true;$('dusk').hidden=false;$('dusend').hidden=false;
  sides.forEach(function(s){var f=s.querySelector('iframe'),l=s.querySelector('.duload');s.classList.add('wait');l.hidden=false;
-  f.onload=function(){s.classList.remove('wait');l.hidden=true};f.src=API+'/f/'+p[s.dataset.s]+'/index.html?v=2';
+  f.onload=function(){s.classList.remove('wait');l.hidden=true};f.src=API+'/f/'+p[s.dataset.s]+'/index.html?v=3';
   s.querySelector('.dupick').disabled=false;s.querySelector('.dupick2').disabled=false;var v=s.querySelector('.durev');v.hidden=true;v.innerHTML=''})}
 function revealSide(s,d){var x=d[s.dataset.s],v=s.querySelector('.durev'),mine=s.dataset.s===d.choice;
  var meta=[x.h==='pi'?'pi':'OpenCode',dur(x.sec)];if(x.date)meta.unshift(T.released.replace('{d}',day(x.date)));if(x.cloud&&x.cost!=null)meta.push(usd(x.cost));
